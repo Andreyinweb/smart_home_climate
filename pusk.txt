@@ -1,0 +1,27 @@
+ 
+ . /home/andrey/andrey_folder/Venv/smart_home_climate/bin/activate
+
+python3 sensor_monitor.py
+
+
+pip install bleak
+
+# Добавление файлов в индекс
+git add . 
+
+# Создание коммита (сохранение изменений)
+git commit -m ""
+
+# Просмотр статуса
+git status
+
+
+
+git push
+
+
+
+
+
+
+git remote add origin https://github.com/Andreyinweb/smart_home_climate.git
