@@ -2,39 +2,24 @@
 
 import asyncio
 import uvicorn
-from settings import config, work_log
+import logging
+
+from settings import config
+from ble_receiver import XiaomiBLEReceiver
 from api import app, shared_data
 from models import write_climate_data
 
-# Безопасный импорт BLE-ресивера
-try:
-    from ble_receiver import XiaomiBLEReceiver
-except ImportError:
-    # Заглушка-генератор эмуляции данных при локальном тестировании без BLE
-    class XiaomiBLEReceiver:
-        async def get_sensor_data(self, mac: str) -> dict:
-            import random
-            # Находим имя сенсора по MAC-адресу для корректной эмуляции
-            sensor_type = "UNKNOWN"
-            for key, val in config.TARGET_MAC_DICT.items():
-                if val == mac:
-                    sensor_type = key
-                    break
-            
-            if sensor_type == "STREET":
-                return {"temp": 0.48, "humi": 5.0, "voltage": 1.1}
-            elif sensor_type == "BASEMENT":
-                return {"temp": 0.2, "humi": 5.0, "voltage": 1.2}
-            elif sensor_type == "FLOOR":
-                return {"temp": 0.48, "humi": 5.0, "voltage": 1.3}
-            return {"temp": 0.0, "humi": 0.0, "voltage": 0.0}
+work_log = logging.getLogger(f"{config.work_log.name}.main")
+work_log.name = "main"
+
+work_log.info(f"Программа запущена. MODE = {config.MODE}.")
+print(f"main запущена. MODE = {config.MODE}.")
+
 
 async def polling_task():
     """Фоновый асинхронный опрос BLE датчиков и сохранение результатов в БД."""
     receiver = XiaomiBLEReceiver()
-    msg = "Запуск фонового циклического опроса датчиков..."
-    print(msg)
-    work_log.info(msg)
+    work_log.info("Запуск фонового циклического опроса датчиков...")
     
     while True:
         # Обходим датчики, настроенные в системе
@@ -52,13 +37,9 @@ async def polling_task():
                         "humi": data["humi"],
                         "voltage": data.get("voltage", 0.0)
                     }
-                    log_msg = f"[{name}] Данные обновлены: T={data['temp']}°C, H={data['humi']}%"
-                    print(log_msg)
-                    work_log.info(log_msg)
+                    work_log.info(f"[{name}] Данные обновлены: T={data['temp']}°C, H={data['humi']}%")
             except Exception as e:
-                err_msg = f"[{name}] Ошибка опроса: {e}"
-                print(err_msg)
-                work_log.error(err_msg)
+                work_log.error(f"[{name}] Ошибка опроса: {e}")
             
             await asyncio.sleep(2)  # Задержка между опросами датчиков в группе
 
@@ -105,27 +86,22 @@ async def polling_task():
                 average_temp=average_temp
             )
             if success:
-                db_msg = "[БД] Данные успешно записаны в таблицу 'table_climate'"
-                print(db_msg)
-                work_log.info(db_msg)
+                work_log.info("[БД] Данные успешно записаны в таблицу 'table_climate'")
         except Exception as db_err:
-            db_err_msg = f"[БД] Ошибка подготовки данных для записи: {db_err}"
-            print(db_err_msg)
-            work_log.error(db_err_msg)
+            work_log.error(f"[БД] Ошибка подготовки данных для записи: {db_err}")
 
-        wait_msg = f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса..."
-        print(wait_msg)
-        work_log.info(wait_msg)
+        work_log.info(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
         await asyncio.sleep(config.INTERVAL_SECONDS)
 
 async def start_services():
     """Асинхронный запуск веб-сервера и фонового опроса одновременно."""
-    # Конфигурация запуска веб-сервера uvicorn внутри общего asyncio event loop
+    # Запускаем uvicorn без дефолтной конфигурации логирования, чтобы применились наши глобальные настройки
     server_config = uvicorn.Config(
         app=app, 
         host=config.SERVER_HOST, 
         port=config.SERVER_PORT, 
         loop="asyncio"
+        # log_config=None
     )
     server = uvicorn.Server(server_config)
     
@@ -139,6 +115,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(start_services())
     except KeyboardInterrupt:
-        term_msg = "Программа завершена пользователем."
-        print(f"\n{term_msg}")
-        work_log.info(term_msg)
+        work_log.info("Программа завершена пользователем.")

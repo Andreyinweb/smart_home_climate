@@ -1,9 +1,10 @@
 # python3.12 settings.py  # Настройки для проекта Smart Home Climate
+
 import os
 import sys
 import logging
 from dotenv import load_dotenv
-from run.run_data import PROJECT_DIR, VENV_DIR, VENV_NAME, DATA_DIR, DATA_FILE
+from run.run_data import PROJECT_DIR, DATA_DIR, DATA_FILE
 
 
 # Преобразовываем путь к папке /analysis
@@ -15,7 +16,6 @@ if parent_path_str not in sys.path:
    sys.path.insert(0, parent_path_str)
 
 # Загрузка переменных окружения из файла  ANALYSIS_DIR/.env
-# ENV_FILE =  # Можно прописать в ручную 
 load_dotenv(ENV_FILE, override=True, verbose=True)
 
 class AppConfig:
@@ -39,15 +39,9 @@ class AppConfig:
    }
 
    def __init__(self):
-      # Настройка логирования для всей программы
+      # Основные логгеры приложения
       self.work_log = self.setup_logger("work", f"{self.PROJECT_DIR}/logs/work_log.log")
       
-      # Настройка логгера для библиотек
-      self.httpx_logger = logging.getLogger("httpx")
-      self.httpx_logger.addHandler(logging.FileHandler(f"{self.PROJECT_DIR}/logs/log_project.log", mode="a"))
-      self.httpx_logger.setLevel(logging.ERROR)  # INFO)  # 
-      self.httpx_logger.propagate = False
-
    def setup_logger(self, name: str, log_file: str, mode="a") -> logging.Logger:
       """Создает логгер с указанным именем и файлом"""
       logger = logging.getLogger(name)
@@ -86,6 +80,6 @@ class Config(
 config = Config()
 
 ## Настройка логирования для модуля Main_climat
-log_project = logging.getLogger("Main_climat")  # Имя модуля сохраняется!
+log_project = logging.getLogger("Main_climat")  # Имя модуля по умолчанию
 log_project.parent = config.work_log
 work_log = config.work_log

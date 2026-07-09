@@ -136,16 +136,16 @@ fields_db = """ (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
             Date TEXT NOT NULL,
             street_temp REAL,
-            street_humi REAL,
-            street_voltage REAL,
             basement_temp REAL,
-            basement_humi REAL,
-            basement_voltage REAL,
             floor_temp REAL,
-            floor_humi REAL,
-            floor_voltage REAL,
             difference_temp REAL,
-            average_temp REAL
+            average_temp REAL,
+            street_humi REAL,
+            basement_humi REAL,
+            floor_humi REAL,
+            street_voltage REAL,
+            basement_voltage REAL,
+            floor_voltage REAL
         )
         """
 create_table(db_path=database_file, table_name="table_climate", fields=fields_db)
