@@ -8,7 +8,7 @@ from datetime import datetime
 from run_data import PROJECT_DIR, DATA_DIR, DATA_FILE
 
 database_file = DATA_DIR + "/" + DATA_FILE
-bakcup_dir = PROJECT_DIR + "/backup/"
+backup_dir = PROJECT_DIR + "/backup/"
 
 def check_or_create_database(db_file):
     # Проверяем существование файла
@@ -130,38 +130,24 @@ def create_backup(source_file, backup_dir, max_backups=100):
 
 # Проверяем и создаем базу данных"
 check_or_create_database(database_file)
-exit(0)
 
 # Создаём таблицу имён баз данных
 fields_db = """ (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            name_table TEXT NOT NULL,
-            mode TEXT NOT NULL,
-            count INTEGER NOT NULL,
-            currency_list TEXT NOT NULL
-            
-            
+            Date TEXT NOT NULL,
+            street_temp REAL,
+            street_humi REAL,
+            street_voltage REAL,
+            basement_temp REAL,
+            basement_humi REAL,
+            basement_voltage REAL,
+            floor_temp REAL,
+            floor_humi REAL,
+            floor_voltage REAL,
+            difference_temp REAL,
+            average_temp REAL
         )
         """
-create_table(db_path=database_file, table_name="table_data_name", fields=fields_db)
+create_table(db_path=database_file, table_name="table_climate", fields=fields_db)
 
-# Создаём таблицу текущих настроек
-fields_db = """ (
-            table_now TEXT NOT NULL,
-            mode TEXT NOT NULL,
-            trading_allowed TEXT NOT NULL,
-            count INTEGER NOT NULL,
-            currency_list TEXT NOT NULL,
-            start BOOLEAN DEFAULT FALSE,          
-            work BOOLEAN DEFAULT FALSE,
-            dict_speed TEXT,
-            graph_dict TEXT);
-            INSERT INTO now_table (table_now, trading_allowed, mode, currency_list, count, start, work)
-            SELECT 'run', 'wait', 'run', 'run', -1, FALSE, FALSE
-            WHERE NOT EXISTS (SELECT 1 FROM now_table);       
-        """
-create_table(db_path=database_file, table_name="now_table", fields=fields_db)
-
-# Создаем резервную копию базы данных
-create_backup(database_file, bakcup_dir)
-
+create_backup(database_file, backup_dir)

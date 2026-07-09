@@ -11,9 +11,12 @@ git status
 # Добавление файлов в индекс
 git add . 
 
+git add -A
+
 # Создание коммита (сохранение изменений)
 git commit -m ""
 
+git push
 
 pip freeze > requirements.txt
 

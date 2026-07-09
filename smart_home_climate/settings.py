@@ -1,0 +1,91 @@
+# python 3.12
+import os
+import sys
+import logging
+from dotenv import load_dotenv
+from run.run_data import PROJECT_DIR, VENV_DIR, VENV_NAME, DATA_DIR, DATA_FILE
+
+
+# Преобразовываем путь к папке /analysis
+parent_path_str = ('/'.join(os.getcwd().split('/')[:-1]))
+ENV_FILE = parent_path_str + "/.env"   
+
+# Добавляем в path путь к папке, чтобы можно было импортировать.
+if parent_path_str not in sys.path:
+   sys.path.insert(0, parent_path_str)
+
+# Загрузка переменных окружения из файла  ANALYSIS_DIR/.env
+# ENV_FILE =  # Можно прописать в ручную 
+load_dotenv(ENV_FILE, override=True, verbose=True)
+
+class AppConfig:
+   # Переменные из run_data, необходимые для инициализации путей
+   PROJECT_DIR: str = PROJECT_DIR
+   
+   # APP configuration
+   MODE: str = os.environ.get("MODE", "test")  # test| dev | prod | stage ...
+   LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
+   INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", "600"))
+   T_FLOOR_DIFF: float = float(os.environ.get("T_FLOOR_DIFF", "4.5"))
+   TARGET_RH: float = float(os.environ.get("TARGET_RH", "74.0"))
+   SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
+   SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
+
+   NAME_SENSOR: list = ["STREET", "BASEMENT", "FLOOR"]
+   TARGET_MAC_DICT: dict = {
+       "STREET": os.environ.get("STREET", 'False'),
+       "BASEMENT": os.environ.get("BASEMENT", 'False'),
+       "FLOOR": os.environ.get("FLOOR", 'False')
+   }
+
+   def __init__(self):
+      # Настройка логирования для всей программы
+      self.work_log = self.setup_logger("work", f"{self.PROJECT_DIR}/logs/work_log.log")
+      
+      # Настройка логгера для библиотек
+      self.httpx_logger = logging.getLogger("httpx")
+      self.httpx_logger.addHandler(logging.FileHandler(f"{self.PROJECT_DIR}/logs/log_project.log", mode="a"))
+      self.httpx_logger.setLevel(logging.ERROR)  # INFO)  # 
+      self.httpx_logger.propagate = False
+
+   def setup_logger(self, name: str, log_file: str, mode="a") -> logging.Logger:
+      """Создает логгер с указанным именем и файлом"""
+      logger = logging.getLogger(name)
+      logger.setLevel(logging.INFO)
+      
+      formatter = logging.Formatter(
+         "%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+         datefmt="%Y-%m-%d %H:%M:%S"
+      )
+      
+      # Гарантируем наличие папки logs
+      os.makedirs(os.path.dirname(log_file), exist_ok=True)
+      
+      handler = logging.FileHandler(log_file, mode=mode)
+      handler.setFormatter(formatter)
+      
+      logger.addHandler(handler)
+      logger.propagate = False
+      return logger
+
+class DatabaseConfig:
+   # Data base configuration
+   DB_DIR: str = os.environ.get("DB_DIR", DATA_DIR)
+   DB_NAME: str = os.environ.get("DB_NAME", DATA_FILE)
+   DB_PATH: str = DB_DIR + "/" + DB_NAME
+
+
+class Config(
+   AppConfig,
+   DatabaseConfig
+   ):
+    def __init__(self):
+        AppConfig.__init__(self)
+
+# Прописываем настройки для всей программы
+config = Config()
+
+## Настройка логирования для модуля Main_climat
+log_project = logging.getLogger("Main_climat")  # Имя модуля сохраняется!
+log_project.parent = config.work_log
+work_log = config.work_log

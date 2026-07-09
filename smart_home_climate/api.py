@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-import config
+from settings import config, work_log
 import operations
 
 app = FastAPI(title="Smart Home Climate API")
