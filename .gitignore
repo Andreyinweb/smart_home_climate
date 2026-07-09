@@ -1,6 +1,9 @@
 
 Proba/
 Settings/
+logs/
+backup/
+*.sqlite3
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -10,7 +13,7 @@ __pycache__/
 # Virtual Environments
 venv/
 .venv/
-.env
+*.env
 env/
 ENV/
 
