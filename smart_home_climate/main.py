@@ -9,6 +9,7 @@ from ble_receiver import XiaomiBLEReceiver
 from api import app, shared_data
 from models import write_climate_data
 
+receiver = XiaomiBLEReceiver()
 work_log = logging.getLogger(f"{config.work_log.name}.main")
 work_log.name = "main"
 
@@ -18,7 +19,6 @@ print(f"main запущена. MODE = {config.MODE}.")
 
 async def polling_task():
     """Фоновый асинхронный опрос BLE датчиков и сохранение результатов в БД."""
-    receiver = XiaomiBLEReceiver()
     work_log.info("Запуск фонового циклического опроса датчиков...")
     
     while True:
