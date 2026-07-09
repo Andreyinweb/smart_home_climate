@@ -1,4 +1,4 @@
-# python 3.12
+# python3.12 settings.py  # Настройки для проекта Smart Home Climate
 import os
 import sys
 import logging
