@@ -32,7 +32,7 @@ class AppConfig:
    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
 
    NAME_SENSOR: list = ["STREET", "BASEMENT", "FLOOR"]
-   TARGET_MAC_DICT: dict = {
+   MAC_DICT: dict = {
        "STREET": os.environ.get("STREET", 'False'),
        "BASEMENT": os.environ.get("BASEMENT", 'False'),
        "FLOOR": os.environ.get("FLOOR", 'False')

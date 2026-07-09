@@ -9,13 +9,22 @@ from ble_receiver import XiaomiBLEReceiver
 from api import app, shared_data
 from models import write_climate_data
 
-receiver = XiaomiBLEReceiver()
+
 work_log = logging.getLogger(f"{config.work_log.name}.main")
 work_log.name = "main"
-
 work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 print(f"main запущена. MODE = {config.MODE}.")
 
+receiver = XiaomiBLEReceiver()
+
+# data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
+#         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
+#         "floor":{"temp":0.0, "humi":0.0, "voltage":0.0},
+#         "difference_temp":0.0,
+#         "average_temp":0.0
+#         }
+
+data_sensors_all = {}
 
 async def polling_task():
     """Фоновый асинхронный опрос BLE датчиков и сохранение результатов в БД."""
@@ -24,31 +33,29 @@ async def polling_task():
     while True:
         # Обходим датчики, настроенные в системе
         for name in config.NAME_SENSOR:
-            mac = config.TARGET_MAC_DICT.get(name, "False")
-            if not mac or mac == "False":
-                continue  # Пропускаем отключенные датчики
+            if config.MAC_DICT[name]:                
+                try:
+                    data = {}
+                    data["temp"] = False
+                    while not data["temp"]: # TODO: Нужно ограничить количество. Надо в энв дописать количество запросов на один датчик, чтобы не зависать на одном датчике.
+                        data = await receiver.get_sensor_data(config.MAC_DICT[name])
+                        print(f"[{name}]: {data}")  # TODO: Удалить после тестирования
+                        if data and "temp" in data and "humi" in data:
+                            # Атомарное обновление разделяемого кэша для API
+                            shared_data[config.MAC_DICT[name]] = data # data_sensors_all[config.MAC_DICT[name]] = data  # TODO:
+                            work_log.info(f"[{name}] Данные обновлены: T={data['temp']}°C, H={data['humi']}%")
+                except Exception as e:
+                    work_log.error(f"[{name}] Ошибка опроса: {e}")
+                    print(f"[{name}] Ошибка опроса: {e}")
                 
-            try:
-                data = await receiver.get_sensor_data(mac)
-                if data and "temp" in data and "humi" in data:
-                    # Атомарное обновление разделяемого кэша для API
-                    shared_data[mac] = {
-                        "temp": data["temp"],
-                        "humi": data["humi"],
-                        "voltage": data.get("voltage", 0.0)
-                    }
-                    work_log.info(f"[{name}] Данные обновлены: T={data['temp']}°C, H={data['humi']}%")
-            except Exception as e:
-                work_log.error(f"[{name}] Ошибка опроса: {e}")
-            
-            await asyncio.sleep(2)  # Задержка между опросами датчиков в группе
+                await asyncio.sleep(2)  # Задержка между опросами датчиков в группе
 
         # После завершения опроса всех датчиков в группе выполняем запись в БД
         try:
             # Получение MAC-адресов из конфигурации
-            street_mac = config.TARGET_MAC_DICT.get("STREET", "False")
-            basement_mac = config.TARGET_MAC_DICT.get("BASEMENT", "False")
-            floor_mac = config.TARGET_MAC_DICT.get("FLOOR", "False")
+            street_mac = config.MAC_DICT.get("STREET", "False")
+            basement_mac = config.MAC_DICT.get("BASEMENT", "False")
+            floor_mac = config.MAC_DICT.get("FLOOR", "False")
 
             # Получение данных по MAC-адресам
             u_data = shared_data.get(street_mac, {"temp": 0.0, "humi": 0.0, "voltage": 0.0}) if street_mac != "False" else {"temp": 0.0, "humi": 0.0, "voltage": 0.0}
@@ -91,6 +98,7 @@ async def polling_task():
             work_log.error(f"[БД] Ошибка подготовки данных для записи: {db_err}")
 
         work_log.info(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
+        print(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
         await asyncio.sleep(config.INTERVAL_SECONDS)
 
 async def start_services():
