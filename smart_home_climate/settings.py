@@ -28,6 +28,7 @@ class AppConfig:
    INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", "600"))
    T_FLOOR_DIFF: float = float(os.environ.get("T_FLOOR_DIFF", "4.5"))
    ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", "0.5"))
+   MAX_RETRIES: int = int(os.environ.get("MAX_RETRIES", "5"))
    TARGET_RH: float = float(os.environ.get("TARGET_RH", "74.0"))
    SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
