@@ -8,7 +8,7 @@ from datetime import datetime
 from settings import config
 from ble_receiver import XiaomiBLEReceiver
 from api import app, shared_data
-from models import write_climate_data
+from models import write_climate_data, get_average_difference_temp
 
 
 work_log = logging.getLogger(f"{config.work_log.name}.main")
@@ -55,8 +55,12 @@ async def polling_task():
 
                     if config.MODE == "T_FLOOR_DIFF":
                         data_sensors_all["difference_temp"] = config.T_FLOOR_DIFF
+                    elif config.MODE == "FLOOR":
+                        data_sensors_all["difference_temp"] = data_sensors_all['basement']['temp'] - data_sensors_all['floor']['temp']
+                    else:
+                        data_sensors_all["difference_temp"] = config.T_FLOOR_DIFF
                         data_sensors_all["average_temp"] = config.T_FLOOR_DIFF
-
+                    data_sensors_all["average_temp"] = get_average_difference_temp()
                 except Exception as e:
                     work_log.error(f"[{name}] Ошибка опроса: {e}")
                     print(f"[{name}] Ошибка опроса: {e}")

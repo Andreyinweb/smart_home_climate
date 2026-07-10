@@ -58,3 +58,21 @@ def get_latest_climate_data(limit: int = 1):
     except sqlite3.Error as e:
         print(f"[БД] Ошибка чтения из базы данных: {e}")
         return []
+
+def get_average_difference_temp() -> float:
+    """
+    Вычисляет среднее значение всех данных из столбца difference_temp.
+    В случае ошибки или отсутствия данных возвращает 0.0.
+    """
+    query = "SELECT AVG(difference_temp) as avg_diff FROM table_climate"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            row = cursor.fetchone()
+            if row and row["avg_diff"] is not None:
+                return round(row["avg_diff"], 2)
+            return 0.0
+    except sqlite3.Error as e:
+        print(f"[БД] Ошибка при расчете среднего значения difference_temp: {e}")
+        return 0.0
