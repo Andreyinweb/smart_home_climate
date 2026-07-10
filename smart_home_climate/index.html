@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мониторинг климата подвала</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <meta http-equiv="refresh" content="30">
+    <meta http-equiv="refresh" content="{website_return_time}">
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
     <div class="max-w-5xl mx-auto space-y-8">
@@ -14,11 +14,11 @@
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">Система мониторинга климата</h1>
-                <p class="text-sm text-gray-500">Автоматическое обновление каждые 30 сек.</p>
+                <p class="text-sm text-gray-500">Автоматическое обновление каждые {website_return_time} сек.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
-                    Батарея Спальня: {v_bedroom:.3f} В
+                    Батарея Спальня (Пол): {v_bedroom:.3f} В
                 </span>
                 <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
                     Батарея Улица: {v_street:.3f} В
@@ -41,7 +41,7 @@
                             <th class="py-4 px-6">Параметр</th>
                             <th class="py-4 px-6">Датчик (Улица)</th>
                             <th class="py-4 px-6">Датчик (Подвал, 1.7м)</th>
-                            <th class="py-4 px-6">Расчет (Подвал, Пол)</th>
+                            <th class="py-4 px-6">Расчет / Датчик (Подвал, Пол)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
@@ -55,32 +55,41 @@
                             <td class="py-4 px-6 font-medium text-gray-700">Относительная влажность</td>
                             <td class="py-4 px-6">{h_street:.1f} %</td>
                             <td class="py-4 px-6">{h_cellar:.1f} %</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{h_floor_calc:.2f} %</td>
+                            <td class="py-4 px-6 text-red-600 font-semibold">{h_floor_calc:.1f} %</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Абсолютная влажность</td>
                             <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
                             <td class="py-4 px-6">{ah_cellar:.2f} г/м³</td>
-                            <td class="py-4 px-6">{ah_floor_calc:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-red-600 font-semibold">{ah_floor_calc:.2f} г/м³</td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 px-6 font-medium text-gray-700">Точка росы</td>
+                            <td class="py-4 px-6">{dp_street:.1f} °C</td>
+                            <td class="py-4 px-6">{dp_cellar:.1f} °C</td>
+                            <td class="py-4 px-6 text-red-600 font-semibold">{dp_floor:.1f} °C</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold">Проветривание:</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold {vent_class}">
+                        {vent_status} — {vent_reason}
+                    </span>
+                </div>
+                <div class="text-sm font-semibold text-gray-600">
+                    Разница влажности (пв-у): <span class="text-gray-900">{humidity_difference:.2f} г/м³</span> (погрешность: 0.5)
+                </div>
             </div>
         </div>
 
         <!-- ТАБЛИЦА 2: РАСЧЕТНЫЕ ДАННЫЕ (ПРОВЕТРИВАНИЕ) -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-800">РАСЧЕТНЫЕ ДАННЫЕ</h2>
-                    <p class="text-xs text-gray-500 mt-1">Симуляция климата внутри подвала при открытии вентиляции</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold">Проветривание:</span>
-                    <span class="px-3 py-1 rounded-full text-xs font-bold {vent_class}">
-                        {vent_status} {vent_reason}
-                    </span>
-                </div>
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">РАСЧЕТНЫЕ ДАННЫЕ (Замещение воздуха)</h2>
+                <p class="text-xs text-gray-500 mt-1">Симуляция климата внутри подвала при полном обновлении воздуха уличным</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -89,7 +98,7 @@
                             <th class="py-4 px-6">Параметр</th>
                             <th class="py-4 px-6">Датчик (Улица)</th>
                             <th class="py-4 px-6">Датчик (Подвал, 1.7м)</th>
-                            <th class="py-4 px-6">Расчет (Подвал, Пол)</th>
+                            <th class="py-4 px-6">Расчет / Датчик (Подвал, Пол)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
@@ -102,8 +111,8 @@
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Относительная влажность</td>
                             <td class="py-4 px-6">{h_street:.1f} %</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_h_cellar:.2f} %</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{sim_h_floor:.2f} %</td>
+                            <td class="py-4 px-6 text-gray-600">{sim_h_cellar:.1f} %</td>
+                            <td class="py-4 px-6 text-red-600 font-semibold">{sim_h_floor:.1f} %</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Абсолютная влажность</td>
@@ -120,8 +129,8 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">ДАННЫЕ отопление</h2>
-                    <p class="text-xs text-gray-500 mt-1">Симуляция климата при компенсационном подогреве</p>
+                    <h2 class="text-xl font-bold text-gray-800">ДАННЫЕ ОТОПЛЕНИЯ (Догрев)</h2>
+                    <p class="text-xs text-gray-500 mt-1">Симуляция климата при компенсационном подогреве до ОВ у пола = 74%</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-semibold">Отопление:</span>
@@ -137,7 +146,7 @@
                             <th class="py-4 px-6">Параметр</th>
                             <th class="py-4 px-6">Датчик (Улица)</th>
                             <th class="py-4 px-6">Датчик (Подвал, 1.7м)</th>
-                            <th class="py-4 px-6">Расчет (Подвал, Пол)</th>
+                            <th class="py-4 px-6">Расчет / Датчик (Подвал, Пол)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
@@ -150,14 +159,14 @@
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Относительная влажность</td>
                             <td class="py-4 px-6">{h_street:.1f} %</td>
-                            <td class="py-4 px-6 text-gray-600">{h_cellar_heated:.2f} %</td>
-                            <td class="py-4 px-6 text-emerald-600 font-bold">{h_floor_heated:.2f} %</td>
+                            <td class="py-4 px-6 text-gray-600">{h_cellar_heated:.1f} %</td>
+                            <td class="py-4 px-6 text-emerald-600 font-bold">{h_floor_heated:.1f} %</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Абсолютная влажность</td>
                             <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{ah_cellar:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{ah_cellar:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-gray-600">{ah_street:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-gray-600">{ah_street:.2f} г/м³</td>
                         </tr>
                     </tbody>
                 </table>

@@ -1,17 +1,31 @@
 import os
+import math
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from settings import config, work_log
 import operations
+from models import get_latest_climate_data
 
 app = FastAPI(title="Smart Home Climate API")
 
-# Глобальный разделяемый словарь с последними сырыми данными опроса
+# Глобальный разделяемый словарь с последними данными опроса в едином формате
 shared_data = {
-    "A4:C1:38:53:82:0F": {"temp": 0.7, "humi": 5.0, "voltage": 1}, # Улица
-    "A4:C1:38:51:C3:0D": {"temp": 0.2, "humi": 5.0, "voltage": 1}, # Подвал
-    "A4:C1:38:10:3B:D1": {"temp": 0.48, "humi": 5.0, "voltage": 1}  # Спальня
+    "street": {"temp": 0.0, "humi": 0.0, "voltage": 0.0}, 
+    "basement": {"temp": 0.0, "humi": 0.0, "voltage": 0.0}, 
+    "floor": {"temp": 0.0, "humi": 0.0, "voltage": 0.0},
+    "difference_temp": 0.0,
+    "average_temp": 0.0
 }
+
+def calculate_dew_point(temp: float, humi: float) -> float:
+    """Расчет точки росы (°C) по формуле Магнуса."""
+    if temp is None or humi is None or humi == 0:
+        return 0.0
+    a = 17.27
+    b = 237.7
+    alpha = ((a * temp) / (b + temp)) + math.log(humi / 100.0)
+    dp = (b * alpha) / (a - alpha)
+    return round(dp, 2)
 
 @app.get("/api/data")
 async def get_raw_data():
@@ -20,43 +34,120 @@ async def get_raw_data():
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
-    """Сборка дашборда на основе физических расчетов и шаблона HTML."""
-    # Получение параметров из разделяемого кэша датчиков
-    u_data = shared_data.get("A4:C1:38:53:82:0F", {"temp": 0.0, "humi": 0.0, "voltage": 0.0})
-    p_data = shared_data.get("A4:C1:38:51:C3:0D", {"temp": 0.0, "humi": 0.0, "voltage": 0.0})
-    s_data = shared_data.get("A4:C1:38:10:3B:D1", {"temp": 0.0, "humi": 0.0, "voltage": 0.0})
+    """Сборка дашборда на основе данных из БД, физических расчетов и шаблона HTML."""
+    # Получаем последнюю запись из базы данных
+    latest_records = get_latest_climate_data(limit=1)
+    
+    if latest_records:
+        db_data = latest_records[0]
+        # Обновляем shared_data в соответствии с новой структурой
+        shared_data["street"] = {
+            "temp": db_data.get("street_temp", 0.0),
+            "humi": db_data.get("street_humi", 0.0),
+            "voltage": db_data.get("street_voltage", 0.0)
+        }
+        shared_data["basement"] = {
+            "temp": db_data.get("basement_temp", 0.0),
+            "humi": db_data.get("basement_humi", 0.0),
+            "voltage": db_data.get("basement_voltage", 0.0)
+        }
+        shared_data["floor"] = {
+            "temp": db_data.get("floor_temp", 0.0),
+            "humi": db_data.get("floor_humi", 0.0),
+            "voltage": db_data.get("floor_voltage", 0.0)
+        }
+        shared_data["difference_temp"] = db_data.get("difference_temp", 0.0)
+        shared_data["average_temp"] = db_data.get("average_temp", 0.0)
+        
+        t_street = db_data.get("street_temp", 0.0)
+        h_street = db_data.get("street_humi", 0.0)
+        v_street = db_data.get("street_voltage", 0.0)
 
-    t_street, h_street = u_data["temp"], u_data["humi"]
-    t_cellar, h_cellar = p_data["temp"], p_data["humi"]
+        t_cellar = db_data.get("basement_temp", 0.0)
+        h_cellar = db_data.get("basement_humi", 0.0)
+        v_cellar = db_data.get("basement_voltage", 0.0)
 
-    # Динамический расчет температуры самого холодного угла пола подвала
-    t_floor = t_cellar - config.T_FLOOR_DIFF
+        v_floor = db_data.get("floor_voltage", 0.0)
 
-    # Расчеты текущего состояния
+        # Вычисление параметров у пола в зависимости от режима MODE
+        if config.MODE == "FLOOR":
+            t_floor = db_data.get("floor_temp", 0.0)
+            h_floor_calc = db_data.get("floor_humi", 0.0)
+        else:
+            # MODE == "T_FLOOR_DIFF" или резерв
+            t_floor = t_cellar - config.T_FLOOR_DIFF
+            # Абсолютная влажность у пола равна абсолютной влажности в подвале
+            ah_cellar_temp = operations.calculate_absolute_humidity(t_cellar, h_cellar)
+            h_floor_calc = operations.calculate_relative_humidity(t_floor, ah_cellar_temp)
+    else:
+        # Резервные дефолтные значения, если БД пуста
+        t_street, h_street, v_street = 0.0, 0.0, 0.0
+        t_cellar, h_cellar, v_cellar = 0.0, 0.0, 0.0
+        t_floor, h_floor_calc, v_floor = 0.0, 0.0, 0.0
+
+    # Расчет абсолютных влажностей
     ah_street = operations.calculate_absolute_humidity(t_street, h_street)
     ah_cellar = operations.calculate_absolute_humidity(t_cellar, h_cellar)
-    h_floor_calc = operations.calculate_relative_humidity(t_floor, ah_cellar)
     ah_floor_calc = operations.calculate_absolute_humidity(t_floor, h_floor_calc)
 
-    # Расчеты вентиляции
-    vent_status, vent_reason = operations.analyze_ventilation(t_street, ah_street, t_cellar, ah_cellar)
+    # Расчет точек росы
+    dp_street = calculate_dew_point(t_street, h_street)
+    dp_cellar = calculate_dew_point(t_cellar, h_cellar)
+    dp_floor = calculate_dew_point(t_floor, h_floor_calc)
+
+    # Расчет проветривания с учетом абсолютной погрешности ABSOLUTE_HUMIDITY_TOLERANCE (0.5 г/м³)
+    humidity_difference = round(ah_cellar - ah_street, 2)
+    is_safe_ventilation = humidity_difference > config.ABSOLUTE_HUMIDITY_TOLERANCE
+    has_draft = t_cellar > t_street
+
+    if is_safe_ventilation and has_draft:
+        vent_status = "ДА"
+        try:
+            vent_time_val = round(10.4 / math.sqrt(t_cellar - t_street))
+            vent_reason = f"Время проветривания: {vent_time_val} мин."
+        except (ZeroDivisionError, ValueError):
+            vent_reason = "Время проветривания рассчитать не удалось."
+    elif not is_safe_ventilation:
+        vent_status = "НЕТ"
+        vent_reason = "Влага пойдет (конденсат)."
+    else:
+        vent_status = "НЕТ"
+        vent_reason = "Тяги нет."
+
     vent_class = "bg-green-100 text-green-800" if vent_status == "ДА" else "bg-red-100 text-red-800"
-    
+
+    # Моделирование замещения (Проветривание)
     sim_ah_cellar = ah_street
     sim_h_cellar = operations.calculate_relative_humidity(t_cellar, sim_ah_cellar)
     sim_h_floor = operations.calculate_relative_humidity(t_floor, sim_ah_cellar)
 
-    # Расчеты отопления
-    heating_needed, heating_delta = operations.analyze_heating(t_cellar, ah_cellar, config.T_FLOOR_DIFF, config.TARGET_RH)
+    # Расчет компенсационного нагрева (Отопление)
+    heating_needed = sim_h_floor > config.TARGET_RH
+    heating_delta = 0.0
+
+    if heating_needed:
+        for delta in [x * 0.1 for x in range(1, 150)]:
+            sim_t_floor_heated = t_floor + delta
+            rh_at_heated_floor = operations.calculate_relative_humidity(sim_t_floor_heated, sim_ah_cellar)
+            if rh_at_heated_floor <= config.TARGET_RH:
+                heating_delta = round(delta, 1)
+                break
+
     heat_status = "ДА" if heating_needed else "НЕТ"
-    heat_info = f"{heating_delta} °C." if heating_needed else ""
+    heat_info = f"+{heating_delta} °C" if heating_needed else ""
     heat_class = "bg-amber-100 text-amber-800" if heating_needed else "bg-gray-100 text-gray-700"
 
-    t_cellar_heated = t_cellar + heating_delta
-    h_cellar_heated = operations.calculate_relative_humidity(t_cellar_heated, ah_cellar)
-    
-    t_floor_heated = t_floor + heating_delta
-    h_floor_heated = operations.calculate_relative_humidity(t_floor_heated, ah_cellar)
+    # Итоговые параметры после догрева
+    if heating_needed:
+        t_cellar_heated = round(t_cellar + heating_delta, 1)
+        h_cellar_heated = operations.calculate_relative_humidity(t_cellar_heated, sim_ah_cellar)
+        t_floor_heated = round(t_floor + heating_delta, 1)
+        h_floor_heated = operations.calculate_relative_humidity(t_floor_heated, sim_ah_cellar)
+    else:
+        t_cellar_heated = t_cellar
+        h_cellar_heated = sim_h_cellar
+        t_floor_heated = t_floor
+        h_floor_heated = sim_h_floor
 
     # Чтение шаблона разметки
     html_path = os.path.join(os.path.dirname(__file__), "index.html")
@@ -66,23 +157,27 @@ async def get_dashboard():
     else:
         return HTMLResponse("Ошибка: Файл шаблона index.html не найден.", status_code=500)
 
-    # Форматирование шаблона расчетными данными
+    # Форматирование шаблона расчетными данными с учетом WEBSITE_RETURN_TIME
     rendered_html = template.format(
-        v_bedroom=s_data.get("voltage", 0.0),
-        v_street=u_data.get("voltage", 0.0),
-        v_cellar=p_data.get("voltage", 0.0),
+        v_bedroom=v_floor,
+        v_street=v_street,
+        v_cellar=v_cellar,
         t_street=t_street,
         h_street=h_street,
         ah_street=ah_street,
+        dp_street=dp_street,
         t_cellar=t_cellar,
         h_cellar=h_cellar,
         ah_cellar=ah_cellar,
+        dp_cellar=dp_cellar,
         t_floor=t_floor,
         h_floor_calc=h_floor_calc,
         ah_floor_calc=ah_floor_calc,
+        dp_floor=dp_floor,
         vent_status=vent_status,
         vent_reason=vent_reason,
         vent_class=vent_class,
+        humidity_difference=humidity_difference,
         sim_h_cellar=sim_h_cellar,
         sim_h_floor=sim_h_floor,
         sim_ah_cellar=sim_ah_cellar,
@@ -92,7 +187,8 @@ async def get_dashboard():
         t_cellar_heated=t_cellar_heated,
         h_cellar_heated=h_cellar_heated,
         t_floor_heated=t_floor_heated,
-        h_floor_heated=h_floor_heated
+        h_floor_heated=h_floor_heated,
+        website_return_time=getattr(config, "WEBSITE_RETURN_TIME", 30)
     )
 
     return HTMLResponse(rendered_html)
