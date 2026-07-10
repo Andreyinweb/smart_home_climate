@@ -11,36 +11,29 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def write_climate_data(
-    street_temp: float, street_humi: float, street_voltage: float,
-    basement_temp: float, basement_humi: float, basement_voltage: float,
-    floor_temp: float, floor_humi: float, floor_voltage: float,
-    difference_temp: float, average_temp: float
-) -> bool:
+def write_climate_data(data_sensors_all: dict) -> bool:
     """
     Записывает текущие показатели датчиков и расчетные данные в таблицу table_climate.
     """
-    query = """
-    INSERT INTO table_climate (
-        Date,
-        street_temp, street_humi, street_voltage,
-        basement_temp, basement_humi, basement_voltage,
-        floor_temp, floor_humi, floor_voltage,
-        difference_temp, average_temp
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    query = "INSERT INTO table_climate ("
+    name_list = list(data_sensors_all.keys())
+    incoming_data = []
+    for name in name_list:
+        if type(data_sensors_all[name]) is dict:
+            climate_variables = list(data_sensors_all[name].keys())
+            for variable in climate_variables:
+                query += f" {name}_{variable},"
+                incoming_data.append(data_sensors_all[name][variable])
+        else:
+            query += f" {name},"
+            incoming_data.append(data_sensors_all[name])
+    query = query[:-1] + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    incoming_data = tuple(incoming_data)
     
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (
-                current_time,
-                street_temp, street_humi, street_voltage,
-                basement_temp, basement_humi, basement_voltage,
-                floor_temp, floor_humi, floor_voltage,
-                difference_temp, average_temp
-            ))
+            cursor.execute(query, incoming_data)
             conn.commit()
         return True
     except sqlite3.Error as e:
