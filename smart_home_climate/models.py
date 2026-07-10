@@ -18,18 +18,21 @@ def write_climate_data(data_sensors_all: dict) -> bool:
     query = "INSERT INTO table_climate ("
     name_list = list(data_sensors_all.keys())
     incoming_data = []
+    count_values = 0
     for name in name_list:
         if type(data_sensors_all[name]) is dict:
             climate_variables = list(data_sensors_all[name].keys())
             for variable in climate_variables:
                 query += f" {name}_{variable},"
+                count_values += 1
                 incoming_data.append(data_sensors_all[name][variable])
         else:
             query += f" {name},"
+            count_values += 1
             incoming_data.append(data_sensors_all[name])
-    query = query[:-1] + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    query = query[:-1] + ") VALUES (" + "?, " * count_values
+    query = query[:-2]  + ")"
     incoming_data = tuple(incoming_data)
-    
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
