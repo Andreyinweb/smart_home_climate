@@ -18,6 +18,13 @@ print(f"main запущена. MODE = {config.MODE}.")
 
 receiver = XiaomiBLEReceiver()
 
+# data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
+#         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
+#         "floor":{"temp":0.0, "humi":0.0, "voltage":0.0},
+#         "difference_temp":0.0,
+#         "average_temp":0.0
+#         }
+
 data_sensors_all = {}
 
 async def polling_task():
