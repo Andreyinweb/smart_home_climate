@@ -33,13 +33,20 @@ class AppConfig:
    TARGET_RH: float = float(os.environ.get("TARGET_RH", "74.0"))
    SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
+   if MODE == "FLOOR":
+      NAME_SENSOR: list = ["FLOOR", "STREET", "BASEMENT"]
+      MAC_DICT: dict = {
+         "STREET": os.environ.get("STREET", False),
+         "BASEMENT": os.environ.get("BASEMENT", False),
+         "FLOOR": os.environ.get("FLOOR", False)
+          }
 
-   NAME_SENSOR: list = ["STREET", "BASEMENT", "FLOOR"]
-   MAC_DICT: dict = {
-       "STREET": os.environ.get("STREET", 'False'),
-       "BASEMENT": os.environ.get("BASEMENT", 'False'),
-       "FLOOR": os.environ.get("FLOOR", 'False')
-   }
+   else:
+      NAME_SENSOR: list = ["STREET", "BASEMENT"]
+      MAC_DICT: dict = {
+         "STREET": os.environ.get("STREET", False),
+         "BASEMENT": os.environ.get("BASEMENT", False)
+      }
 
    def __init__(self):
       # Основные логгеры приложения
@@ -86,3 +93,9 @@ config = Config()
 log_project = logging.getLogger("Main_climat")  # Имя модуля по умолчанию
 log_project.parent = config.work_log
 work_log = config.work_log
+
+for name in config.NAME_SENSOR:      
+    if not config.MAC_DICT[name]:
+          print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
+          work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
+          sys.exit()

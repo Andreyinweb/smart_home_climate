@@ -41,49 +41,60 @@ async def get_dashboard():
     
     if latest_records:
         db_data = latest_records[0]
-        # Обновляем shared_data в соответствии с новой структурой
-        shared_data["street"] = {
-            "temp": db_data.get("street_temp", 0.0),
-            "humi": db_data.get("street_humi", 0.0),
-            "voltage": db_data.get("street_voltage", 0.0)
-        }
-        shared_data["basement"] = {
-            "temp": db_data.get("basement_temp", 0.0),
-            "humi": db_data.get("basement_humi", 0.0),
-            "voltage": db_data.get("basement_voltage", 0.0)
-        }
-        shared_data["floor"] = {
-            "temp": db_data.get("floor_temp", 0.0),
-            "humi": db_data.get("floor_humi", 0.0),
-            "voltage": db_data.get("floor_voltage", 0.0)
-        }
-        shared_data["difference_temp"] = db_data.get("difference_temp", 0.0)
-        shared_data["average_temp"] = db_data.get("average_temp", 0.0)
-        shared_data["Date"] = db_data.get("Date", "")
         
-        t_street = db_data.get("street_temp", 0.0)
-        h_street = db_data.get("street_humi", 0.0)
-        v_street = db_data.get("street_voltage", 0.0)
+        # Безопасное получение значений с обработкой None (NULL в БД)
+        t_street_raw = db_data.get("street_temp")
+        t_street = float(t_street_raw) if t_street_raw is not None else 0.0
+        
+        h_street_raw = db_data.get("street_humi")
+        h_street = float(h_street_raw) if h_street_raw is not None else 0.0
+        
+        v_street_raw = db_data.get("street_voltage")
+        v_street = float(v_street_raw) if v_street_raw is not None else 0.0
 
-        t_cellar = db_data.get("basement_temp", 0.0)
-        h_cellar = db_data.get("basement_humi", 0.0)
-        v_cellar = db_data.get("basement_voltage", 0.0)
+        t_cellar_raw = db_data.get("basement_temp")
+        t_cellar = float(t_cellar_raw) if t_cellar_raw is not None else 0.0
+        
+        h_cellar_raw = db_data.get("basement_humi")
+        h_cellar = float(h_cellar_raw) if h_cellar_raw is not None else 0.0
+        
+        v_cellar_raw = db_data.get("basement_voltage")
+        v_cellar = float(v_cellar_raw) if v_cellar_raw is not None else 0.0
 
-        v_floor = db_data.get("floor_voltage", 0.0)
-        db_date = db_data.get("Date", "Нет данных")
+        v_floor_raw = db_data.get("floor_voltage")
+        v_floor = float(v_floor_raw) if v_floor_raw is not None else 0.0
+        
+        db_date = db_data.get("Date") or "Нет данных"
+
+        # Обновляем shared_data в соответствии с новой структурой
+        shared_data["street"] = {"temp": t_street, "humi": h_street, "voltage": v_street}
+        shared_data["basement"] = {"temp": t_cellar, "humi": h_cellar, "voltage": v_cellar}
+        
+        t_floor_raw = db_data.get("floor_temp")
+        t_floor_db = float(t_floor_raw) if t_floor_raw is not None else 0.0
+        
+        h_floor_raw = db_data.get("floor_humi")
+        h_floor_db = float(h_floor_raw) if h_floor_raw is not None else 0.0
+
+        shared_data["floor"] = {"temp": t_floor_db, "humi": h_floor_db, "voltage": v_floor}
+        
+        diff_temp_raw = db_data.get("difference_temp")
+        shared_data["difference_temp"] = float(diff_temp_raw) if diff_temp_raw is not None else 0.0
+        
+        avg_temp_raw = db_data.get("average_temp")
+        shared_data["average_temp"] = float(avg_temp_raw) if avg_temp_raw is not None else 0.0
+        
+        shared_data["Date"] = db_date
 
         # Вычисление параметров у пола в зависимости от режима MODE
         if config.MODE == "FLOOR":
-            t_floor = db_data.get("floor_temp", 0.0)
-            h_floor_calc = db_data.get("floor_humi", 0.0)
+            t_floor = t_floor_db
+            h_floor_calc = h_floor_db
         else:
-            # MODE == "T_FLOOR_DIFF" или резерв
             t_floor = t_cellar - config.T_FLOOR_DIFF
-            # Абсолютная влажность у пола равна абсолютной влажности в подвале
             ah_cellar_temp = operations.calculate_absolute_humidity(t_cellar, h_cellar)
             h_floor_calc = operations.calculate_relative_humidity(t_floor, ah_cellar_temp)
     else:
-        # Резервные дефолтные значения, если БД пуста
         t_street, h_street, v_street = 0.0, 0.0, 0.0
         t_cellar, h_cellar, v_cellar = 0.0, 0.0, 0.0
         t_floor, h_floor_calc, v_floor = 0.0, 0.0, 0.0
@@ -193,7 +204,8 @@ async def get_dashboard():
         t_floor_heated=t_floor_heated,
         h_floor_heated=h_floor_heated,
         website_return_time=getattr(config, "WEBSITE_RETURN_TIME", 30),
-        db_date=db_date
+        db_date=db_date,
+        max_rh=config.TARGET_RH
     )
 
     return HTMLResponse(rendered_html)

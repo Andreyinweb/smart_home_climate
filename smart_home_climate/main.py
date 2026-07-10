@@ -1,5 +1,7 @@
 #  python3 main.py  # Точка входа для запуска сервера и фонового опроса
 
+
+import sys
 import asyncio
 import uvicorn
 import logging
@@ -15,6 +17,8 @@ work_log = logging.getLogger(f"{config.work_log.name}.main")
 work_log.name = "main"
 work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 print(f"main запущена. MODE = {config.MODE}.")
+
+
 
 receiver = XiaomiBLEReceiver()
 
@@ -58,7 +62,7 @@ async def polling_task():
                         data_sensors_all[name.lower()] = data
                         work_log.info(f"[{name}] Данные успешно получены: T={data['temp']}°C, H={data['humi']}%")
                     else:
-                        work_log.error(f"[{name}] Не удалось получить данные за {max_retries} попыток.")
+                        work_log.error(f"[{name}] Не удалось получить данные за {config.MAX_RETRIES} попыток.")
                         
                 except Exception as e:
                     work_log.error(f"[{name}] Ошибка опроса в цикле: {e}")
