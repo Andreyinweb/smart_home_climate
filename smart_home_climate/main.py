@@ -22,7 +22,8 @@ receiver = XiaomiBLEReceiver()
 #         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
 #         "floor":{"temp":0.0, "humi":0.0, "voltage":0.0},
 #         "difference_temp":0.0,
-#         "average_temp":0.0
+#         "average_temp":0.0,
+#         "Date": ""
 #         }
 
 data_sensors_all = {}

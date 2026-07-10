@@ -14,7 +14,8 @@ shared_data = {
     "basement": {"temp": 0.0, "humi": 0.0, "voltage": 0.0}, 
     "floor": {"temp": 0.0, "humi": 0.0, "voltage": 0.0},
     "difference_temp": 0.0,
-    "average_temp": 0.0
+    "average_temp": 0.0,
+    "Date": ""
 }
 
 def calculate_dew_point(temp: float, humi: float) -> float:
@@ -58,6 +59,7 @@ async def get_dashboard():
         }
         shared_data["difference_temp"] = db_data.get("difference_temp", 0.0)
         shared_data["average_temp"] = db_data.get("average_temp", 0.0)
+        shared_data["Date"] = db_data.get("Date", "")
         
         t_street = db_data.get("street_temp", 0.0)
         h_street = db_data.get("street_humi", 0.0)
@@ -68,6 +70,7 @@ async def get_dashboard():
         v_cellar = db_data.get("basement_voltage", 0.0)
 
         v_floor = db_data.get("floor_voltage", 0.0)
+        db_date = db_data.get("Date", "Нет данных")
 
         # Вычисление параметров у пола в зависимости от режима MODE
         if config.MODE == "FLOOR":
@@ -84,6 +87,7 @@ async def get_dashboard():
         t_street, h_street, v_street = 0.0, 0.0, 0.0
         t_cellar, h_cellar, v_cellar = 0.0, 0.0, 0.0
         t_floor, h_floor_calc, v_floor = 0.0, 0.0, 0.0
+        db_date = "База данных пуста"
 
     # Расчет абсолютных влажностей
     ah_street = operations.calculate_absolute_humidity(t_street, h_street)
@@ -122,13 +126,13 @@ async def get_dashboard():
     sim_h_floor = operations.calculate_relative_humidity(t_floor, sim_ah_cellar)
 
     # Расчет компенсационного нагрева (Отопление)
-    heating_needed = sim_h_floor > config.TARGET_RH
+    heating_needed = h_floor_calc > config.TARGET_RH
     heating_delta = 0.0
 
     if heating_needed:
         for delta in [x * 0.1 for x in range(1, 150)]:
             sim_t_floor_heated = t_floor + delta
-            rh_at_heated_floor = operations.calculate_relative_humidity(sim_t_floor_heated, sim_ah_cellar)
+            rh_at_heated_floor = operations.calculate_relative_humidity(sim_t_floor_heated, ah_cellar)
             if rh_at_heated_floor <= config.TARGET_RH:
                 heating_delta = round(delta, 1)
                 break
@@ -140,14 +144,14 @@ async def get_dashboard():
     # Итоговые параметры после догрева
     if heating_needed:
         t_cellar_heated = round(t_cellar + heating_delta, 1)
-        h_cellar_heated = operations.calculate_relative_humidity(t_cellar_heated, sim_ah_cellar)
+        h_cellar_heated = operations.calculate_relative_humidity(t_cellar_heated, ah_cellar)
         t_floor_heated = round(t_floor + heating_delta, 1)
-        h_floor_heated = operations.calculate_relative_humidity(t_floor_heated, sim_ah_cellar)
+        h_floor_heated = operations.calculate_relative_humidity(t_floor_heated, ah_cellar)
     else:
         t_cellar_heated = t_cellar
-        h_cellar_heated = sim_h_cellar
+        h_cellar_heated = h_cellar
         t_floor_heated = t_floor
-        h_floor_heated = sim_h_floor
+        h_floor_heated = h_floor_calc
 
     # Чтение шаблона разметки
     html_path = os.path.join(os.path.dirname(__file__), "index.html")
@@ -188,7 +192,8 @@ async def get_dashboard():
         h_cellar_heated=h_cellar_heated,
         t_floor_heated=t_floor_heated,
         h_floor_heated=h_floor_heated,
-        website_return_time=getattr(config, "WEBSITE_RETURN_TIME", 30)
+        website_return_time=getattr(config, "WEBSITE_RETURN_TIME", 30),
+        db_date=db_date
     )
 
     return HTMLResponse(rendered_html)
