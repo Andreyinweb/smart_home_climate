@@ -2,33 +2,24 @@
 
 import os
 import sys
+from pathlib import Path
 import logging
 from dotenv import load_dotenv
-from run.run_data import PROJECT_DIR, DATA_DIR, DATA_FILE
 
-# Преобразовываем путь к папке /analysis
-parent_path_str = ('/'.join(os.getcwd().split('/')[:-1]))
-ENV_FILE = parent_path_str + "/.env"   
-
-# Добавляем в path путь к папке, чтобы можно было импортировать.
-if parent_path_str not in sys.path:
-   sys.path.insert(0, parent_path_str)
-
-# Загрузка переменных окружения из файла  ANALYSIS_DIR/.env
-load_dotenv(ENV_FILE, override=True, verbose=True)
+# Загрузка переменных окружения из файла .env
+load_dotenv()
 
 class AppConfig:
-   # Переменные из run_data, необходимые для инициализации путей
-   PROJECT_DIR: str = PROJECT_DIR
-   
+
+   PROJECT_DIR: str = Path.cwd()
    # APP configuration
-   MODE: str = os.environ.get("MODE", "DEV")  # FLOOR, TWO_SENSORS, SENSORS_ONE
+   MODE: str = os.environ.get("MODE", "DEV")  
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 
 
    def __init__(self):
       # Основные логгеры приложения
-      self.work_log = self.setup_logger("work", f"{self.PROJECT_DIR}/logs/work_log.log")
+      self.work_log = self.setup_logger("settings", f"{self.PROJECT_DIR}/logs/work_log.log")
       
    def setup_logger(self, name: str, log_file: str, mode="a") -> logging.Logger:
       """Создает логгер с указанным именем и файлом"""
@@ -60,14 +51,14 @@ class BLEConfig:
    NAME_SENSOR: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]
    MAC_DICT: dict = {
       "STREET_MAC": os.environ.get("STREET_MAC", False),
-      "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False),
+      "BASEMENT_MAC": False ,# os.environ.get("BASEMENT_MAC", False),
       "FLOOR_MAC": os.environ.get("FLOOR_MAC", False)
          }
 
 class DatabaseConfig:
    # Data base configuration
-   DB_DIR: str = os.environ.get("DB_DIR", DATA_DIR)
-   DB_NAME: str = os.environ.get("DB_NAME", DATA_FILE)
+   DB_DIR: str = os.environ.get("DB_DIR")
+   DB_NAME: str = os.environ.get("DB_NAME")
    DB_PATH: str = DB_DIR + "/" + DB_NAME
 
 class APIConfig:
