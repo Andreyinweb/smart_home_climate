@@ -88,11 +88,11 @@ async def get_dashboard():
         shared_data["Date"] = db_date
 
         # Вычисление параметров у пола в зависимости от режима MODE
-        if config.MODE == "FLOOR":
+        if config.MODE == "FLOOR_MAC":
             t_floor = t_floor_db
             h_floor_calc = h_floor_db
         else:
-            t_floor = t_cellar - config.T_FLOOR_DIFF
+            t_floor = t_cellar - config.T_FLOOR_MAC_DIFF
             ah_cellar_temp = operations.calculate_absolute_humidity(t_cellar, h_cellar)
             h_floor_calc = operations.calculate_relative_humidity(t_floor, ah_cellar_temp)
     else:

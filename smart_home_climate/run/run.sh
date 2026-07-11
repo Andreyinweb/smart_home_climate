@@ -119,7 +119,7 @@ check_or_create_file "./run/run_data.py"
 source ./run/run_data.py # Аналог import run_data
 
 for var in PROJECT_DIR VENV_DIR VENV_NAME DATA_DIR DATA_FILE \
-            desired_version STREET BASEMENT FLOOR; do
+            desired_version STREET_MAC BASEMENT_MAC FLOOR_MAC; do
     if [ -z "${!var}" ]; then
         echo "Ошибка: Переменная $var не определена в файле run_data.sh"
         echo "Пожалуйста, проверьте файл run_data.sh и убедитесь, что все необходимые переменные определены."
@@ -237,9 +237,9 @@ check_or_create_file "$ENV_FILE" "run/env.txt"
 env_dir=$?
 if [ "$env_dir" -eq 0 ]; then
     echo " " >> $ENV_FILE
-    echo "STREET = '$STREET'" >> $ENV_FILE
-    echo "BASEMENT = '$BASEMENT'" >> $ENV_FILE
-    echo "FLOOR = '$FLOOR'" >> $ENV_FILE
+    echo "STREET_MAC = '$STREET_MAC'" >> $ENV_FILE
+    echo "BASEMENT_MAC = '$BASEMENT_MAC'" >> $ENV_FILE
+    echo "FLOOR_MAC = '$FLOOR_MAC'" >> $ENV_FILE
     echo " " >> $ENV_FILE
     echo "DB_DIR = '$DATA_DIR'" >> $ENV_FILE
     echo "DB_NAME = '$DATA_FILE'" >> $ENV_FILE

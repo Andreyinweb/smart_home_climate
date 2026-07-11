@@ -12,9 +12,9 @@ DATA_FILE="climate_data.sqlite3"
 # Версия Python, которую нужно установить
 desired_version="3.12"
 # Нужно дописать макадреса
-STREET="A4:C1:38:53:82:0F"  # Улица
-BASEMENT="A4:C1:38:51:C3:0D"  # Подвал
-FLOOR="A4:C1:38:10:3B:D1"   # Спальня 
+STREET_MAC="A4:C1:38:53:82:0F"  # Улица
+BASEMENT_MAC="A4:C1:38:51:C3:0D"  # Подвал
+FLOOR_MAC="A4:C1:38:10:3B:D1"   # Спальня 
  
 
 

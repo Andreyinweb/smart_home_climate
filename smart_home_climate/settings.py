@@ -26,26 +26,26 @@ class AppConfig:
    MODE: str = os.environ.get("MODE", "test")  # test| dev | prod | stage ...
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
    INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", "600"))
-   T_FLOOR_DIFF: float = float(os.environ.get("T_FLOOR_DIFF", "4.5"))
+   T_FLOOR_MAC_DIFF: float = float(os.environ.get("T_FLOOR_MAC_DIFF", "4.5"))
    ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", "0.5"))
    MAX_RETRIES: int = int(os.environ.get("MAX_RETRIES", "5"))
    WEBSITE_RETURN_TIME: int = int(os.environ.get("WEBSITE_RETURN_TIME", "30"))
    TARGET_RH: float = float(os.environ.get("TARGET_RH", "74.0"))
    SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
-   if MODE == "FLOOR":
-      NAME_SENSOR: list = ["FLOOR", "STREET", "BASEMENT"]
+   if MODE == "FLOOR_MAC":
+      NAME_SENSOR: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]
       MAC_DICT: dict = {
-         "STREET": os.environ.get("STREET", False),
-         "BASEMENT": os.environ.get("BASEMENT", False),
-         "FLOOR": os.environ.get("FLOOR", False)
+         "STREET_MAC": os.environ.get("STREET_MAC", False),
+         "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False),
+         "FLOOR_MAC": os.environ.get("FLOOR_MAC", False)
           }
 
    else:
-      NAME_SENSOR: list = ["STREET", "BASEMENT"]
+      NAME_SENSOR: list = ["STREET_MAC", "BASEMENT_MAC"]
       MAC_DICT: dict = {
-         "STREET": os.environ.get("STREET", False),
-         "BASEMENT": os.environ.get("BASEMENT", False)
+         "STREET_MAC": os.environ.get("STREET_MAC", False),
+         "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False)
       }
 
    def __init__(self):
@@ -95,11 +95,11 @@ log_project.parent = config.work_log
 work_log = config.work_log
 
 for name in config.NAME_SENSOR:      
-   if not config.MAC_DICT[name] and config.MODE == "FLOOR":
+   if not config.MAC_DICT[name] and config.MODE == "FLOOR_MAC":
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()
-   elif config.MODE == "TWO_SENSORS" and not config.MAC_DICT["STREET"] and not config.MAC_DICT["BASEMENT"]:
+   elif config.MODE == "TWO_SENSORS" and not config.MAC_DICT["STREET_MAC"] and not config.MAC_DICT["BASEMENT_MAC"]:
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()

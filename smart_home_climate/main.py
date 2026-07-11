@@ -55,7 +55,7 @@ async def polling_task():
                             await asyncio.sleep(1) # Короткая пауза перед повторной попыткой
                     
                     if data and "temp" in data and "humi" in data:
-                        data_sensors_all[name.lower()] = data
+                        data_sensors_all[name[:-4].lower()] = data
                         work_log.info(f"[{name}] Данные успешно получены: T={data['temp']}°C, H={data['humi']}%")
                     else:
                         work_log.error(f"[{name}] Не удалось получить данные за {config.MAX_RETRIES} попыток.")
@@ -71,9 +71,9 @@ async def polling_task():
             data_sensors_all["Date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Вычисление difference_temp в зависимости от режима работы
-            if config.MODE == "T_FLOOR_DIFF":
-                data_sensors_all["difference_temp"] = config.T_FLOOR_DIFF
-            elif config.MODE == "FLOOR":
+            if config.MODE == "T_FLOOR_MAC_DIFF":
+                data_sensors_all["difference_temp"] = config.T_FLOOR_MAC_DIFF
+            elif config.MODE == "FLOOR_MAC":
                 # Проверяем наличие необходимых данных перед расчетом
                 if 'basement' in data_sensors_all and 'floor' in data_sensors_all:
                     data_sensors_all["difference_temp"] = round(
@@ -83,8 +83,8 @@ async def polling_task():
                     data_sensors_all["difference_temp"] = 0.0
                     work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчиков basement или floor")
             else:
-                data_sensors_all["difference_temp"] = config.T_FLOOR_DIFF
-                data_sensors_all["average_temp"] = config.T_FLOOR_DIFF
+                data_sensors_all["difference_temp"] = config.T_FLOOR_MAC_DIFF
+                data_sensors_all["average_temp"] = config.T_FLOOR_MAC_DIFF
 
             # Получение среднего исторического значения разницы температур из БД
             data_sensors_all["average_temp"] = get_average_difference_temp()
