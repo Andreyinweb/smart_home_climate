@@ -31,14 +31,21 @@ class AppConfig:
             u_logger.handlers = [api_handler]  # Назначаем только файловый обработчик
             u_logger.propagate = False         # Запрещаем передачу сообщений в консоль
             u_logger.setLevel(logging.INFO)
-      
+   
+   @staticmethod
+   def clean_logger_name(record: logging.LogRecord) -> bool:
+      """Отрезает префикс 'climat_app.' или 'api_app.' у имени логгера"""
+      if record.name.startswith(("climat_app.", "api_app.")):
+         record.name = record.name.split(".")[-1]
+      return True 
+         
    def setup_logger(self, name: str, log_file: str, mode="a") -> logging.Logger:
       """Создает логгер с указанным именем и файлом"""
       logger = logging.getLogger(name)
       logger.setLevel(logging.INFO)
       
       formatter = logging.Formatter(
-         "%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+         "%(asctime)s:%(levelname)s:" + "%(name)s" + ":%(message)s",
          datefmt="%Y-%m-%d %H:%M:%S"
       )
       
@@ -47,7 +54,8 @@ class AppConfig:
       
       handler = logging.FileHandler(log_file, mode=mode)
       handler.setFormatter(formatter)
-      
+      handler.addFilter(self.clean_logger_name)
+
       logger.addHandler(handler)
       logger.propagate = False  # Логи не дублируются в консоль Root логгера по умолчанию
       return logger

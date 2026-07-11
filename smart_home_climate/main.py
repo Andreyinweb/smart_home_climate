@@ -11,10 +11,8 @@ from ble_receiver import XiaomiBLEReceiver
 from api import app, shared_data
 from models import write_climate_data, get_average_difference_temp
 
-# work_log = logging.getLogger(f"{config.work_log.name}.main")
-# work_log.name = "main"
-# work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 work_log = logging.getLogger("climat_app.main")
+work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 print(f"main запущена. MODE = {config.MODE}.")
 
 receiver = XiaomiBLEReceiver()

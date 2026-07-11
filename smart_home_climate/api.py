@@ -1,10 +1,15 @@
 import os
 import math
+import logging
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from settings import config, work_log
+from settings import config
 import operations
 from models import get_latest_climate_data
+
+# Логирование
+api_log = logging.getLogger("api_app.api")
+api_log.info(f"Сервер запускается, перезагрузка = {config.WEBSITE_RETURN_TIME} с.")
 
 app = FastAPI(title="Smart Home Climate API")
 
