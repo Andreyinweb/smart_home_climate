@@ -71,9 +71,9 @@ async def polling_task():
             data_sensors_all["Date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Вычисление difference_temp в зависимости от режима работы
-            if config.MODE == "T_FLOOR_MAC_DIFF":
+            if config.MODE == "TWO_SENSORS":
                 data_sensors_all["difference_temp"] = config.T_FLOOR_MAC_DIFF
-            elif config.MODE == "FLOOR_MAC":
+            elif config.MODE == "FLOOR":
                 # Проверяем наличие необходимых данных перед расчетом
                 if 'basement' in data_sensors_all and 'floor' in data_sensors_all:
                     data_sensors_all["difference_temp"] = round(

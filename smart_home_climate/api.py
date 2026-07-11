@@ -88,7 +88,7 @@ async def get_dashboard():
         shared_data["Date"] = db_date
 
         # Вычисление параметров у пола в зависимости от режима MODE
-        if config.MODE == "FLOOR_MAC":
+        if config.MODE == "FLOOR":
             t_floor = t_floor_db
             h_floor_calc = h_floor_db
         else:

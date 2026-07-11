@@ -116,10 +116,11 @@ function check_or_create_file() {
 
 ######################################################### Начальные условия #########################################################
 check_or_create_file "./run/run_data.py"
+sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\'$PWD\'|" ./run/run_data.py
 source ./run/run_data.py # Аналог import run_data
 
 for var in PROJECT_DIR VENV_DIR VENV_NAME DATA_DIR DATA_FILE \
-            desired_version STREET_MAC BASEMENT_MAC FLOOR_MAC; do
+            desired_version BASEMENT_MAC; do
     if [ -z "${!var}" ]; then
         echo "Ошибка: Переменная $var не определена в файле run_data.sh"
         echo "Пожалуйста, проверьте файл run_data.sh и убедитесь, что все необходимые переменные определены."

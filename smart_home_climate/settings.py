@@ -6,7 +6,6 @@ import logging
 from dotenv import load_dotenv
 from run.run_data import PROJECT_DIR, DATA_DIR, DATA_FILE
 
-
 # Преобразовываем путь к папке /analysis
 parent_path_str = ('/'.join(os.getcwd().split('/')[:-1]))
 ENV_FILE = parent_path_str + "/.env"   
@@ -23,30 +22,9 @@ class AppConfig:
    PROJECT_DIR: str = PROJECT_DIR
    
    # APP configuration
-   MODE: str = os.environ.get("MODE", "test")  # test| dev | prod | stage ...
+   MODE: str = os.environ.get("MODE", "DEV")  # FLOOR, TWO_SENSORS, SENSORS_ONE
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
-   INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", "600"))
-   T_FLOOR_MAC_DIFF: float = float(os.environ.get("T_FLOOR_MAC_DIFF", "4.5"))
-   ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", "0.5"))
-   MAX_RETRIES: int = int(os.environ.get("MAX_RETRIES", "5"))
-   WEBSITE_RETURN_TIME: int = int(os.environ.get("WEBSITE_RETURN_TIME", "30"))
-   TARGET_RH: float = float(os.environ.get("TARGET_RH", "74.0"))
-   SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
-   SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
-   if MODE == "FLOOR_MAC":
-      NAME_SENSOR: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]
-      MAC_DICT: dict = {
-         "STREET_MAC": os.environ.get("STREET_MAC", False),
-         "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False),
-         "FLOOR_MAC": os.environ.get("FLOOR_MAC", False)
-          }
 
-   else:
-      NAME_SENSOR: list = ["STREET_MAC", "BASEMENT_MAC"]
-      MAC_DICT: dict = {
-         "STREET_MAC": os.environ.get("STREET_MAC", False),
-         "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False)
-      }
 
    def __init__(self):
       # Основные логгеры приложения
@@ -71,6 +49,20 @@ class AppConfig:
       logger.addHandler(handler)
       logger.propagate = False
       return logger
+   
+class BLEConfig:
+   # BLE configuration
+   INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", 300))
+   MAX_RETRIES: int = int(os.environ.get("MAX_RETRIES", 5))
+   TARGET_RH: float = float(os.environ.get("TARGET_RH", 74.0))
+   ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
+   # MAC addresses for BLE sensors
+   NAME_SENSOR: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]
+   MAC_DICT: dict = {
+      "STREET_MAC": os.environ.get("STREET_MAC", False),
+      "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False),
+      "FLOOR_MAC": os.environ.get("FLOOR_MAC", False)
+         }
 
 class DatabaseConfig:
    # Data base configuration
@@ -78,13 +70,22 @@ class DatabaseConfig:
    DB_NAME: str = os.environ.get("DB_NAME", DATA_FILE)
    DB_PATH: str = DB_DIR + "/" + DB_NAME
 
+class APIConfig:
+   WEBSITE_RETURN_TIME: int = int(os.environ.get("WEBSITE_RETURN_TIME", "30"))
+   SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
+   SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
 
 class Config(
    AppConfig,
-   DatabaseConfig
+   DatabaseConfig,
+   BLEConfig,
+   APIConfig
    ):
    def __init__(self):
       AppConfig.__init__(self)
+      DatabaseConfig.__init__(self)
+      BLEConfig.__init__(self)
+      APIConfig.__init__(self)
 
 # Прописываем настройки для всей программы
 config = Config()
@@ -95,11 +96,15 @@ log_project.parent = config.work_log
 work_log = config.work_log
 
 for name in config.NAME_SENSOR:      
-   if not config.MAC_DICT[name] and config.MODE == "FLOOR_MAC":
+   if not config.MAC_DICT[name] and config.MODE == "FLOOR":
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()
    elif config.MODE == "TWO_SENSORS" and not config.MAC_DICT["STREET_MAC"] and not config.MAC_DICT["BASEMENT_MAC"]:
+      print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
+      work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
+      sys.exit()
+   elif config.MODE == "SENSORS_ONE" and not config.MAC_DICT["BASEMENT_MAC"]:
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()

@@ -1,12 +1,9 @@
 import sqlite3
-import os
-from run.run_data import DATA_DIR, DATA_FILE
-
-DB_PATH = os.path.join(DATA_DIR, DATA_FILE)
+from settings import config
 
 def get_db_connection():
     """Создает подключение к базе данных SQLite с включенным автокоммитом."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(config.DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
