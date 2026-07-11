@@ -38,6 +38,7 @@ async def get_dashboard():
     """Сборка дашборда на основе данных из БД, физических расчетов и шаблона HTML."""
     # Получаем последнюю запись из базы данных
     latest_records = get_latest_climate_data(limit=1)
+    print(f"latest_records: {latest_records}")  # TODO: Удалить после тестирования
     
     if latest_records:
         db_data = latest_records[0]
@@ -203,7 +204,7 @@ async def get_dashboard():
         h_cellar_heated=h_cellar_heated,
         t_floor_heated=t_floor_heated,
         h_floor_heated=h_floor_heated,
-        website_return_time=getattr(config, "WEBSITE_RETURN_TIME", 30),
+        website_return_time=config.WEBSITE_RETURN_TIME,
         db_date=db_date,
         max_rh=config.TARGET_RH
     )

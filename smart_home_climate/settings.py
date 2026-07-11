@@ -83,8 +83,8 @@ class Config(
    AppConfig,
    DatabaseConfig
    ):
-    def __init__(self):
-        AppConfig.__init__(self)
+   def __init__(self):
+      AppConfig.__init__(self)
 
 # Прописываем настройки для всей программы
 config = Config()
@@ -95,7 +95,12 @@ log_project.parent = config.work_log
 work_log = config.work_log
 
 for name in config.NAME_SENSOR:      
-    if not config.MAC_DICT[name]:
-          print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
-          work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
-          sys.exit()
+   if not config.MAC_DICT[name] and config.MODE == "FLOOR":
+      print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
+      work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
+      sys.exit()
+   elif config.MODE == "TWO_SENSORS" and not config.MAC_DICT["STREET"] and not config.MAC_DICT["BASEMENT"]:
+      print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
+      work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
+      sys.exit()
+   

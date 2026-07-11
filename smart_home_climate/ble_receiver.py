@@ -1,4 +1,4 @@
-# python3 
+# python3 ble_receiver.py
 
 import asyncio
 import struct
@@ -8,8 +8,7 @@ from settings import config
 
 work_log = logging.getLogger(f"{config.work_log.name}.ble_receiver")
 work_log.name = "ble_receiver"
-# Использование: work_log.info("Сообщение")
-work_log.info("Проверяю  наличие BLE-ресивера и его работоспособность...")
+
 
 class XiaomiBLEReceiver:
     """Класс для опроса датчиков Xiaomi Mijia по протоколу BLE"""
@@ -64,5 +63,5 @@ class XiaomiBLEReceiver:
                 raise TimeoutError("Превышено время ожидания данных от датчика")
             finally:
                 await client.stop_notify(self.REALTIME_DATA_CHAR)
-                
+        work_log.info("Данные успешно получены от датчика.")       
         return result

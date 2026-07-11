@@ -1,6 +1,5 @@
 import sqlite3
 import os
-from datetime import datetime
 from run.run_data import DATA_DIR, DATA_FILE
 
 DB_PATH = os.path.join(DATA_DIR, DATA_FILE)

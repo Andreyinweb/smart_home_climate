@@ -2,7 +2,6 @@
 # Дополнительные настройки находятся в файле run.sh Начальные условия
 # Переменные надо писать чтобы их пог прочитать и bash и python
 
-
 PROJECT_DIR="/home/andrey/andrey_folder/Indoor_climate/smart_home_climate"   #  "../analysis"
 # Путь к целевой директории для виртуального окружения 
 VENV_DIR="/home/andrey/andrey_folder/Venv"  #  "/home/komp/Programming/Venv"    #  "/home/venv" #   Обязательно указать свою   # 
