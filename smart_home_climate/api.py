@@ -178,41 +178,44 @@ async def get_dashboard():
             template = f.read()
     else:
         return HTMLResponse("Ошибка: Файл шаблона index.html не найден.", status_code=500)
+    
+    data_rendered = {
+        "v_bedroom":v_floor,
+        "v_street":v_street,
+        "v_cellar":v_cellar,
+        "t_street":t_street,
+        "h_street":h_street,
+        "ah_street":ah_street,
+        "dp_street":dp_street,
+        "t_cellar":t_cellar,
+        "h_cellar":h_cellar,
+        "ah_cellar":ah_cellar,
+        "dp_cellar":dp_cellar,
+        "t_floor":t_floor,
+        "h_floor_calc":h_floor_calc,
+        "ah_floor_calc":ah_floor_calc,
+        "dp_floor":dp_floor,
+        "vent_status":vent_status,
+        "vent_reason":vent_reason,
+        "vent_class":vent_class,
+        "humidity_difference":humidity_difference,
+        "sim_h_cellar":sim_h_cellar,
+        "sim_h_floor":sim_h_floor,
+        "sim_ah_cellar":sim_ah_cellar,
+        "heat_status":heat_status,
+        "heat_info":heat_info,
+        "heat_class":heat_class,
+        "t_cellar_heated":t_cellar_heated,
+        "h_cellar_heated":h_cellar_heated,
+        "t_floor_heated":t_floor_heated,
+        "h_floor_heated":h_floor_heated,
+        "website_return_time":config.WEBSITE_RETURN_TIME,
+        "db_date":db_date,
+        "max_rh":config.TARGET_RH
+    }
+
 
     # Форматирование шаблона расчетными данными с учетом WEBSITE_RETURN_TIME
-    rendered_html = template.format(
-        v_bedroom=v_floor,
-        v_street=v_street,
-        v_cellar=v_cellar,
-        t_street=t_street,
-        h_street=h_street,
-        ah_street=ah_street,
-        dp_street=dp_street,
-        t_cellar=t_cellar,
-        h_cellar=h_cellar,
-        ah_cellar=ah_cellar,
-        dp_cellar=dp_cellar,
-        t_floor=t_floor,
-        h_floor_calc=h_floor_calc,
-        ah_floor_calc=ah_floor_calc,
-        dp_floor=dp_floor,
-        vent_status=vent_status,
-        vent_reason=vent_reason,
-        vent_class=vent_class,
-        humidity_difference=humidity_difference,
-        sim_h_cellar=sim_h_cellar,
-        sim_h_floor=sim_h_floor,
-        sim_ah_cellar=sim_ah_cellar,
-        heat_status=heat_status,
-        heat_info=heat_info,
-        heat_class=heat_class,
-        t_cellar_heated=t_cellar_heated,
-        h_cellar_heated=h_cellar_heated,
-        t_floor_heated=t_floor_heated,
-        h_floor_heated=h_floor_heated,
-        website_return_time=config.WEBSITE_RETURN_TIME,
-        db_date=db_date,
-        max_rh=config.TARGET_RH
-    )
+    rendered_html = template.format(**data_rendered)
 
     return HTMLResponse(rendered_html)

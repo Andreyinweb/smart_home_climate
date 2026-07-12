@@ -33,37 +33,38 @@ async def polling_task():
     
     
     while True:
-        data_sensors_all = {}  # Сброс данных перед каждой итерацией опроса
-        
+         # Сброс данных перед каждой итерацией опроса
+        data_sensors_all = await receiver.sensor_get_sensors_all()
+
         # 1. Сбор данных со всех датчиков
-        for name in config.NAME_SENSOR:
-            if config.MAC_DICT[name]:                
-                try:
-                    data = {}
-                    data["temp"] = False
-                    retries = 0
+        # for name in config.NAME_SENSOR:
+        #     if config.MAC_DICT[name]:                
+        #         try:
+        #             data = {}
+        #             data["temp"] = False
+        #             retries = 0
                     
-                    # Опрос датчика с ограничением по количеству попыток
-                    while not data["temp"] and retries < config.MAX_RETRIES:
-                        retries += 1
-                        try:
-                            data = await receiver.get_sensor_data(config.MAC_DICT[name])
-                            print(f"[{name}] Попытка {retries}: {data}")  # TODO: Удалить после тестирования
-                        except Exception as sensor_err:
-                            work_log.warning(f"[{name}] Попытка {retries} не удалась: {sensor_err}")
-                            await asyncio.sleep(1) # Короткая пауза перед повторной попыткой
+        #             # Опрос датчика с ограничением по количеству попыток
+        #             while not data["temp"] and retries < config.MAX_RETRIES:
+        #                 retries += 1
+        #                 try:
+        #                     data = await receiver.get_sensor_data(config.MAC_DICT[name])
+        #                     print(f"[{name}] Попытка {retries}: {data}")  # TODO: Удалить после тестирования
+        #                 except Exception as sensor_err:
+        #                     work_log.warning(f"[{name}] Попытка {retries} не удалась: {sensor_err}")
+        #                     await asyncio.sleep(1) # Короткая пауза перед повторной попыткой
                     
-                    if data and "temp" in data and "humi" in data:
-                        data_sensors_all[name[:-4].lower()] = data
-                        work_log.info(f"[{name}] Данные успешно получены: T={data['temp']}°C, H={data['humi']}%")
-                    else:
-                        work_log.error(f"[{name}] Не удалось получить данные за {config.MAX_RETRIES} попыток.")
+        #             if data and "temp" in data and "humi" in data:
+        #                 data_sensors_all[name[:-4].lower()] = data
+        #                 work_log.info(f"[{name}] Данные успешно получены: T={data['temp']}°C, H={data['humi']}%")
+        #             else:
+        #                 work_log.error(f"[{name}] Не удалось получить данные за {config.MAX_RETRIES} попыток.")
                         
-                except Exception as e:
-                    work_log.error(f"[{name}] Ошибка опроса в цикле: {e}")
-                    print(f"[{name}] Ошибка опроса в цикле: {e}")
+        #         except Exception as e:
+        #             work_log.error(f"[{name}] Ошибка опроса в цикле: {e}")
+        #             print(f"[{name}] Ошибка опроса в цикле: {e}")
                 
-                await asyncio.sleep(2)  # Задержка между опросами датчиков в группе
+        #         await asyncio.sleep(2)  # Задержка между опросами датчиков в группе
 
         # 2. Обработка собранных данных (после того, как опрос ВСЕХ датчиков завершен)
         if data_sensors_all:

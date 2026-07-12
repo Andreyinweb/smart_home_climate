@@ -2,12 +2,11 @@
 
 import asyncio
 import struct
-from bleak import BleakClient
 import logging
+from bleak import BleakClient
 from settings import config
 
-work_log = logging.getLogger(f"{config.work_log.name}.ble_receiver")
-work_log.name = "ble_receiver"
+work_log = logging.getLogger("climat_app.ble_receiver")
 
 
 class XiaomiBLEReceiver:
@@ -31,7 +30,7 @@ class XiaomiBLEReceiver:
             voltage = struct.unpack("<H", data[3:5])[0] / 1000.0
             return temp, humi, voltage
         return None, None, None
-
+    
     async def get_sensor_data(self, mac_address: str) -> dict:
         """
         Подключение к датчику и получение одного замера данных.
@@ -54,7 +53,7 @@ class XiaomiBLEReceiver:
 
         async with BleakClient(mac, timeout=self.connection_timeout) as client:
             if not client.is_connected:
-                raise ConnectionError(f"Не удалось установить соединение")
+                raise ConnectionError("Не удалось установить соединение")
             
             await client.start_notify(self.REALTIME_DATA_CHAR, notification_handler)
             try:
@@ -62,6 +61,36 @@ class XiaomiBLEReceiver:
             except asyncio.TimeoutError:
                 raise TimeoutError("Превышено время ожидания данных от датчика")
             finally:
-                await client.stop_notify(self.REALTIME_DATA_CHAR)
-        work_log.info("Данные успешно получены от датчика.")       
+                await client.stop_notify(self.REALTIME_DATA_CHAR)      
         return result
+    
+    async def sensor_get_sensors_all(self):
+        data_sensors_all = {} 
+        # 1. Сбор данных со всех датчиков
+        for name in config.NAME_SENSOR:
+            if config.MAC_DICT.get(name):                
+                try:
+                    data = {}
+                    retries = 0
+                    
+                    # Опрос датчика с ограничением по количеству попыток
+                    while "temp" not in data and retries < config.MAX_RETRIES:
+                        retries += 1
+                        try:
+                            data = await self.get_sensor_data(config.MAC_DICT[name])
+                        except Exception as sensor_err:
+                            work_log.warning(f"[{name}] Попытка {retries} не удалась: {sensor_err}")
+                            await asyncio.sleep(1) # Короткая пауза перед повторной попыткой
+                    
+                    if data and "temp" in data and "humi" in data:
+                        data_sensors_all[name[:-4].lower()] = data
+                        work_log.info(f"[{name}] Попытка {retries}: {data}. Данные: T={data['temp']}°C, H={data['humi']}%")
+                    else:
+                        work_log.error(f"[{name}] Не удалось получить данные за {config.MAX_RETRIES} попыток.")
+                        
+                except Exception as e:
+                    work_log.error(f"[{name}] Ошибка опроса в цикле: {e}")
+                    print(f"[{name}] Ошибка опроса в цикле: {e}")
+                
+                await asyncio.sleep(2)  # Задержка между опросами датчиков в группе
+        return data_sensors_all
