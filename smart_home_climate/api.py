@@ -96,6 +96,7 @@ async def get_dashboard():
         if config.MODE == "FLOOR":
             t_floor = t_floor_db
             h_floor_calc = h_floor_db
+
         else:
             t_floor = t_cellar - config.T_FLOOR_MAC_DIFF
             ah_cellar_temp = operations.calculate_absolute_humidity(t_cellar, h_cellar)
@@ -125,12 +126,12 @@ async def get_dashboard():
         vent_status = "ДА"
         try:
             vent_time_val = round(10.4 / math.sqrt(t_cellar - t_street))
-            vent_reason = f"Время проветривания: {vent_time_val} мин."
+            vent_reason = f"Время: {vent_time_val} мин."
         except (ZeroDivisionError, ValueError):
-            vent_reason = "Время проветривания рассчитать не удалось."
+            vent_reason = "Время рассчитать не удалось."
     elif not is_safe_ventilation:
         vent_status = "НЕТ"
-        vent_reason = "Влага пойдет (конденсат)."
+        vent_reason = "dАВ < 0.5"
     else:
         vent_status = "НЕТ"
         vent_reason = "Тяги нет."

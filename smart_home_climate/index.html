@@ -11,60 +11,54 @@
     <div class="max-w-5xl mx-auto space-y-8">
         
         <!-- ШАПКА -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
+        <!-- <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">Система мониторинга климата</h1>
-                <p class="text-sm text-gray-500">Последнее обновление данных: <span class="font-semibold text-blue-600">{db_date}</span></p>
+                <h1 class="text-2xl font-bold text-gray-800">Климат</h1>
+                <p class="text-sm text-gray-500">Данные: <span class="font-semibold text-blue-600">{db_date}</span></p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
-                    Батарея Спальня (Пол): {v_bedroom:.3f} В
-                </span>
-                <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
-                    Батарея Улица: {v_street:.3f} В
-                </span>
-                <span class="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold">
-                    Батарея Подвал: {v_cellar:.3f} В
-                </span>
-            </div>
-        </div>
+
+        </div> -->
 
         <!-- ТАБЛИЦА 1: ТЕКУЩИЕ ПОКАЗАТЕЛИ -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="p-6 border-b border-gray-100">
                 <h2 class="text-xl font-bold text-gray-800">Текущие показатели</h2>
+                <p class="text-sm text-gray-500">  Дата : <span class="font-semibold text-blue-600">{db_date}</span></p>
+                <p class="text-xs text-gray-500 mt-1">ОВ пол = <span class="font-semibold text-blue-600">{max_rh:.1f}%</span></p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                            <th class="py-4 px-6">Параметр</th>
-                            <th class="py-4 px-6">Датчик (Улица)</th>
-                            <th class="py-4 px-6">Датчик (Подвал, 1.7м)</th>
-                            <th class="py-4 px-6">Расчет / Датчик (Подвал, Пол)</th>
+                            <th class="py-4 px-6"></th>
+                            <th class="py-4 px-6">Улица</th>
+                            <th class="py-4 px-6">Подвал</th>
+                            <th class="py-4 px-6">Пол</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Температура</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">Т</td>
                             <td class="py-4 px-6">{t_street:.1f} °C</td>
                             <td class="py-4 px-6">{t_cellar:.1f} °C</td>
-                            <td class="py-4 px-6 text-blue-600 font-semibold">{t_floor:.1f} °C</td>
+                            <!-- <td class="py-4 px-6 text-blue-600 font-semibold">{t_floor:.1f} °C</td> -->
+                            <td class="py-4 px-6">{t_floor:.1f} °C</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Относительная влажность</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
                             <td class="py-4 px-6">{h_street:.1f} %</td>
                             <td class="py-4 px-6">{h_cellar:.1f} %</td>
+                            <!-- <td class="py-4 px-6 text-red-600 font-semibold">{h_floor_calc:.1f} %</td> -->
                             <td class="py-4 px-6 text-red-600 font-semibold">{h_floor_calc:.1f} %</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Абсолютная влажность</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
                             <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
                             <td class="py-4 px-6">{ah_cellar:.2f} г/м³</td>
                             <td class="py-4 px-6 text-red-600 font-semibold">{ah_floor_calc:.2f} г/м³</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Точка росы</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">ТР</td>
                             <td class="py-4 px-6">{dp_street:.1f} °C</td>
                             <td class="py-4 px-6">{dp_cellar:.1f} °C</td>
                             <td class="py-4 px-6 text-red-600 font-semibold">{dp_floor:.1f} °C</td>
@@ -73,49 +67,54 @@
                 </table>
             </div>
             <div class="p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold">Проветривание:</span>
+                <div class="text-sm font-semibold text-gray-600">
+                    Проветривание: <span class="text-gray-900">{humidity_difference:.2f} г/м³</span>
                     <span class="px-3 py-1 rounded-full text-xs font-bold {vent_class}">
                         {vent_status} — {vent_reason}
                     </span>
+                    <span class="text-sm font-semibold">Отопление:</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold {heat_class}">
+                        {heat_status} {heat_info}
+                    </span>
                 </div>
-                <div class="text-sm font-semibold text-gray-600">
-                    Разница влажности (пв-у): <span class="text-gray-900">{humidity_difference:.2f} г/м³</span> (погрешность: 0.5)
-                </div>
+                <!-- <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold">Проветривание:</span>
+                    
+                </div> -->
+
             </div>
         </div>
 
         <!-- ТАБЛИЦА 2: РАСЧЕТНЫЕ ДАННЫЕ (ПРОВЕТРИВАНИЕ) -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="p-6 border-b border-gray-100">
-                <h2 class="text-xl font-bold text-gray-800">РАСЧЕТНЫЕ ДАННЫЕ (Замещение воздуха)</h2>
-                <p class="text-xs text-gray-500 mt-1">Симуляция климата внутри подвала при полном обновлении воздуха уличным</p>
+                <h2 class="text-xl font-bold text-gray-800">ПРОВЕТРИВАНИЕ</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                            <th class="py-4 px-6">Параметр</th>
-                            <th class="py-4 px-6">Датчик (Улица)</th>
-                            <th class="py-4 px-6">Датчик (Подвал, 1.7м)</th>
-                            <th class="py-4 px-6">Расчет / Датчик (Подвал, Пол)</th>
+                            <th class="py-4 px-6"></th>
+                            <th class="py-4 px-6">Улица </th>
+                            <th class="py-4 px-6">Подвал</th>
+                            <th class="py-4 px-6">П о л</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Температура</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">Т</td>
                             <td class="py-4 px-6">{t_street:.1f} °C</td>
                             <td class="py-4 px-6">{t_cellar:.1f} °C</td>
                             <td class="py-4 px-6 text-blue-600 font-semibold">{t_floor:.1f} °C</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Относительная влажность</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
                             <td class="py-4 px-6">{h_street:.1f} %</td>
                             <td class="py-4 px-6 text-gray-600">{sim_h_cellar:.1f} %</td>
                             <td class="py-4 px-6 text-red-600 font-semibold">{sim_h_floor:.1f} %</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Абсолютная влажность</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
                             <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
                             <td class="py-4 px-6 text-gray-600">{sim_ah_cellar:.2f} г/м³</td>
                             <td class="py-4 px-6 text-gray-600">{sim_ah_cellar:.2f} г/м³</td>
@@ -129,41 +128,41 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">ДАННЫЕ ОТОПЛЕНИЯ (Догрев)</h2>
-                    <p class="text-xs text-gray-500 mt-1">Симуляция климата при компенсационном подогреве до ОВ у пола = <span class="font-semibold text-blue-600">{max_rh:.1f}%</span></p>
+                    <h2 class="text-xl font-bold text-gray-800">ОТОПЛЕНИЕ</h2>
+                    <!-- <p class="text-xs text-gray-500 mt-1">ОВ пол = <span class="font-semibold text-blue-600">{max_rh:.1f}%</span></p> -->
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold">Отопление:</span>
+                    <!-- <span class="text-sm font-semibold">Отопление:</span>
                     <span class="px-3 py-1 rounded-full text-xs font-bold {heat_class}">
                         {heat_status} {heat_info}
-                    </span>
+                    </span> -->
                 </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                            <th class="py-4 px-6">Параметр</th>
-                            <th class="py-4 px-6">Датчик (Улица)</th>
-                            <th class="py-4 px-6">Датчик (Подвал, 1.7м)</th>
-                            <th class="py-4 px-6">Расчет / Датчик (Подвал, Пол)</th>
+                            <th class="py-4 px-6"></th>
+                            <th class="py-4 px-6">Улица </th>
+                            <th class="py-4 px-6">Подвал</th>
+                            <th class="py-4 px-6">П о л</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Температура</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">Т</td>
                             <td class="py-4 px-6">{t_street:.1f} °C</td>
                             <td class="py-4 px-6 text-amber-600 font-semibold">{t_cellar_heated:.1f} °C</td>
                             <td class="py-4 px-6 text-amber-600 font-semibold">{t_floor_heated:.1f} °C</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Относительная влажность</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
                             <td class="py-4 px-6">{h_street:.1f} %</td>
                             <td class="py-4 px-6 text-gray-600">{h_cellar_heated:.1f} %</td>
                             <td class="py-4 px-6 text-emerald-600 font-bold">{h_floor_heated:.1f} %</td>
                         </tr>
                         <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Абсолютная влажность</td>
+                            <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
                             <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
                             <td class="py-4 px-6 text-gray-600">{ah_street:.2f} г/м³</td>
                             <td class="py-4 px-6 text-gray-600">{ah_street:.2f} г/м³</td>
@@ -172,7 +171,20 @@
                 </table>
             </div>
         </div>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
+            <div class="flex flex-wrap gap-2">
+                <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
+                    Заряд батареи Улица: {v_street:.3f} В
+                </span>
+                <span class="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold">
+                    Заряд батареи Подвал: {v_cellar:.3f} В
+                </span>
+                                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                    Заряд батареи Пол: {v_bedroom:.3f} В
+                </span>
+            </div>
 
+        </div>
     </div>
 </body>
 </html>
