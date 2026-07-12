@@ -39,28 +39,28 @@
                     <tbody class="divide-y divide-gray-100 text-sm">
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Т</td>
-                            <td class="py-4 px-6">{t_street:.1f} °C</td>
-                            <td class="py-4 px-6">{t_cellar:.1f} °C</td>
-                            <!-- <td class="py-4 px-6 text-blue-600 font-semibold">{t_floor:.1f} °C</td> -->
-                            <td class="py-4 px-6">{t_floor:.1f} °C</td>
+                            <td class="py-4 px-6">{street_temp:.1f} °C</td>
+                            <td class="py-4 px-6">{basement_temp:.1f} °C</td>
+                            <!-- <td class="py-4 px-6 text-blue-600 font-semibold">{floor_temp:.1f} °C</td> -->
+                            <td class="py-4 px-6">{floor_temp:.1f} °C</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
-                            <td class="py-4 px-6">{h_street:.1f} %</td>
-                            <td class="py-4 px-6">{h_cellar:.1f} %</td>
-                            <!-- <td class="py-4 px-6 text-red-600 font-semibold">{h_floor_calc:.1f} %</td> -->
-                            <td class="py-4 px-6 text-red-600 font-semibold">{h_floor_calc:.1f} %</td>
+                            <td class="py-4 px-6">{street_humi:.1f} %</td>
+                            <td class="py-4 px-6">{basement_humi:.1f} %</td>
+                            <!-- <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td> -->
+                            <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
-                            <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
-                            <td class="py-4 px-6">{ah_cellar:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{ah_floor_calc:.2f} г/м³</td>
+                            <td class="py-4 px-6">{a_street_humi:.2f} г/м³</td>
+                            <td class="py-4 px-6">{a_basement_humi:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-red-600 font-semibold">{a_floor_humi:.2f} г/м³</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">ТР</td>
                             <td class="py-4 px-6">{dp_street:.1f} °C</td>
-                            <td class="py-4 px-6">{dp_cellar:.1f} °C</td>
+                            <td class="py-4 px-6">{dp_basement:.1f} °C</td>
                             <td class="py-4 px-6 text-red-600 font-semibold">{dp_floor:.1f} °C</td>
                         </tr>
                     </tbody>
@@ -103,21 +103,21 @@
                     <tbody class="divide-y divide-gray-100 text-sm">
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Т</td>
-                            <td class="py-4 px-6">{t_street:.1f} °C</td>
-                            <td class="py-4 px-6">{t_cellar:.1f} °C</td>
-                            <td class="py-4 px-6 text-blue-600 font-semibold">{t_floor:.1f} °C</td>
+                            <td class="py-4 px-6">{street_temp:.1f} °C</td>
+                            <td class="py-4 px-6">{basement_temp:.1f} °C</td>
+                            <td class="py-4 px-6 text-blue-600 font-semibold">{floor_temp:.1f} °C</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
-                            <td class="py-4 px-6">{h_street:.1f} %</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_h_cellar:.1f} %</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{sim_h_floor:.1f} %</td>
+                            <td class="py-4 px-6">{street_humi:.1f} %</td>
+                            <td class="py-4 px-6 text-gray-600">{sim_basement_humi:.1f} %</td>
+                            <td class="py-4 px-6 text-red-600 font-semibold">{sim_floor_humi:.1f} %</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
-                            <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_ah_cellar:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_ah_cellar:.2f} г/м³</td>
+                            <td class="py-4 px-6">{a_street_humi:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-gray-600">{sim_abasement_humi:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-gray-600">{sim_abasement_humi:.2f} г/м³</td>
                         </tr>
                     </tbody>
                 </table>
@@ -151,21 +151,21 @@
                     <tbody class="divide-y divide-gray-100 text-sm">
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">Т</td>
-                            <td class="py-4 px-6">{t_street:.1f} °C</td>
-                            <td class="py-4 px-6 text-amber-600 font-semibold">{t_cellar_heated:.1f} °C</td>
-                            <td class="py-4 px-6 text-amber-600 font-semibold">{t_floor_heated:.1f} °C</td>
+                            <td class="py-4 px-6">{street_temp:.1f} °C</td>
+                            <td class="py-4 px-6 text-amber-600 font-semibold">{basement_temp_heated:.1f} °C</td>
+                            <td class="py-4 px-6 text-amber-600 font-semibold">{floor_temp_heated:.1f} °C</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
-                            <td class="py-4 px-6">{h_street:.1f} %</td>
-                            <td class="py-4 px-6 text-gray-600">{h_cellar_heated:.1f} %</td>
-                            <td class="py-4 px-6 text-emerald-600 font-bold">{h_floor_heated:.1f} %</td>
+                            <td class="py-4 px-6">{street_humi:.1f} %</td>
+                            <td class="py-4 px-6 text-gray-600">{basement_humi_heated:.1f} %</td>
+                            <td class="py-4 px-6 text-emerald-600 font-bold">{floor_humi_heated:.1f} %</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
-                            <td class="py-4 px-6">{ah_street:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{ah_street:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{ah_street:.2f} г/м³</td>
+                            <td class="py-4 px-6">{a_street_humi:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-gray-600">{a_street_humi:.2f} г/м³</td>
+                            <td class="py-4 px-6 text-gray-600">{a_street_humi:.2f} г/м³</td>
                         </tr>
                     </tbody>
                 </table>
@@ -174,13 +174,13 @@
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
             <div class="flex flex-wrap gap-2">
                 <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
-                    Заряд батареи Улица: {v_street:.3f} В
+                    Заряд батареи Улица: {street_voltage:.3f} В
                 </span>
                 <span class="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold">
-                    Заряд батареи Подвал: {v_cellar:.3f} В
+                    Заряд батареи Подвал: {basement_voltage:.3f} В
                 </span>
                                 <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
-                    Заряд батареи Пол: {v_bedroom:.3f} В
+                    Заряд батареи Пол: {floor_voltage:.3f} В
                 </span>
             </div>
 
