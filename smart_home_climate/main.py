@@ -8,7 +8,7 @@ from datetime import datetime
 
 from settings import config
 from ble_receiver import XiaomiBLEReceiver
-from api import app, shared_data
+from api import app
 from models import write_climate_data, get_average_difference_temp
 
 work_log = logging.getLogger("climat_app.main")

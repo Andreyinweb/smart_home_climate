@@ -15,16 +15,6 @@ api_log.info(f"Сервер запускается, перезагрузка = {
 
 app = FastAPI(title="Smart Home Climate API")
 
-# Глобальный разделяемый словарь с последними данными опроса в едином формате
-shared_data = {
-    "street": {"temp": 0.0, "humi": 0.0, "voltage": 0.0}, 
-    "basement": {"temp": 0.0, "humi": 0.0, "voltage": 0.0}, 
-    "floor": {"temp": 0.0, "humi": 0.0, "voltage": 0.0},
-    "difference_temp": 0.0,
-    "average_temp": 0.0,
-    "Date": ""
-}
-
 def calculate_dew_point(temp: float, humi: float) -> float:
     """Расчет точки росы (°C) по формуле Магнуса."""
     if temp is None or humi is None or humi == 0:
@@ -45,7 +35,6 @@ async def get_dashboard():
     """Сборка дашборда на основе данных из БД, физических расчетов и шаблона HTML."""
     # Получаем последнюю запись из базы данных
     latest_records = get_latest_climate_data(limit=1)
-    print(f"latest_records: {latest_records}")  # TODO: Удалить после тестирования
     
     if latest_records:
         db_data = latest_records[0]
