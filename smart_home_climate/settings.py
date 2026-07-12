@@ -15,6 +15,8 @@ class AppConfig:
    # APP configuration
    MODE: str = os.environ.get("MODE", "DEV")  
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
+   TARGET_RH: float = float(os.environ.get("TARGET_RH", 60.0))
+   ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
 
 
    def __init__(self):
@@ -64,8 +66,6 @@ class BLEConfig:
    # BLE configuration
    INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", 300))
    MAX_RETRIES: int = int(os.environ.get("MAX_RETRIES", 5))
-   TARGET_RH: float = float(os.environ.get("TARGET_RH", 74.0))
-   ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
    # MAC addresses for BLE sensors
    NAME_SENSOR: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]
    MAC_DICT: dict = {
