@@ -78,7 +78,7 @@ class XiaomiBLEReceiver:
     async def sensor_get_sensors_all(self):
         data_sensors_all = {} 
         # 1. Сбор данных со всех датчиков
-        for name in config.NAME_SENSOR:
+        for name in config.NAME_SENSOR_MAC:
             if config.MAC_DICT.get(name):                
                 try:
                     data = {}

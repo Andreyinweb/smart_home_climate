@@ -67,12 +67,15 @@ class BLEConfig:
    INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", 300))
    MAX_RETRIES: int = int(os.environ.get("MAX_RETRIES", 5))
    # MAC addresses for BLE sensors
-   NAME_SENSOR: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]
+   NAME_SENSOR_MAC: list = ["FLOOR_MAC", "STREET_MAC", "BASEMENT_MAC"]   
    MAC_DICT: dict = {
       "STREET_MAC": os.environ.get("STREET_MAC", False),
       "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False),
       "FLOOR_MAC": os.environ.get("FLOOR_MAC", False)
          }
+   sensor_name = []
+   for name in NAME_SENSOR_MAC:
+      sensor_name.append(name[:-4].lower())
 
 class DatabaseConfig:
    # Data base configuration
@@ -103,7 +106,7 @@ config = Config()
 # Логгер для самого модуля settings (дочерний от climat_app)
 work_log = logging.getLogger("climat_app.settings")
 
-for name in config.NAME_SENSOR:      
+for name in config.NAME_SENSOR_MAC:      
    if not config.MAC_DICT[name] and config.MODE == "FLOOR":
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
