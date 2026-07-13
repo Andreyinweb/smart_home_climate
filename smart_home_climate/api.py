@@ -15,20 +15,14 @@ api_log.info(f"Сервер запускается, перезагрузка = {
 
 app = FastAPI(title="Smart Home Climate API")
 
-def calculate_dew_point(temp: float, humi: float) -> float:
-    """Расчет точки росы (°C) по формуле Магнуса."""
-    if temp is None or humi is None or humi == 0:
-        return 0.0
-    a = 17.27
-    b = 237.7
-    alpha = ((a * temp) / (b + temp)) + math.log(humi / 100.0)
-    dp = (b * alpha) / (a - alpha)
-    return round(dp, 2)
+data_rendered ={}
+
+
 
 @app.get("/api/data")
 async def get_raw_data():
     """Получение сырых данных в формате JSON."""
-    return shared_data
+    return data_rendered
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
@@ -46,14 +40,14 @@ async def get_dashboard():
     for name in config.NAME_SENSOR:
         db_data["a_" + name[:-4].lower() + "_humi"] = operations.calculate_absolute_humidity(db_data[name[:-4].lower() + "_temp"], db_data[name[:-4].lower() + "_humi"])
         # Расчет точек росы
-        db_data["dp_" + name[:-4].lower()] = operations.calculate_absolute_humidity(db_data[name[:-4].lower() + "_temp"], db_data[name[:-4].lower() + "_humi"])
+        db_data["dp_" + name[:-4].lower()] = operations.calculate_dew_point(db_data[name[:-4].lower() + "_temp"], db_data[name[:-4].lower() + "_humi"])
 
     # Расчет проветривания с учетом абсолютной погрешности ABSOLUTE_HUMIDITY_TOLERANCE (0.5 г/м³)
     humidity_difference = round(db_data["a_basement_humi"] - db_data["a_street_humi"], 2)
     is_safe_ventilation = humidity_difference > config.ABSOLUTE_HUMIDITY_TOLERANCE
-    has_draft = db_data["basement_temp"] > db_data["street_temp"]
+    # has_draft = db_data["basement_temp"] > db_data["street_temp"]
 
-    if is_safe_ventilation and has_draft:
+    if is_safe_ventilation: # and has_draft:
         vent_status = "ДА"
         try:
             vent_time_val = round(10.4 / math.sqrt(db_data["basement_temp"] - db_data["street_temp"]))
@@ -79,9 +73,9 @@ async def get_dashboard():
     heating_delta = 0.0
 
     floor_temp_heated, heating_delta = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
-    print(f"floor_temp_heated= {floor_temp_heated}        heating_delta= {heating_delta}")
-    tutochki = operations.calculate_relative_humidity(floor_temp_heated, db_data["a_floor_humi"])
-    print(f"floor tutochki= {tutochki}")
+    print(f"floor_temp_heated= {floor_temp_heated}        heating_delta= {heating_delta}") # TODO
+    tutochki = operations.calculate_relative_humidity(floor_temp_heated, db_data["a_floor_humi"]) # TODO
+    print(f"floor tutochki= {tutochki}") # TODO
 
     heat_status = "ДА" if heating_needed else "НЕТ"
     heat_info = f"+{heating_delta} °C" if heating_needed else ""

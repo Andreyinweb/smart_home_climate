@@ -16,6 +16,16 @@ def calculate_absolute_humidity(temp: float, humi: float) -> float:
     ah = (216.7 * e) / (temp + 273.15)
     return round(ah, 2)
 
+def calculate_dew_point(temp: float, humi: float) -> float:
+    """Расчет точки росы (°C) по формуле Магнуса."""
+    if temp is None or humi is None or humi == 0:
+        return 0.0
+    a = 17.27
+    b = 237.7
+    alpha = ((a * temp) / (b + temp)) + math.log(humi / 100.0)
+    dp = (b * alpha) / (a - alpha)
+    return round(dp, 2)
+
 def calculate_relative_humidity(temp: float, ah: float) -> float:
     """
     Обратный расчет относительной влажности (%) по температуре и абсолютной влажности.
