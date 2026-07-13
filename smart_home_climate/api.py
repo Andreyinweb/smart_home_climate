@@ -75,16 +75,13 @@ async def get_dashboard():
     sim_floor_humi = operations.calculate_relative_humidity(db_data["floor_temp"], sim_abasement_humi)
 
     # Расчет компенсационного нагрева (Отопление)
-    heating_needed = db_data["street_humi"]> config.TARGET_RH
+    heating_needed = db_data["floor_humi"] > config.TARGET_RH
     heating_delta = 0.0
 
-    if heating_needed:
-        for delta in [x * 0.1 for x in range(1, 150)]:
-            sim_floor_temp_heated = db_data["street_humi"] + delta
-            rh_at_heated_floor = operations.calculate_relative_humidity(sim_floor_temp_heated, db_data["a_basement_humi"])
-            if rh_at_heated_floor <= config.TARGET_RH:
-                heating_delta = round(delta, 1)
-                break
+    floor_temp_heated, heating_delta = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
+    print(f"floor_temp_heated= {floor_temp_heated}        heating_delta= {heating_delta}")
+    tutochki = operations.calculate_relative_humidity(floor_temp_heated, db_data["a_floor_humi"])
+    print(f"floor tutochki= {tutochki}")
 
     heat_status = "ДА" if heating_needed else "НЕТ"
     heat_info = f"+{heating_delta} °C" if heating_needed else ""
@@ -94,8 +91,7 @@ async def get_dashboard():
     if heating_needed:
         basement_temp_heated = round(db_data["basement_temp"] + heating_delta, 1)
         basement_humi_heated = operations.calculate_relative_humidity(basement_temp_heated, db_data["a_basement_humi"])
-        floor_temp_heated = round(db_data["floor_temp"] + heating_delta, 1)
-        floor_humi_heated = operations.calculate_relative_humidity(floor_temp_heated, db_data["a_basement_humi"])
+        floor_humi_heated = operations.calculate_relative_humidity(floor_temp_heated, db_data["a_floor_humi"])
     else:
         basement_temp_heated = db_data["basement_temp"]
         basement_humi_heated = db_data["basement_humi"]
