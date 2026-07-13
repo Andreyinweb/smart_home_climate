@@ -72,7 +72,7 @@
                     <span class="px-3 py-1 rounded-full text-xs font-bold {vent_class}">
                         {vent_status} — {vent_reason}
                     </span>
-                    <span class="text-sm font-semibold">Отопление:</span>
+                    <span class="text-sm font-semibold ml-0 sm:ml-4">Отопление:</span>
                     <span class="px-3 py-1 rounded-full text-xs font-bold {heat_class}">
                         {heat_status} {heat_info}
                     </span>
@@ -86,7 +86,7 @@
         </div>
 
         <!-- ТАБЛИЦА 2: РАСЧЕТНЫЕ ДАННЫЕ (ПРОВЕТРИВАНИЕ) -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden {vent_display_class}">
             <div class="p-6 border-b border-gray-100">
                 <h2 class="text-xl font-bold text-gray-800">ПРОВЕТРИВАНИЕ</h2>
             </div>
@@ -125,7 +125,7 @@
         </div>
 
         <!-- ТАБЛИЦА 3: ДАННЫЕ ОТОПЛЕНИЯ -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden {heat_display_class}">
             <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">ОТОПЛЕНИЕ</h2>

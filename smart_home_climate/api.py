@@ -62,6 +62,10 @@ async def get_dashboard():
         vent_reason = "Тяги нет."
 
     vent_class = "bg-green-100 text-green-800" if vent_status == "ДА" else "bg-red-100 text-red-800"
+    
+    vent_status = "ДА" #TODO Удали
+    # Класс видимости для таблицы проветривания (скрываем, если "НЕТ")
+    vent_display_class = "" if vent_status == "ДА" else "hidden"
 
     # Моделирование замещения (Проветривание)
     sim_abasement_humi = db_data["a_street_humi"]
@@ -80,6 +84,10 @@ async def get_dashboard():
     heat_status = "ДА" if heating_needed else "НЕТ"
     heat_info = f"+{heating_delta} °C" if heating_needed else ""
     heat_class = "bg-amber-100 text-amber-800" if heating_needed else "bg-gray-100 text-gray-700"
+    
+    heat_status == "ДА" #TODO Удали
+    # Класс видимости для таблицы отопления (скрываем, если "НЕТ")
+    heat_display_class = "" if heat_status == "ДА" else "hidden"
 
     # Итоговые параметры после догрева
     if heating_needed:
@@ -104,6 +112,7 @@ async def get_dashboard():
         "vent_status":vent_status,
         "vent_reason":vent_reason,
         "vent_class":vent_class,
+        "vent_display_class":vent_display_class,
         "humidity_difference":humidity_difference,
         "sim_basement_humi":sim_basement_humi,
         "sim_floor_humi":sim_floor_humi,
@@ -111,6 +120,7 @@ async def get_dashboard():
         "heat_status":heat_status,
         "heat_info":heat_info,
         "heat_class":heat_class,
+        "heat_display_class":heat_display_class,
         "basement_temp_heated":basement_temp_heated,
         "basement_humi_heated":basement_humi_heated,
         "floor_temp_heated":floor_temp_heated,
