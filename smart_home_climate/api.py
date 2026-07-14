@@ -37,8 +37,8 @@ async def get_dashboard():
           'average_temp': 0.0, 'street_humi': 0.0, 'basement_humi': 0.0, 'floor_humi': 0.0, 'street_voltage': 0.0, 
           'basement_voltage': 0.0, 'floor_voltage': 0.0, 'a_floor_humi': 0.0, 'dp_floor': 0.0, 
           'a_street_humi': 0.0, 'dp_street': 0.0, 'a_basement_humi': 0.0, 'dp_basement': 0.0, 'humidity_difference': 0.0, 
-          'vent_status': 'ДА', 'vent_time_val': 0, 'sim_a_basement_humi': 0.0, 'sim_basement_humi': 0.0, 'sim_floor_humi': 0.0, 
-          'heating_delta': 0.0, 'floor_temp_heated': 0.0, 'heat_status': 'ДА', 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0, 
+          'vent_status': True, 'vent_time_val': 0, 'sim_a_basement_humi': 0.0, 'sim_basement_humi': 0.0, 'sim_floor_humi': 0.0, 
+          'heating_delta': 0.0, 'floor_temp_heated': 0.0, 'heat_status': True, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0, 
           'floor_humi_heated': 0.0}
         db_data["db_date"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
 ############################################################### TODO Переделать под майн и базу данных        #############################################   
@@ -52,13 +52,13 @@ async def get_dashboard():
     db_data["humidity_difference"] = round(db_data["a_basement_humi"] - db_data["a_street_humi"], 2)
 
     if db_data["humidity_difference"] >= config.ABSOLUTE_HUMIDITY_TOLERANCE:        
-        db_data["vent_status"] = "ДА"
+        db_data["vent_status"] = True
         if abs(db_data["basement_temp"] - db_data["street_temp"]):
             db_data["vent_time_val"] = round(10.4 / math.sqrt(abs(db_data["basement_temp"] - db_data["street_temp"])))
         else:
             db_data["vent_time_val"] = 0
     else:
-        db_data["vent_status"] = "НЕТ"
+        db_data["vent_status"] = False
         db_data["vent_time_val"] = 0
      
     # Моделирование замещения (Проветривание)
@@ -69,8 +69,8 @@ async def get_dashboard():
     # Расчет компенсационного нагрева (Отопление)
     db_data["heating_delta"] = 0.0
 
-    if db_data["vent_status"] == "ДА" and db_data["floor_humi"] > config.TARGET_RH:
-        db_data["heat_status"] = "ДА"
+    if db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
+        db_data["heat_status"] = True
         db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_street_humi"])
         db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
         db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_street_humi"])
@@ -78,8 +78,8 @@ async def get_dashboard():
         db_data["floor_humi_heated"] = operations.calculate_relative_humidity(db_data["floor_temp_heated"], db_data["a_street_humi"])
         db_data["a_floor_humi_heated"] = db_data["a_street_humi"]
 
-    elif db_data["vent_status"] == "НЕТ" and db_data["floor_humi"] > config.TARGET_RH:
-        db_data["heat_status"] = "ДА"
+    elif not db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
+        db_data["heat_status"] = True
         db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
         db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
         db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_basement_humi"])
@@ -87,7 +87,7 @@ async def get_dashboard():
         db_data["floor_humi_heated"] = operations.calculate_relative_humidity(db_data["floor_temp_heated"], db_data["a_floor_humi"])
         db_data["a_floor_humi_heated"] = db_data["a_floor_humi"]
     else:
-        db_data["heat_status"] = "НЕТ"
+        db_data["heat_status"] = False
         db_data["basement_temp_heated"] = db_data["basement_temp"]
         db_data["basement_humi_heated"] = db_data["basement_humi"]
         db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]
@@ -97,10 +97,13 @@ async def get_dashboard():
 
 ################################################## TODO Переделать под майн и базу данных ####################################################################
 
-    if db_data["vent_status"] == "ДА" and  db_data["vent_time_val"]:
+    if db_data["vent_status"] and  db_data["vent_time_val"]:
+
+        db_data["msg_vent_status"] = "ДА"
         db_data["vent_reason"] = f"Время: {db_data["vent_time_val"]} мин."
 
-    elif db_data["vent_status"] == "НЕТ":
+    elif not db_data["vent_status"]:
+        db_data["msg_vent_status"] = "НЕТ"
         db_data["vent_reason"] = "dАВ < 0.5"
     else:
         db_data["vent_reason"] = "Тяги нет."
@@ -108,13 +111,18 @@ async def get_dashboard():
     db_data["vent_class"] = "bg-green-100 text-green-800" if db_data["vent_status"] == "ДА" else "bg-red-100 text-red-800"
 
     # Класс видимости для таблицы проветривания (скрываем, если "НЕТ")
-    db_data["vent_display_class"] = "" # if db_data["vent_status"] == "ДА" else "hidden" #TODO Розкоментируй
+    db_data["vent_display_class"] = "" # if db_data["vent_status"] else "hidden" #TODO Розкоментируй
 
-    db_data["heat_info"] = f"+{db_data["heating_delta"]} °C" if db_data["heat_status"] == "ДА" else ""
-    db_data["heat_class"] = "bg-amber-100 text-amber-800" if db_data["heat_status"] == "ДА" else "bg-gray-100 text-gray-700"
+    if db_data["heat_status"]:
+        db_data["msg_heat_status"] = "ДА"
+    else:
+        db_data["msg_heat_status"] = "НЕТ"
+
+    db_data["heat_info"] = f"+{db_data["heating_delta"]} °C" if db_data["heat_status"] else ""
+    db_data["heat_class"] = "bg-amber-100 text-amber-800" if db_data["heat_status"] else "bg-gray-100 text-gray-700"
 
     # Класс видимости для таблицы отопления (скрываем, если "НЕТ")
-    db_data["heat_display_class"] = "" # if db_data["heat_status"] == "ДА" else "hidden" #TODO Розкоментируй
+    db_data["heat_display_class"] = "" # if db_data["heat_status"] else "hidden" #TODO Розкоментируй
 
     # Чтение шаблона разметки
     html_path = os.path.join(config.PROJECT_DIR, "index.html")

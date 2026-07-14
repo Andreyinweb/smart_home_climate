@@ -14,7 +14,7 @@ class XiaomiBLEReceiver:
     
     REALTIME_DATA_CHAR = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6"
 
-    def __init__(self, connection_timeout: float = 15.0, read_timeout: float = 10.0):
+    def __init__(self, connection_timeout: float = 20.0, read_timeout: float = 15.0):
         self.connection_timeout = connection_timeout
         self.read_timeout = read_timeout
 
