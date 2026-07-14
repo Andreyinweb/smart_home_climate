@@ -131,7 +131,7 @@ done
 # Путь к целевой директории для виртуального окружения
 VENV_PATH="$VENV_DIR/$VENV_NAME"
 # Пути для проверки .env
-ENV_FILE="${PROJECT_DIR%/*}/.env"
+ENV_FILE="${PROJECT_DIR}/.env"
 # Пути для проверки log
 LOG_DIR="$PROJECT_DIR/logs"
 WORK_FILE="$LOG_DIR/work_log.log"

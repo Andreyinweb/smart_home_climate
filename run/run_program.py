@@ -131,10 +131,10 @@ def create_backup(source_file, backup_dir, max_backups=100):
 # Проверяем и создаем базу данных"
 check_or_create_database(database_file)
 
-# Создаём таблицу имён баз данных
+# Создаём таблицу table_sensor_data
 fields_db = """ (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            Date TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
             street_temp REAL,
             basement_temp REAL,
             floor_temp REAL,
@@ -145,9 +145,50 @@ fields_db = """ (
             floor_humi REAL,
             street_voltage REAL,
             basement_voltage REAL,
-            floor_voltage REAL
+            floor_voltage REAL,
+            gas_meter
         )
         """
-create_table(db_path=database_file, table_name="table_climate", fields=fields_db)
+create_table(db_path=database_file, table_name="table_sensor_data", fields=fields_db)
+
+# Создаём таблицу api_table
+fields_db = """ (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    street_temp REAL,
+    basement_temp REAL,
+    floor_temp REAL,
+    difference_temp REAL,
+    average_temp REAL,
+    street_humi REAL,
+    basement_humi REAL,
+    floor_humi REAL,
+    street_voltage REAL,
+    basement_voltage REAL,
+    floor_voltage REAL,
+    gas_meter REAL,
+    a_floor_humi REAL,
+    dp_floor REAL,
+    a_street_humi REAL,
+    dp_street REAL,
+    a_basement_humi REAL,
+    dp_basement REAL,
+    humidity_difference REAL,
+    vent_status BOOLEAN,
+    vent_time_val INTEGER,
+    sim_a_basement_humi REAL,
+    sim_basement_humi REAL,
+    sim_floor_humi REAL,
+    heating_delta REAL,
+    heat_status BOOLEAN,
+    floor_temp_heated REAL,
+    basement_temp_heated REAL,
+    basement_humi_heated REAL,
+    a_basement_humi_heated REAL,
+    floor_humi_heated REAL,
+    a_floor_humi_heated REAL
+    )
+    """
+create_table(db_path=database_file, table_name="api_table", fields=fields_db)
 
 create_backup(database_file, backup_dir)

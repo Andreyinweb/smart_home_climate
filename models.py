@@ -1,5 +1,9 @@
 import sqlite3
+import logging
 from settings import config
+
+work_log = logging.getLogger("climat_app.models")
+
 
 def get_db_connection():
     """Создает подключение к базе данных SQLite с включенным автокоммитом."""
@@ -7,28 +11,18 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def write_climate_data(data_sensors_all: dict) -> bool:
+def write_climate_data(name_table, data_sensors_all: dict) -> bool:
     """
-    Записывает текущие показатели датчиков и расчетные данные в таблицу table_climate.
+    Записывает текущие показатели датчиков и расчетные данные в таблицу table_sensor_data.
     """
-    query = "INSERT INTO table_climate ("
-    name_list = list(data_sensors_all.keys())
-    incoming_data = []
-    count_values = 0
-    for name in name_list:
-        if type(data_sensors_all[name]) is dict:
-            climate_variables = list(data_sensors_all[name].keys())
-            for variable in climate_variables:
-                query += f" {name}_{variable},"
-                count_values += 1
-                incoming_data.append(data_sensors_all[name][variable])
-        else:
-            query += f" {name},"
-            count_values += 1
-            incoming_data.append(data_sensors_all[name])
-    query = query[:-1] + ") VALUES (" + "?, " * count_values
-    query = query[:-2]  + ")"
-    incoming_data = tuple(incoming_data)
+    names = list(data_sensors_all.keys())
+    incoming_data = tuple(data_sensors_all.values())
+
+    columns = ", ".join(names)
+    placeholders = ", ".join(["?"] * len(names))
+
+    query = f"INSERT INTO " + name_table + f" ({columns}) VALUES ({placeholders})"
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -39,12 +33,12 @@ def write_climate_data(data_sensors_all: dict) -> bool:
         print(f"[БД] Ошибка записи в базу данных: {e}")
         return False
 
-def get_latest_climate_data(limit: int = 1):
+def get_latest_climate_data(name_table, limit: int = 1):
     """
-    Возвращает последние записи из таблицы table_climate.
+    Возвращает последние записи из таблицы table_sensor_data.
     """
     query = f"""
-    SELECT * FROM table_climate
+    SELECT * FROM {name_table}
     ORDER BY ID DESC
     LIMIT {limit}
     """
@@ -63,7 +57,7 @@ def get_average_difference_temp() -> float:
     Вычисляет среднее значение всех данных из столбца difference_temp.
     В случае ошибки или отсутствия данных возвращает 0.0.
     """
-    query = "SELECT AVG(difference_temp) as avg_diff FROM table_climate"
+    query = "SELECT AVG(difference_temp) as avg_diff FROM table_sensor_data"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()

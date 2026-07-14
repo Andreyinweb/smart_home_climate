@@ -2,16 +2,16 @@
 # Дополнительные настройки находятся в файле run.sh Начальные условия
 # Переменные надо писать чтобы их пог прочитать и bash и python
 
-PROJECT_DIR=
+PROJECT_DIR='/home/andrey/andrey_folder/1_New_climate/smart_home_climate'
 # Путь к целевой директории для виртуального окружения 
-VENV_DIR="/home/venv" #  "/home/venv" #   Обязательно указать свою 
-VENV_NAME="venv_climate" # Имя виртуального окружения
+VENV_DIR="/home/andrey/andrey_folder/Venv"  #  "/home/komp/Programming/Venv"    #  "/home/venv" #   Обязательно указать свою   # 
+VENV_NAME="new_smart_home_climate" # Имя виртуального окружения
 # Пути для проверки базы данных
-DATA_DIR="/home/base" # Папка для хранения базы данных
+DATA_DIR="/home/andrey/andrey_folder/1_New_climate/smart_home_climate"  
 DATA_FILE="climate_data.sqlite3"
 # Версия Python, которую нужно установить
 desired_version="3.12"
 # Нужно дописать макадреса
-BASEMENT_MAC=
-STREET_MAC=
-FLOOR_MAC= 
+STREET_MAC="A4:C1:38:53:82:0F"  # Улица
+BASEMENT_MAC="A4:C1:38:51:C3:0D"  # Подвал
+FLOOR_MAC="A4:C1:38:10:3B:D1"   # Спальня  

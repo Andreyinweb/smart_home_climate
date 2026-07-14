@@ -99,7 +99,8 @@ class XiaomiBLEReceiver:
                             await asyncio.sleep(1) # Короткая пауза перед повторной попыткой
                     
                     if data and "temp" in data and "humi" in data:
-                        data_sensors_all[name[:-4].lower()] = data
+                        for sensor_variable in data: 
+                            data_sensors_all[name[:-4].lower() + "_" + sensor_variable] = data[sensor_variable]
                         work_log.info(f"[{name}] Попытка {retries}. Данные: T={data['temp']}°C, H={data['humi']}%")
                     else:
                         work_log.error(f"[{name}] Не удалось получить данные за {retries} попыток.")

@@ -15,6 +15,7 @@ class AppConfig:
    # APP configuration
    MODE: str = os.environ.get("MODE", "DEV")  
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
+   T_FLOOR_MAC_DIFF: float = float(os.environ.get("T_FLOOR_MAC_DIFF", 2.4))
    TARGET_RH: float = float(os.environ.get("TARGET_RH", 60.0))
    ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
 

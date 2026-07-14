@@ -8,6 +8,7 @@ from datetime import datetime
 
 from settings import config
 from ble_receiver import XiaomiBLEReceiver
+import operations
 from api import app
 from models import write_climate_data, get_average_difference_temp
 
@@ -22,7 +23,7 @@ receiver = XiaomiBLEReceiver()
 #         "floor":{"temp":0.0, "humi":0.0, "voltage":0.0},
 #         "difference_temp":0.0,
 #         "average_temp":0.0,
-#         "Date": ""
+#         "timestamp": ""
 #         }
 
 data_sensors_all = {}
@@ -38,7 +39,7 @@ async def polling_task():
 
         # 2. Обработка собранных данных (после того, как опрос ВСЕХ датчиков завершен)
         if data_sensors_all:
-            data_sensors_all["Date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            data_sensors_all["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Вычисление difference_temp в зависимости от режима работы
             if config.MODE == "TWO_SENSORS":
@@ -59,15 +60,80 @@ async def polling_task():
             # Получение среднего исторического значения разницы температур из БД
             data_sensors_all["average_temp"] = get_average_difference_temp()
 
-            # 3. Запись транзакции в SQLite
+            print(f"Запись в БД: {data_sensors_all}") #TODO
+        # 3. Запись датчиков в table_sensor_data
+            
             try:
-                print(f"Запись в БД: {data_sensors_all}")
-                success = write_climate_data(data_sensors_all)
+                success = write_climate_data("table_sensor_data", data_sensors_all)
                 if success:
-                    work_log.info("[БД] Данные успешно записаны в таблицу 'table_climate'")
+                    work_log.info("[БД] Данные успешно записаны в таблицу 'table_sensor_data'")
+            except Exception as db_err:
+                work_log.error(f"[БД] Ошибка подготовки данных для записи: {db_err}")
+##########################################################################################################################################
+        # 4. Расчёт данных
+            db_data ={}
+            db_data = dict(data_sensors_all)
+            for name in config.sensor_name:
+                # Расчет абсолютных влажностей
+                db_data["a_" + name + "_humi"] = operations.calculate_absolute_humidity(db_data[name + "_temp"], db_data[name + "_humi"])
+                # Расчет точек росы
+                db_data["dp_" + name] = operations.calculate_dew_point(db_data[name + "_temp"], db_data[name + "_humi"])
+
+            # Расчет проветривания с учетом абсолютной погрешности ABSOLUTE_HUMIDITY_TOLERANCE (0.5 г/м³)
+            db_data["humidity_difference"] = round(db_data["a_basement_humi"] - db_data["a_street_humi"], 2)
+
+            if db_data["humidity_difference"] >= config.ABSOLUTE_HUMIDITY_TOLERANCE:        
+                db_data["vent_status"] = True
+                if abs(db_data["basement_temp"] - db_data["street_temp"]):
+                    db_data["vent_time_val"] = round(10.4 / math.sqrt(abs(db_data["basement_temp"] - db_data["street_temp"])))
+                else:
+                    db_data["vent_time_val"] = 0
+            else:
+                db_data["vent_status"] = False
+                db_data["vent_time_val"] = 0
+            
+            # Моделирование замещения (Проветривание)
+            db_data["sim_a_basement_humi"] = db_data["a_street_humi"]
+            db_data["sim_basement_humi"] = operations.calculate_relative_humidity(db_data["basement_temp"], db_data["sim_a_basement_humi"])
+            db_data["sim_floor_humi"] = operations.calculate_relative_humidity(db_data["floor_temp"], db_data["sim_a_basement_humi"])
+
+            # Расчет компенсационного нагрева (Отопление)
+            db_data["heating_delta"] = 0.0
+
+            if db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
+                db_data["heat_status"] = True
+                db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_street_humi"])
+                db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
+                db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_street_humi"])
+                db_data["a_basement_humi_heated"] = db_data["a_street_humi"]
+                db_data["floor_humi_heated"] = operations.calculate_relative_humidity(db_data["floor_temp_heated"], db_data["a_street_humi"])
+                db_data["a_floor_humi_heated"] = db_data["a_street_humi"]
+
+            elif not db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
+                db_data["heat_status"] = True
+                db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
+                db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
+                db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_basement_humi"])
+                db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]
+                db_data["floor_humi_heated"] = operations.calculate_relative_humidity(db_data["floor_temp_heated"], db_data["a_floor_humi"])
+                db_data["a_floor_humi_heated"] = db_data["a_floor_humi"]
+            else:
+                db_data["heat_status"] = False
+                db_data["basement_temp_heated"] = db_data["basement_temp"]
+                db_data["basement_humi_heated"] = db_data["basement_humi"]
+                db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]
+                db_data["floor_temp_heated"] = db_data["floor_temp"]
+                db_data["floor_humi_heated"] = db_data["floor_humi"]
+                db_data["a_floor_humi_heated"] = db_data["a_floor_humi"]
+        # 5. Запись датчиков в api_table
+            try:
+                success = write_climate_data("api_table", db_data)
+                if success:
+                    work_log.info("[БД] Данные успешно записаны в таблицу 'api_table'")
             except Exception as db_err:
                 work_log.error(f"[БД] Ошибка подготовки данных для записи: {db_err}")
 
+        # 6. Пауза
         work_log.info(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
         print(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
         await asyncio.sleep(config.INTERVAL_SECONDS)
