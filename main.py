@@ -46,9 +46,9 @@ async def polling_task():
                 data_sensors_all["difference_temp"] = config.T_FLOOR_MAC_DIFF
             elif config.MODE == "FLOOR":
                 # Проверяем наличие необходимых данных перед расчетом
-                if 'basement' in data_sensors_all and 'floor' in data_sensors_all:
+                if 'basement_temp' in data_sensors_all and 'floor_temp' in data_sensors_all:
                     data_sensors_all["difference_temp"] = round(
-                        data_sensors_all['basement']['temp'] - data_sensors_all['floor']['temp'], 2
+                        data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
                 else:
                     data_sensors_all["difference_temp"] = 0.0
