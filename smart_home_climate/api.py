@@ -67,23 +67,33 @@ async def get_dashboard():
     db_data["sim_floor_humi"] = operations.calculate_relative_humidity(db_data["floor_temp"], db_data["sim_a_basement_humi"])
 
     # Расчет компенсационного нагрева (Отопление)
-    heating_needed = db_data["floor_humi"] > config.TARGET_RH
     db_data["heating_delta"] = 0.0
 
-    db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
+    if db_data["vent_status"] == "ДА" and db_data["floor_humi"] > config.TARGET_RH:
+        db_data["heat_status"] = "ДА"
+        db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_street_humi"])
+        db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
+        db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_street_humi"])
+        db_data["a_basement_humi_heated"] = db_data["a_street_humi"]
+        db_data["floor_humi_heated"] = operations.calculate_relative_humidity(db_data["floor_temp_heated"], db_data["a_street_humi"])
+        db_data["a_floor_humi_heated"] = db_data["a_street_humi"]
 
-    db_data["heat_status"] = "ДА" if heating_needed else "НЕТ"
-
-    # Итоговые параметры после догрева
-    if heating_needed:
+    elif db_data["vent_status"] == "НЕТ" and db_data["floor_humi"] > config.TARGET_RH:
+        db_data["heat_status"] = "ДА"
+        db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
         db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
         db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_basement_humi"])
+        db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]
         db_data["floor_humi_heated"] = operations.calculate_relative_humidity(db_data["floor_temp_heated"], db_data["a_floor_humi"])
+        db_data["a_floor_humi_heated"] = db_data["a_floor_humi"]
     else:
+        db_data["heat_status"] = "НЕТ"
         db_data["basement_temp_heated"] = db_data["basement_temp"]
         db_data["basement_humi_heated"] = db_data["basement_humi"]
+        db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]
         db_data["floor_temp_heated"] = db_data["floor_temp"]
         db_data["floor_humi_heated"] = db_data["floor_humi"]
+        db_data["a_floor_humi_heated"] = db_data["a_floor_humi"]
 
 ################################################## TODO Переделать под майн и базу данных ####################################################################
 
@@ -100,8 +110,8 @@ async def get_dashboard():
     # Класс видимости для таблицы проветривания (скрываем, если "НЕТ")
     db_data["vent_display_class"] = "" # if db_data["vent_status"] == "ДА" else "hidden" #TODO Розкоментируй
 
-    db_data["heat_info"] = f"+{db_data["heating_delta"]} °C" if heating_needed else ""
-    db_data["heat_class"] = "bg-amber-100 text-amber-800" if heating_needed else "bg-gray-100 text-gray-700"
+    db_data["heat_info"] = f"+{db_data["heating_delta"]} °C" if db_data["heat_status"] == "ДА" else ""
+    db_data["heat_class"] = "bg-amber-100 text-amber-800" if db_data["heat_status"] == "ДА" else "bg-gray-100 text-gray-700"
 
     # Класс видимости для таблицы отопления (скрываем, если "НЕТ")
     db_data["heat_display_class"] = "" # if db_data["heat_status"] == "ДА" else "hidden" #TODO Розкоментируй
