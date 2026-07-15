@@ -1,7 +1,6 @@
 #  python3 api.py  # Сервер 
 
 import os
-import math
 import logging
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse

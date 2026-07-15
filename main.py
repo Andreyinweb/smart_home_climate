@@ -1,6 +1,6 @@
 #  python3 main.py  # Точка входа для запуска сервера и фонового опроса
 
-import sys
+import math
 import asyncio
 import uvicorn
 import logging
