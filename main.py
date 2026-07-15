@@ -51,7 +51,7 @@ async def polling_task():
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
                 else:
-                    data_sensors_all["difference_temp"] = 0.0
+                    data_sensors_all["difference_temp"] = config.T_FLOOR_MAC_DIFF
                     work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчиков basement или floor")
             else:
                 data_sensors_all["difference_temp"] = config.T_FLOOR_MAC_DIFF

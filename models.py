@@ -55,7 +55,7 @@ def get_latest_climate_data(name_table, limit: int = 1):
 def get_average_difference_temp() -> float:
     """
     Вычисляет среднее значение всех данных из столбца difference_temp.
-    В случае ошибки или отсутствия данных возвращает 0.0.
+    В случае ошибки или отсутствия данных возвращает config.T_FLOOR_MAC_DIFF
     """
     query = "SELECT AVG(difference_temp) as avg_diff FROM table_sensor_data"
     try:
@@ -65,7 +65,7 @@ def get_average_difference_temp() -> float:
             row = cursor.fetchone()
             if row and row["avg_diff"] is not None:
                 return round(row["avg_diff"], 2)
-            return 0.0
+            return config.T_FLOOR_MAC_DIFF
     except sqlite3.Error as e:
         print(f"[БД] Ошибка при расчете среднего значения difference_temp: {e}")
-        return 0.0
+        return config.T_FLOOR_MAC_DIFF
