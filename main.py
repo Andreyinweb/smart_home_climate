@@ -13,6 +13,7 @@ from api import app
 from models import write_climate_data, get_average_difference_temp
 
 work_log = logging.getLogger("climat_app.main")
+work_log.info(f"------------------------------------------------------------------------------------")
 work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 print(f"main запущена. MODE = {config.MODE}.")
 
@@ -101,8 +102,11 @@ async def polling_task():
             db_data["heating_delta"] = 0.0
 
             if db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
-                db_data["heat_status"] = True
                 db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_street_humi"])
+                if db_data["heating_delta"] >= 1:
+                    db_data["heat_status"] = True
+                else:
+                    db_data["heat_status"] = False
                 db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
                 db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_street_humi"])
                 db_data["a_basement_humi_heated"] = db_data["a_street_humi"]
@@ -110,8 +114,11 @@ async def polling_task():
                 db_data["a_floor_humi_heated"] = db_data["a_street_humi"]
 
             elif not db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
-                db_data["heat_status"] = True
                 db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
+                if db_data["heating_delta"] >= 1:
+                    db_data["heat_status"] = True
+                else:
+                    db_data["heat_status"] = False
                 db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
                 db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_basement_humi"])
                 db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]
@@ -119,6 +126,7 @@ async def polling_task():
                 db_data["a_floor_humi_heated"] = db_data["a_floor_humi"]
             else:
                 db_data["heat_status"] = False
+                db_data["heating_delta"] = 0.0
                 db_data["basement_temp_heated"] = db_data["basement_temp"]
                 db_data["basement_humi_heated"] = db_data["basement_humi"]
                 db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]

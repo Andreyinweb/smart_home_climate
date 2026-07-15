@@ -9,6 +9,7 @@ from models import get_latest_climate_data, write_climate_data
 
 # Логирование
 api_log = logging.getLogger("api_app.api")
+api_log.info(f"-------------------------------------------------------------------------------------------------")
 api_log.info(f"Сервер запускается, перезагрузка = {config.WEBSITE_RETURN_TIME} с.")
 
 app = FastAPI(title="Smart Home Climate API")
