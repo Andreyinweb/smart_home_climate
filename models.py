@@ -11,22 +11,32 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def write_climate_data(name_table, data_sensors_all: dict) -> bool:
+def write_climate_data(name_table, data_sensors_all: dict, row_id: int = None) -> bool:
     """
-    Записывает текущие показатели датчиков и расчетные данные в таблицу table_sensor_data.
+    Записывает текущие показатели в таблицу. 
+    Если передан row_id, перезаписывает (или создает) строку с этим ID.
     """
     names = list(data_sensors_all.keys())
-    incoming_data = tuple(data_sensors_all.values())
+    incoming_data = list(data_sensors_all.values())
 
-    columns = ", ".join(names)
-    placeholders = ", ".join(["?"] * len(names))
-
-    query = f"INSERT INTO " + name_table + f" ({columns}) VALUES ({placeholders})"
+    if row_id is not None:
+        # Добавляем id в список полей и значений для INSERT OR REPLACE
+        names.append("id")
+        incoming_data.append(row_id)
+        
+        columns = ", ".join(names)
+        placeholders = ", ".join(["?"] * len(names))
+        query = f"INSERT OR REPLACE INTO {name_table} ({columns}) VALUES ({placeholders})"
+    else:
+        # Стандартный INSERT для добавления новой строки с автоинкрементом
+        columns = ", ".join(names)
+        placeholders = ", ".join(["?"] * len(names))
+        query = f"INSERT INTO {name_table} ({columns}) VALUES ({placeholders})"
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, incoming_data)
+            cursor.execute(query, tuple(incoming_data))
             conn.commit()
         return True
     except sqlite3.Error as e:

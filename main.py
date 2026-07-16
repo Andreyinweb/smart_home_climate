@@ -19,6 +19,36 @@ print(f"main запущена. MODE = {config.MODE}.")
 
 receiver = XiaomiBLEReceiver()
 
+settings_in_db = {}
+
+settings_in_db["mode"] =  config.MODE
+settings_in_db["interval_seconds"] =  config.INTERVAL_SECONDS
+settings_in_db["max_retries"] =  config.MAX_RETRIES
+settings_in_db["t_floor_mac_diff"] = config.T_FLOOR_MAC_DIFF
+settings_in_db["website_return_time"] =  config.WEBSITE_RETURN_TIME
+settings_in_db["target_rh"] = config.TARGET_RH
+settings_in_db["absolute_humidity_tolerance"] = config.ABSOLUTE_HUMIDITY_TOLERANCE
+settings_in_db["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+try:
+    success = write_climate_data("settings_table", settings_in_db, row_id=1)
+    if success:
+        work_log.info("[БД] Данные успешно записаны в таблицу 'settings_table'")
+except Exception as db_err:
+    work_log.error(f"[БД] Ошибка settings_table подготовки данных для записи: {db_err}")
+
+ventilation_in_db = {}
+ventilation_in_db["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+ventilation_in_db["ventilation_start"] = 10
+ventilation_in_db["stop_ventilation"] = 20
+
+try:
+    success = write_climate_data("ventilation_table", ventilation_in_db, row_id=1)
+    if success:
+        work_log.info("[БД] Данные успешно записаны в таблицу 'ventilation_table'")
+except Exception as db_err:
+    work_log.error(f"[БД] Ошибка ventilation_table подготовки данных для записи: {db_err}")
+
 # data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
 #         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
 #         "floor":{"temp":0.0, "humi":0.0, "voltage":0.0},
@@ -103,10 +133,7 @@ async def polling_task():
 
             if db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
                 db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_street_humi"])
-                if db_data["heating_delta"] >= 1:
-                    db_data["heat_status"] = True
-                else:
-                    db_data["heat_status"] = False
+                db_data["heat_status"] = True
                 db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
                 db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_street_humi"])
                 db_data["a_basement_humi_heated"] = db_data["a_street_humi"]
@@ -115,10 +142,7 @@ async def polling_task():
 
             elif not db_data["vent_status"] and db_data["floor_humi"] > config.TARGET_RH:
                 db_data["floor_temp_heated"], db_data["heating_delta"] = operations.calculating_temperature_from_humidity(db_data["floor_temp"], db_data["a_floor_humi"])
-                if db_data["heating_delta"] >= 1:
-                    db_data["heat_status"] = True
-                else:
-                    db_data["heat_status"] = False
+                db_data["heat_status"] = True
                 db_data["basement_temp_heated"] = round(db_data["basement_temp"] + db_data["heating_delta"], 1)
                 db_data["basement_humi_heated"] = operations.calculate_relative_humidity(db_data["basement_temp_heated"], db_data["a_basement_humi"])
                 db_data["a_basement_humi_heated"] = db_data["a_basement_humi"]

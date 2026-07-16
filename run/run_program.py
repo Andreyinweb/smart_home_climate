@@ -151,6 +151,7 @@ fields_db = """ (
         """
 create_table(db_path=database_file, table_name="table_sensor_data", fields=fields_db)
 
+fields_db = []
 # Создаём таблицу api_table
 fields_db = """ (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,5 +191,43 @@ fields_db = """ (
     )
     """
 create_table(db_path=database_file, table_name="api_table", fields=fields_db)
+
+fields_db = []
+# Создаём таблицу settings_table
+fields_db = """ (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mode TEXT, 
+    interval_seconds INTEGER, 
+    max_retries INTEGER, 
+    website_return_time INTEGER, 
+    t_floor_mac_diff REAL, 
+    target_rh REAL, 
+    absolute_humidity_tolerance REAL,
+    timestamp TEXT
+    )
+    """
+create_table(db_path=database_file, table_name="settings_table", fields=fields_db)
+
+fields_db = []
+# Создаём таблицу ventilation_table
+fields_db = """ (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    ventilation_start INTEGER,
+    stop_ventilation INTEGER   
+    )
+    """
+create_table(db_path=database_file, table_name="ventilation_table", fields=fields_db)
+
+fields_db = []
+# Создаём таблицу heating_table
+fields_db = """ (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    heating_start INTEGER,
+    stop_heating INTEGER   
+    )
+    """
+create_table(db_path=database_file, table_name="heating_table", fields=fields_db)
 
 create_backup(database_file, backup_dir)
