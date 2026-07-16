@@ -8,7 +8,26 @@
     <meta http-equiv="refresh" content="{website_return_time}">
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
-    <div class="max-w-5xl mx-auto space-y-8">        
+    <div class="max-w-5xl mx-auto space-y-8">   
+            <!-- НАВИГАЦИОННАЯ ПАНЕЛЬ -->
+        <nav class="bg-white shadow-sm border border-gray-200 rounded-2xl p-2 flex flex-wrap gap-2 justify-between items-center">
+            <div class="flex items-center gap-2 pl-4">
+                <span class="text-xl">🏠</span>
+                <span class="font-bold text-gray-800">Климат Контроль</span>
+            </div>
+            <div class="flex gap-2">
+                <a href="/" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow-sm transition">
+                    Главная
+                </a>
+                <a href="/ventilation" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
+                    💨 Проветривание
+                </a>
+                <a href="/heating" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
+                    🔥 Отопление
+                </a>
+            </div>
+        </nav>
+
         <!-- ТАБЛИЦА 1: ТЕКУЩИЕ ПОКАЗАТЕЛИ -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="p-6 border-b border-gray-100">
@@ -31,14 +50,12 @@
                             <td class="py-4 px-6 font-medium text-gray-700">Т</td>
                             <td class="py-4 px-6">{street_temp:.1f} °C</td>
                             <td class="py-4 px-6">{basement_temp:.1f} °C</td>
-                            <!-- <td class="py-4 px-6 text-blue-600 font-semibold">{floor_temp:.1f} °C</td> -->
                             <td class="py-4 px-6">{floor_temp:.1f} °C</td>
                         </tr>
                         <tr>
                             <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
                             <td class="py-4 px-6">{street_humi:.1f} %</td>
                             <td class="py-4 px-6">{basement_humi:.1f} %</td>
-                            <!-- <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td> -->
                             <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td>
                         </tr>
                         <tr>
@@ -67,11 +84,6 @@
                         {msg_heat_status} {heat_info}
                     </span>
                 </div>
-                <!-- <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold">Проветривание:</span>
-                    
-                </div> -->
-
             </div>
         </div>
 
@@ -119,13 +131,6 @@
             <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">ОТОПЛЕНИЕ</h2>
-                    <!-- <p class="text-xs text-gray-500 mt-1">ОВ пол = <span class="font-semibold text-blue-600">{max_rh:.1f}%</span></p> -->
-                </div>
-                <div class="flex items-center gap-2">
-                    <!-- <span class="text-sm font-semibold">Отопление:</span>
-                    <span class="px-3 py-1 rounded-full text-xs font-bold {heat_class}">
-                        {heat_status} {heat_info}
-                    </span> -->
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -161,6 +166,8 @@
                 </table>
             </div>
         </div>
+        
+        <!-- Заряды батарей -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
             <div class="flex flex-wrap gap-2">
                 <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
@@ -169,12 +176,15 @@
                 <span class="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold">
                     Заряд батареи Подвал: {basement_voltage:.3f} В
                 </span>
-                                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
                     Заряд батареи Пол: {floor_voltage:.3f} В
                 </span>
             </div>
-
         </div>
+    
+     
+        
+        
     </div>
 </body>
 </html>
