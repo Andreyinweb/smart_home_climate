@@ -43,24 +43,51 @@ def write_climate_data(name_table, data_sensors_all: dict, row_id: int = None) -
         print(f"[БД] Ошибка записи в базу данных: {e}")
         return False
 
-def get_latest_climate_data(name_table, limit: int = 1):
+def get_latest_climate_data(name_table: str, start_id: int = None, stop_id: int = None):
     """
-    Возвращает последние записи из таблицы table_sensor_data.
+    Возвращает записи из таблицы по условиям start_id и/или stop_id.
+    
+    - Если оба ID не указаны, возвращается последняя строка по ID.
+    - Если указан только start_id, возвращаются строки от start_id до конца.
+    - Если указан только stop_id, возвращаются строки от начала до stop_id.
+    - Если указаны оба ID и они равны, возвращается конкретная строка.
+    - Если указаны оба ID и они разные, возвращается выборка в этом диапазоне.
     """
-    query = f"""
-    SELECT * FROM {name_table}
-    ORDER BY ID DESC
-    LIMIT {limit}
-    """
+    query = f"SELECT * FROM {name_table}"
+    params = []
+
+    # Реализация логики условий в зависимости от переданных аргументов
+    if start_id is None and stop_id is None:
+        # Возвращаем последнюю строку
+        query += " ORDER BY ID DESC LIMIT 1"
+    elif start_id is not None and stop_id is not None:
+        if start_id == stop_id:
+            # Конкретная строка
+            query += " WHERE ID = ?"
+            params.append(start_id)
+        else:
+            # Выборка по диапазону ID
+            query += " WHERE ID >= ? AND ID <= ? ORDER BY ID ASC"
+            params.extend([start_id, stop_id])
+    elif start_id is not None:
+        # От start_id до конца таблицы
+        query += " WHERE ID >= ? ORDER BY ID ASC"
+        params.append(start_id)
+    else:  # stop_id is not None
+        # От начала таблицы до stop_id
+        query += " WHERE ID <= ? ORDER BY ID ASC"
+        params.append(stop_id)
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query)
+            cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
     except sqlite3.Error as e:
         print(f"[БД] Ошибка чтения из базы данных: {e}")
         return []
+
 
 def get_average_difference_temp() -> float:
     """
