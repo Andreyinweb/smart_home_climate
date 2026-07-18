@@ -37,17 +37,6 @@ try:
 except Exception as db_err:
     work_log.error(f"[БД] Ошибка settings_table подготовки данных для записи: {db_err}")
 
-ventilation_in_db = {}
-ventilation_in_db["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-ventilation_in_db["ventilation_start"] = 10
-ventilation_in_db["stop_ventilation"] = 20
-
-try:
-    success = write_climate_data("ventilation_table", ventilation_in_db, row_id=1)
-    if success:
-        work_log.info("[БД] Данные успешно записаны в таблицу 'ventilation_table'")
-except Exception as db_err:
-    work_log.error(f"[БД] Ошибка ventilation_table подготовки данных для записи: {db_err}")
 
 # data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
 #         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 

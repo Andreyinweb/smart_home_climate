@@ -213,6 +213,7 @@ fields_db = []
 fields_db = """ (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TEXT,
+    status_ventilation BOOLEAN,
     ventilation_start INTEGER,
     stop_ventilation INTEGER   
     )
@@ -224,6 +225,7 @@ fields_db = []
 fields_db = """ (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TEXT,
+    status_heating BOOLEAN,
     heating_start INTEGER,
     stop_heating INTEGER   
     )

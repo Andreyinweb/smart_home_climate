@@ -179,9 +179,10 @@ async def start_ventilation():
     api_on_db = {}
     status_ventilation_table = get_latest_climate_data("ventilation_table")[0]
     if status_ventilation_table:
-        if status_ventilation_table["stop_ventilation"]: 
+        if not status_ventilation_table["status_ventilation"]: 
             latest_records = get_latest_climate_data("api_table")
-            if latest_records:        
+            if latest_records:  
+                api_on_db["status_ventilation"] = True       
                 api_on_db["timestamp"] = latest_records[0]["timestamp"]
                 api_on_db["ventilation_start"] = latest_records[0]["id"]
                 api_on_db["stop_ventilation"] = 0
@@ -193,7 +194,8 @@ async def start_ventilation():
             None
     else:
         latest_records = get_latest_climate_data("api_table")
-        if latest_records:        
+        if latest_records: 
+            api_on_db["status_ventilation"] = True      
             api_on_db["timestamp"] = latest_records[0]["timestamp"]
             api_on_db["ventilation_start"] = latest_records[0]["id"]
             api_on_db["stop_ventilation"] = 0
@@ -211,10 +213,11 @@ async def stop_ventilation():
     api_on_db = {}
     status_ventilation_table = get_latest_climate_data("ventilation_table")[0]
     if status_ventilation_table:
-        if not status_ventilation_table["stop_ventilation"]:
+        if status_ventilation_table["status_ventilation"]:
             latest_records = get_latest_climate_data("api_table")
             if latest_records:
                 api_on_db["timestamp"] = status_ventilation_table["timestamp"]
+                api_on_db["status_ventilation"] = False
                 api_on_db["ventilation_start"] = status_ventilation_table["ventilation_start"]
                 api_on_db["stop_ventilation"] = latest_records[0]["id"]
                 write_climate_data("ventilation_table", api_on_db, row_id=status_ventilation_table["id"])
