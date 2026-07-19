@@ -56,6 +56,11 @@ async def polling_task():
     while True:
         # Запрос ко всем датчикам.
         data_sensors_all = await receiver.sensor_get_sensors_all()
+        if 'basement_temp' in data_sensors_all and not ('floor_temp' in data_sensors_all):
+            data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - config.T_FLOOR_MAC_DIFF           
+            abs_basement_humi = operations.calculate_absolute_humidity(data_sensors_all['basement_temp'], data_sensors_all['basement_humi'])
+            data_sensors_all['floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], abs_basement_humi)
+            data_sensors_all['floor_voltage'] = 0.0
 
         # 2. Обработка собранных данных (после того, как опрос ВСЕХ датчиков завершен)
         if data_sensors_all:
