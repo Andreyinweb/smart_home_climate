@@ -187,7 +187,7 @@ async def start_ventilation():
                 api_on_db["ventilation_start"] = latest_records[0]["id"]
                 api_on_db["stop_ventilation"] = 0
                 write_climate_data("ventilation_table", api_on_db)
-                api_log.info(f"[БД] Успешный старт проветривания: api_id={api_on_db["ventilation_start"]}, timestamp={api_on_db["timestamp"]}")
+                api_log.info(f"[БД] Успешный старт проветривания: api_id={api_on_db['ventilation_start']}, timestamp={api_on_db['timestamp']}")
             else:
                 api_log.warning(f"На сервер не приходят значения из базы данных")
         else:
@@ -200,7 +200,7 @@ async def start_ventilation():
             api_on_db["ventilation_start"] = latest_records[0]["id"]
             api_on_db["stop_ventilation"] = 0
             write_climate_data("ventilation_table", api_on_db)
-            api_log.info(f"[БД] Успешный старт проветривания: api_id={api_on_db["ventilation_start"]}, timestamp={api_on_db["timestamp"]}")
+            api_log.info(f"[БД] Успешный старт проветривания: api_id={api_on_db['ventilation_start']}, timestamp={api_on_db['timestamp']}")
         else:
             api_log.warning(f"На сервер не приходят значения из базы данных")
 
@@ -221,7 +221,7 @@ async def stop_ventilation():
                 api_on_db["ventilation_start"] = status_ventilation_table["ventilation_start"]
                 api_on_db["stop_ventilation"] = latest_records[0]["id"]
                 write_climate_data("ventilation_table", api_on_db, row_id=status_ventilation_table["id"])
-                api_log.info(f"[БД] Успешный стоп проветривания: api_id={api_on_db["stop_ventilation"]}")
+                api_log.info(f"[БД] Успешный стоп проветривания: api_id={api_on_db['stop_ventilation']}")
             else:
                 api_log.warning(f"На сервер не приходят значения из базы данных") 
 
@@ -236,7 +236,8 @@ async def stop_ventilation():
 @app.get("/heating", response_class=HTMLResponse)
 async def get_heating_page():
     """Страница ручного управления отоплением и сравнительной таблицы."""
-    status_heating_table = get_latest_climate_data("heating_table")[0]
+    heat_before = {}
+    status_heating_table = get_latest_climate_data("heating_table")
     if status_heating_table:
         if status_heating_table["stop_heating"]:            
             latest_records = get_latest_climate_data("api_table")
@@ -276,9 +277,26 @@ async def get_heating_page():
                 
             heat_active = True
             heat_start_time = heat_before["timestamp"] 
+    else:
+        latest_records = get_latest_climate_data("api_table")
+        if latest_records:
+            db_data = latest_records[0]
+        else:
+            api_log.warning(f"На сервер не приходят значения из базы данных")               
+            db_data = {"id":1, 'street_temp': 0.0, 'basement_temp': 0.0, 'floor_temp': 0.0, 'difference_temp': 0.0,
+                        'average_temp': 0.0, 'street_humi': 0.0, 'basement_humi': 0.0, 'floor_humi': 0.0, 'street_voltage': 0.0,
+                        'basement_voltage': 0.0, 'floor_voltage': 0.0, 'gas_meter': 0, 'a_floor_humi': 0.0, 'dp_floor': 0.0,
+                        'a_street_humi': 0.0, 'dp_street': 0.0, 'a_basement_humi': 0.0, 'dp_basement': 0.0, 'humidity_difference': 0.0,
+                        'vent_status': True, 'vent_time_val': 0.0, 'sim_a_basement_humi': 0.0, 'sim_basement_humi': 0.0, 'sim_floor_humi': 0.0,
+                        'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
+                        'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
+                        }
+            db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
 
     if not heat_before:
-        heat_before = db_data
+        heat_before = dict(db_data)
+        heat_active = False
+        heat_start_time = db_data["timestamp"]
 
     diffs = {
         "diff_basement_temp": db_data.get("basement_temp", 0) - heat_before.get("basement_temp", 0),
