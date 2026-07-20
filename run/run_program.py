@@ -149,7 +149,7 @@ fields_db = """ (
             gas_meter
         )
         """
-create_table(db_path=database_file, table_name="table_sensor_data", fields=fields_db)
+create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
 
 fields_db = []
 # Создаём таблицу api_table
@@ -190,7 +190,7 @@ fields_db = """ (
     a_floor_humi_heated REAL
     )
     """
-create_table(db_path=database_file, table_name="api_table", fields=fields_db)
+create_table(db_path=database_file, table_name='api_table', fields=fields_db)
 
 fields_db = []
 # Создаём таблицу settings_table
@@ -206,7 +206,7 @@ fields_db = """ (
     timestamp TEXT
     )
     """
-create_table(db_path=database_file, table_name="settings_table", fields=fields_db)
+create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
 
 fields_db = []
 # Создаём таблицу ventilation_table
@@ -218,7 +218,7 @@ fields_db = """ (
     stop_ventilation INTEGER   
     )
     """
-create_table(db_path=database_file, table_name="ventilation_table", fields=fields_db)
+create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
 
 fields_db = []
 # Создаём таблицу heating_table
@@ -230,6 +230,6 @@ fields_db = """ (
     stop_heating INTEGER   
     )
     """
-create_table(db_path=database_file, table_name="heating_table", fields=fields_db)
+create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
 
 create_backup(database_file, backup_dir)

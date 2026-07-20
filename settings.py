@@ -19,7 +19,6 @@ class AppConfig:
    TARGET_RH: float = float(os.environ.get("TARGET_RH", 60.0))
    ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
 
-
    def __init__(self):
       # 1. Основной лог работы приложения (климат, БД, опросы датчиков)
       self.work_log = self.setup_logger("climat_app", f"{self.PROJECT_DIR}/logs/work_log.log")

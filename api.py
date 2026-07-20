@@ -39,28 +39,28 @@ async def get_dashboard():
                     'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
                     'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
                     }
-        db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
+        db_data['timestamp'] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
 
-    if db_data["vent_status"] and db_data["vent_time_val"]:
+    if db_data['vent_status'] and db_data['vent_time_val']:
         db_data["msg_vent_status"] = "ДА"
         db_data["vent_reason"] = f"Время: {db_data['vent_time_val']} мин."
-    elif not db_data["vent_status"]:
+    elif not db_data['vent_status']:
         db_data["msg_vent_status"] = "НЕТ"
         db_data["vent_reason"] = "dАВ < 0.5"
     else:
         db_data["msg_vent_status"] = "НЕТ"
         db_data["vent_reason"] = "Тяги нет."
 
-    db_data["vent_class"] = "bg-green-100 text-green-800" if db_data["vent_status"] == "ДА" else "bg-red-100 text-red-800"
+    db_data["vent_class"] = "bg-green-100 text-green-800" if db_data['vent_status'] == "ДА" else "bg-red-100 text-red-800"
     db_data["vent_display_class"] = "" 
 
-    if db_data["heat_status"]:
+    if db_data['heat_status']:
         db_data["msg_heat_status"] = "ДА"
     else:
         db_data["msg_heat_status"] = "НЕТ"
 
-    db_data["heat_info"] = f"+{db_data['heating_delta']} °C" if db_data["heat_status"] else ""
-    db_data["heat_class"] = "bg-amber-100 text-amber-800" if db_data["heat_status"] else "bg-gray-100 text-gray-700"
+    db_data["heat_info"] = f"+{db_data['heating_delta']} °C" if db_data['heat_status'] else ""
+    db_data["heat_class"] = "bg-amber-100 text-amber-800" if db_data['heat_status'] else "bg-gray-100 text-gray-700"
     db_data["heat_display_class"] = "" 
 
     # Чтение шаблона разметки
@@ -79,9 +79,9 @@ async def get_dashboard():
 @app.get("/ventilation", response_class=HTMLResponse)
 async def get_ventilation_page():
     """Страница ручного управления проветриванием и сравнительной таблицы."""
-
-    status_ventilation_table = get_latest_climate_data("ventilation_table")[0]
-    if status_ventilation_table:
+    latest_ventilation_table = get_latest_climate_data("ventilation_table")
+    if latest_ventilation_table:
+        status_ventilation_table = latest_ventilation_table[0]
         if status_ventilation_table["stop_ventilation"]:            
             latest_records = get_latest_climate_data("api_table")
             if latest_records:
@@ -96,11 +96,11 @@ async def get_ventilation_page():
                             'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
                             'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
                             }
-                db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
+                db_data['timestamp'] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
 
             vent_active = False
             vent_before = dict(db_data)
-            vent_start_time = db_data["timestamp"] 
+            vent_start_time = db_data['timestamp'] 
         else:
             latest_records = get_latest_climate_data("api_table")
             vent_before = get_latest_climate_data("api_table", status_ventilation_table["ventilation_start"], status_ventilation_table["ventilation_start"])[0]
@@ -116,20 +116,20 @@ async def get_ventilation_page():
                             'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
                             'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
                             }
-                db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
+                db_data['timestamp'] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
                 
             vent_active = True
-            vent_start_time = vent_before["timestamp"] 
+            vent_start_time = vent_before['timestamp'] 
 
 
     # Вычисляем разницу
     diffs = {
-        "diff_basement_temp": db_data.get("basement_temp", 0) - vent_before.get("basement_temp", 0),
-        "diff_basement_humi": db_data.get("basement_humi", 0) - vent_before.get("basement_humi", 0),
-        "diff_a_basement_humi": db_data.get("a_basement_humi", 0) - vent_before.get("a_basement_humi", 0),
-        "diff_floor_temp": db_data.get("floor_temp", 0) - vent_before.get("floor_temp", 0),
-        "diff_floor_humi": db_data.get("floor_humi", 0) - vent_before.get("floor_humi", 0),
-        "diff_a_floor_humi": db_data.get("a_floor_humi", 0) - vent_before.get("a_floor_humi", 0),
+        "diff_basement_temp": db_data.get('basement_temp', 0) - vent_before.get('basement_temp', 0),
+        "diff_basement_humi": db_data.get('basement_humi', 0) - vent_before.get('basement_humi', 0),
+        "diff_a_basement_humi": db_data.get('a_basement_humi', 0) - vent_before.get('a_basement_humi', 0),
+        "diff_floor_temp": db_data.get('floor_temp', 0) - vent_before.get('floor_temp', 0),
+        "diff_floor_humi": db_data.get('floor_humi', 0) - vent_before.get('floor_humi', 0),
+        "diff_a_floor_humi": db_data.get('a_floor_humi', 0) - vent_before.get('a_floor_humi', 0),
     }
 
     # Классы стилей для изменений (уменьшение влажности — зеленый, увеличение — красный)
@@ -148,19 +148,19 @@ async def get_ventilation_page():
         "status_class": "bg-green-100 text-green-800 border-green-300" if vent_active else "bg-gray-100 text-gray-700 border-gray-300",
         "vent_start_time": vent_start_time if vent_start_time else "Нет запущенных циклов",
         
-        "b_temp_before": vent_before.get("basement_temp", 0.0),
-        "b_humi_before": vent_before.get("basement_humi", 0.0),
-        "b_ahumi_before": vent_before.get("a_basement_humi", 0.0),
-        "f_temp_before": vent_before.get("floor_temp", 0.0),
-        "f_humi_before": vent_before.get("floor_humi", 0.0),
-        "f_ahumi_before": vent_before.get("a_floor_humi", 0.0),
+        "b_temp_before": vent_before.get('basement_temp', 0.0),
+        "b_humi_before": vent_before.get('basement_humi', 0.0),
+        "b_ahumi_before": vent_before.get('a_basement_humi', 0.0),
+        "f_temp_before": vent_before.get('floor_temp', 0.0),
+        "f_humi_before": vent_before.get('floor_humi', 0.0),
+        "f_ahumi_before": vent_before.get('a_floor_humi', 0.0),
 
-        "b_temp_now": db_data.get("basement_temp", 0.0),
-        "b_humi_now": db_data.get("basement_humi", 0.0),
-        "b_ahumi_now": db_data.get("a_basement_humi", 0.0),
-        "f_temp_now": db_data.get("floor_temp", 0.0),
-        "f_humi_now": db_data.get("floor_humi", 0.0),
-        "f_ahumi_now": db_data.get("a_floor_humi", 0.0),
+        "b_temp_now": db_data.get('basement_temp', 0.0),
+        "b_humi_now": db_data.get('basement_humi', 0.0),
+        "b_ahumi_now": db_data.get('a_basement_humi', 0.0),
+        "f_temp_now": db_data.get('floor_temp', 0.0),
+        "f_humi_now": db_data.get('floor_humi', 0.0),
+        "f_ahumi_now": db_data.get('a_floor_humi', 0.0),
     }
 
     html_path = os.path.join(config.PROJECT_DIR, "ventilation.html")
@@ -177,13 +177,14 @@ async def get_ventilation_page():
 async def start_ventilation():
     """Запись старта проветривания в БД с привязкой ID и timestamp из api_table."""
     api_on_db = {}
-    status_ventilation_table = get_latest_climate_data("ventilation_table")[0]
-    if status_ventilation_table:
+    latest_ventilation_table = get_latest_climate_data("ventilation_table")
+    if latest_ventilation_table:
+        status_ventilation_table = latest_ventilation_table[0]
         if not status_ventilation_table["status_ventilation"]: 
             latest_records = get_latest_climate_data("api_table")
             if latest_records:  
                 api_on_db["status_ventilation"] = True       
-                api_on_db["timestamp"] = latest_records[0]["timestamp"]
+                api_on_db['timestamp'] = latest_records[0]['timestamp']
                 api_on_db["ventilation_start"] = latest_records[0]["id"]
                 api_on_db["stop_ventilation"] = 0
                 write_climate_data("ventilation_table", api_on_db)
@@ -196,7 +197,7 @@ async def start_ventilation():
         latest_records = get_latest_climate_data("api_table")
         if latest_records: 
             api_on_db["status_ventilation"] = True      
-            api_on_db["timestamp"] = latest_records[0]["timestamp"]
+            api_on_db['timestamp'] = latest_records[0]['timestamp']
             api_on_db["ventilation_start"] = latest_records[0]["id"]
             api_on_db["stop_ventilation"] = 0
             write_climate_data("ventilation_table", api_on_db)
@@ -211,12 +212,13 @@ async def start_ventilation():
 async def stop_ventilation():
     """Запись остановки проветривания в БД с фиксацией ID текущей записи из api_table."""
     api_on_db = {}
-    status_ventilation_table = get_latest_climate_data("ventilation_table")[0]
-    if status_ventilation_table:
+    latest_ventilation_table = get_latest_climate_data("ventilation_table")
+    if latest_ventilation_table:
+        status_ventilation_table = latest_ventilation_table[0]
         if status_ventilation_table["status_ventilation"]:
             latest_records = get_latest_climate_data("api_table")
             if latest_records:
-                api_on_db["timestamp"] = status_ventilation_table["timestamp"]
+                api_on_db['timestamp'] = status_ventilation_table['timestamp']
                 api_on_db["status_ventilation"] = False
                 api_on_db["ventilation_start"] = status_ventilation_table["ventilation_start"]
                 api_on_db["stop_ventilation"] = latest_records[0]["id"]
@@ -237,8 +239,9 @@ async def stop_ventilation():
 async def get_heating_page():
     """Страница ручного управления отоплением и сравнительной таблицы."""
     heat_before = {}
-    status_heating_table = get_latest_climate_data("heating_table")
-    if status_heating_table:
+    latest_heating_table = get_latest_climate_data("heating_table")
+    if latest_heating_table:
+        status_heating_table = latest_heating_table[0]
         if status_heating_table["stop_heating"]:            
             latest_records = get_latest_climate_data("api_table")
             if latest_records:
@@ -253,11 +256,11 @@ async def get_heating_page():
                             'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
                             'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
                             }
-                db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
+                db_data['timestamp'] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
 
             heat_active = False
             heat_before = dict(db_data)
-            heat_start_time = db_data["timestamp"] 
+            heat_start_time = db_data['timestamp'] 
         else:
             latest_records = get_latest_climate_data("api_table")
             heat_before = get_latest_climate_data("api_table", status_heating_table["heating_start"], status_heating_table["heating_start"])[0]
@@ -273,10 +276,10 @@ async def get_heating_page():
                             'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
                             'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
                             }
-                db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
+                db_data['timestamp'] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
                 
             heat_active = True
-            heat_start_time = heat_before["timestamp"] 
+            heat_start_time = heat_before['timestamp'] 
     else:
         latest_records = get_latest_climate_data("api_table")
         if latest_records:
@@ -291,20 +294,20 @@ async def get_heating_page():
                         'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
                         'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
                         }
-            db_data["timestamp"] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
+            db_data['timestamp'] = "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ"
 
     if not heat_before:
         heat_before = dict(db_data)
         heat_active = False
-        heat_start_time = db_data["timestamp"]
+        heat_start_time = db_data['timestamp']
 
     diffs = {
-        "diff_basement_temp": db_data.get("basement_temp", 0) - heat_before.get("basement_temp", 0),
-        "diff_basement_humi": db_data.get("basement_humi", 0) - heat_before.get("basement_humi", 0),
-        "diff_a_basement_humi": db_data.get("a_basement_humi", 0) - heat_before.get("a_basement_humi", 0),
-        "diff_floor_temp": db_data.get("floor_temp", 0) - heat_before.get("floor_temp", 0),
-        "diff_floor_humi": db_data.get("floor_humi", 0) - heat_before.get("floor_humi", 0),
-        "diff_a_floor_humi": db_data.get("a_floor_humi", 0) - heat_before.get("a_floor_humi", 0),
+        "diff_basement_temp": db_data.get('basement_temp', 0) - heat_before.get('basement_temp', 0),
+        "diff_basement_humi": db_data.get('basement_humi', 0) - heat_before.get('basement_humi', 0),
+        "diff_a_basement_humi": db_data.get('a_basement_humi', 0) - heat_before.get('a_basement_humi', 0),
+        "diff_floor_temp": db_data.get('floor_temp', 0) - heat_before.get('floor_temp', 0),
+        "diff_floor_humi": db_data.get('floor_humi', 0) - heat_before.get('floor_humi', 0),
+        "diff_a_floor_humi": db_data.get('a_floor_humi', 0) - heat_before.get('a_floor_humi', 0),
     }
 
     # Классы стилей для отопления (увеличение температуры — зеленый, падение — красный)
@@ -323,19 +326,19 @@ async def get_heating_page():
         "status_class": "bg-amber-100 text-amber-800 border-amber-300" if heat_active else "bg-gray-100 text-gray-700 border-gray-300",
         "heat_start_time": heat_start_time if heat_start_time else "Нет запущенных циклов",
         
-        "b_temp_before": heat_before.get("basement_temp", 0.0),
-        "b_humi_before": heat_before.get("basement_humi", 0.0),
-        "b_ahumi_before": heat_before.get("a_basement_humi", 0.0),
-        "f_temp_before": heat_before.get("floor_temp", 0.0),
-        "f_humi_before": heat_before.get("floor_humi", 0.0),
-        "f_ahumi_before": heat_before.get("a_floor_humi", 0.0),
+        "b_temp_before": heat_before.get('basement_temp', 0.0),
+        "b_humi_before": heat_before.get('basement_humi', 0.0),
+        "b_ahumi_before": heat_before.get('a_basement_humi', 0.0),
+        "f_temp_before": heat_before.get('floor_temp', 0.0),
+        "f_humi_before": heat_before.get('floor_humi', 0.0),
+        "f_ahumi_before": heat_before.get('a_floor_humi', 0.0),
 
-        "b_temp_now": db_data.get("basement_temp", 0.0),
-        "b_humi_now": db_data.get("basement_humi", 0.0),
-        "b_ahumi_now": db_data.get("a_basement_humi", 0.0),
-        "f_temp_now": db_data.get("floor_temp", 0.0),
-        "f_humi_now": db_data.get("floor_humi", 0.0),
-        "f_ahumi_now": db_data.get("a_floor_humi", 0.0),
+        "b_temp_now": db_data.get('basement_temp', 0.0),
+        "b_humi_now": db_data.get('basement_humi', 0.0),
+        "b_ahumi_now": db_data.get('a_basement_humi', 0.0),
+        "f_temp_now": db_data.get('floor_temp', 0.0),
+        "f_humi_now": db_data.get('floor_humi', 0.0),
+        "f_ahumi_now": db_data.get('a_floor_humi', 0.0),
     }
 
     html_path = os.path.join(config.PROJECT_DIR, "heating.html")
