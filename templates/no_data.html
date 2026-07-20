@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ожидание данных телеметрии</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta http-equiv="refresh" content="{website_return_time}">
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex items-center justify-center p-4">
+    
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-150 p-8 text-center space-y-6 transition transform hover:scale-[1.01]">
+        
+        <!-- Анимированная иконка ожидания -->
+        <div class="relative flex items-center justify-center w-24 h-24 mx-auto bg-blue-50 text-blue-600 rounded-full">
+            <span class="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-20 animate-ping"></span>
+            <span class="absolute inline-flex h-20 w-20 rounded-full bg-blue-300 opacity-35 animate-pulse"></span>
+            <span class="text-4xl relative z-10">📡</span>
+        </div>
+
+        <!-- Текстовое описание -->
+        <div class="space-y-2">
+            <h1 class="text-2xl font-black text-gray-800 tracking-tight">Нет данных в базе данных</h1>
+            <p class="text-sm text-gray-500 leading-relaxed">
+                Сервер мониторинга успешно запущен, но таблица телеметрии датчиков <code class="px-1.5 py-0.5 bg-gray-100 text-red-600 rounded-md font-mono text-xs">api_table</code> пуста.
+            </p>
+            <p class="text-xs text-gray-400">
+                Пожалуйста, убедитесь, что скрипты сбора данных активны и отправляют показатели с датчиков климата.
+            </p>
+        </div>
+
+        <!-- Индикатор статуса автообновления -->
+        <div class="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/30 flex items-center justify-between text-left">
+            <div class="flex items-center gap-2">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span class="text-xs font-semibold text-gray-600">Автообновление</span>
+            </div>
+            <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
+                каждые {website_return_time} сек.
+            </span>
+        </div>
+
+        <!-- Кнопки действий -->
+        <div class="pt-2">
+            <button onclick="window.location.reload();" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm shadow-md transition-all duration-150 flex items-center justify-center gap-2">
+                🔄 Обновить вручную
+            </button>
+        </div>
+    </div>
+
+</body>
+</html>

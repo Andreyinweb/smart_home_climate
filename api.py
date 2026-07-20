@@ -1,10 +1,10 @@
 import os
 import logging
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from settings import config
-from models import get_latest_climate_data, write_climate_data
+from models import get_latest_climate_data, write_climate_data, get_db_connection
 
 # Логирование
 api_log = logging.getLogger("api_app.api")
@@ -13,18 +13,21 @@ api_log.info(f"-----------------------------------------------------------------
 api_log.info(f"Сервер запускается, перезагрузка = {config.WEBSITE_RETURN_TIME} с.")
 
 app = FastAPI(title="Smart Home Climate API")
-
-db_nothing = {
-    'id': 1, 'timestamp': "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ", 'street_temp': 0.0, 'basement_temp': 0.0, 'floor_temp': 0.0, 'difference_temp': 0.0,
-    'average_temp': 0.0, 'street_humi': 0.0, 'basement_humi': 0.0, 'floor_humi': 0.0, 'street_voltage': 0.0,
-    'basement_voltage': 0.0, 'floor_voltage': 0.0, 'gas_meter': 0, 'a_floor_humi': 0.0, 'dp_floor': 0.0,
-    'a_street_humi': 0.0, 'dp_street': 0.0, 'a_basement_humi': 0.0, 'dp_basement': 0.0, 'humidity_difference': 0.0,
-    'vent_status': True, 'vent_time_val': 0.0, 'sim_a_basement_humi': 0.0, 'sim_basement_humi': 0.0, 'sim_floor_humi': 0.0,
-    'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
-    'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
-}
-
 data_rendered = {} # TODO
+
+def get_no_data_response():
+    """Возвращает красивую страницу ожидания данных, если в БД пусто."""
+    html_path = os.path.join(config.PROJECT_DIR, 'templates', 'no_data.html')
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            template = f.read()
+        rendered_html = template.format(website_return_time=config.WEBSITE_RETURN_TIME)
+        return HTMLResponse(rendered_html, status_code=503)
+    return HTMLResponse(
+        "<h1 style='font-family:sans-serif; text-align:center; margin-top:50px; color:#ef4444;'>"
+        "Ошибка: База данных пуста, и шаблон no_data.html не найден в папке templates.</h1>", 
+        status_code=500
+    )
 
 @app.get("/api/data")
 async def get_raw_data():
@@ -35,35 +38,35 @@ async def get_raw_data():
 async def get_dashboard():
     """Сборка дашборда на основе данных из БД, физических расчетов и шаблона HTML."""
     latest_records = get_latest_climate_data('api_table')    
-    if latest_records:
-        db_data = latest_records[0]
-    else:
-        api_log.warning(f"На сервер не приходят значения из базы данных")               
-        db_data = dict(db_nothing)
+    if not latest_records:
+        api_log.warning("На сервер не приходят значения из базы данных")
+        return get_no_data_response()
+        
+    db_data = latest_records[0]
 
-    if db_data['vent_status'] and db_data['vent_time_val']:
+    if db_data.get('vent_status') and db_data.get('vent_time_val'):
         db_data['msg_vent_status'] = "ДА"
         db_data['vent_reason'] = f"Время: {db_data['vent_time_val']} мин."
-    elif not db_data['vent_status']:
+    elif not db_data.get('vent_status'):
         db_data['msg_vent_status'] = "НЕТ"
         db_data['vent_reason'] = "dАВ < 0.5"
     else:
         db_data['msg_vent_status'] = "НЕТ"
         db_data['vent_reason'] = "Тяги нет."
 
-    db_data['vent_class'] = "bg-green-100 text-green-800" if db_data['vent_status'] == "ДА" else "bg-red-100 text-red-800"
+    db_data['vent_class'] = "bg-green-100 text-green-800" if db_data.get('vent_status') == "ДА" else "bg-red-100 text-red-800"
     db_data['vent_display_class'] = "" 
 
-    if db_data['heat_status']:
+    if db_data.get('heat_status'):
         db_data['msg_heat_status'] = "ДА"
     else:
         db_data['msg_heat_status'] = "НЕТ"
 
-    db_data['heat_info'] = f"+{db_data['heating_delta']} °C" if db_data['heat_status'] else ""
-    db_data['heat_class'] = "bg-amber-100 text-amber-800" if db_data['heat_status'] else "bg-gray-100 text-gray-700"
+    db_data['heat_info'] = f"+{db_data.get('heating_delta', 0.0)} °C" if db_data.get('heat_status') else ""
+    db_data['heat_class'] = "bg-amber-100 text-amber-800" if db_data.get('heat_status') else "bg-gray-100 text-gray-700"
     db_data['heat_display_class'] = "" 
 
-    # Чтение шаблона разметки из папки templates
+    # Чтение шаблона разметки
     html_path = os.path.join(config.PROJECT_DIR, 'templates', 'index.html')
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
@@ -79,11 +82,14 @@ async def get_dashboard():
 @app.get("/ventilation", response_class=HTMLResponse)
 async def get_ventilation_page():
     """Страница ручного управления проветриванием и сравнительной таблицы."""
-    latest_ventilation_table = get_latest_climate_data('ventilation_table')
     latest_records = get_latest_climate_data('api_table')
-    
-    db_data = latest_records[0] if latest_records else dict(db_nothing)
+    if not latest_records:
+        api_log.warning("На сервер не приходят значения из базы данных")
+        return get_no_data_response()
         
+    db_data = latest_records[0]
+    latest_ventilation_table = get_latest_climate_data('ventilation_table')
+    
     if latest_ventilation_table and latest_ventilation_table[0]['status_ventilation']:
         status_ventilation_table = latest_ventilation_table[0]
         vent_before = get_latest_climate_data('api_table', status_ventilation_table['ventilation_start'], status_ventilation_table['ventilation_start'])[0]             
@@ -116,7 +122,7 @@ async def get_ventilation_page():
         "diff_a_floor_humi_class": "text-green-600 font-semibold" if diffs['diff_a_floor_humi'] < -0.1 else "text-red-600 font-semibold" if diffs['diff_a_floor_humi'] > 0.1 else "text-gray-500",
     }
 
-    # Настройки отображения кнопок на основе статуса проветривания
+    # Динамическая настройка кнопок
     if vent_active:
         btn_start_class = "bg-gray-300 text-gray-500 cursor-not-allowed"
         btn_stop_class = "bg-red-600 text-white hover:bg-red-700 shadow-md"
@@ -211,11 +217,14 @@ async def stop_ventilation():
 @app.get("/heating", response_class=HTMLResponse)
 async def get_heating_page():
     """Страница ручного управления отоплением и сравнительной таблицы."""
-    latest_heating_table = get_latest_climate_data("heating_table")
     latest_records = get_latest_climate_data('api_table')
+    if not latest_records:
+        api_log.warning("На сервер не приходят значения из базы данных")
+        return get_no_data_response()
+        
+    db_data = latest_records[0]
+    latest_heating_table = get_latest_climate_data("heating_table")
     
-    db_data = latest_records[0] if latest_records else dict(db_nothing)
-
     if latest_heating_table and latest_heating_table[0]["stop_heating"] == 0:
         status_heating_table = latest_heating_table[0]
         heat_before = get_latest_climate_data('api_table', status_heating_table["heating_start"], status_heating_table["heating_start"])[0]
@@ -242,7 +251,7 @@ async def get_heating_page():
         "diff_floor_humi_class": "text-green-600 font-semibold" if diffs['diff_floor_humi'] < -0.5 else "text-red-600 font-semibold" if diffs['diff_floor_humi'] > 0.5 else "text-gray-500",
     }
 
-    # Перевод состояния в стиль кнопок (Оранжевый — Активно/Старт, Серый — неактивно)
+    # Динамическая настройка кнопок отопления
     if heat_active:
         btn_start_class = "bg-gray-300 text-gray-500 cursor-not-allowed"
         btn_stop_class = "bg-red-600 text-white hover:bg-red-700 shadow-md"
