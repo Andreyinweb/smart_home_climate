@@ -1,11 +1,10 @@
 import os
 import logging
-import sqlite3
 from datetime import datetime
-from fastapi import FastAPI, Form
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, RedirectResponse
 from settings import config
-from models import get_latest_climate_data, write_climate_data, get_db_connection
+from models import get_latest_climate_data, write_climate_data
 
 # Логирование
 api_log = logging.getLogger("api_app.api")
@@ -64,13 +63,13 @@ async def get_dashboard():
     db_data['heat_class'] = "bg-amber-100 text-amber-800" if db_data['heat_status'] else "bg-gray-100 text-gray-700"
     db_data['heat_display_class'] = "" 
 
-    # Чтение шаблона разметки
-    html_path = os.path.join(config.PROJECT_DIR, 'index.html')
+    # Чтение шаблона разметки из папки templates
+    html_path = os.path.join(config.PROJECT_DIR, 'templates', 'index.html')
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             template = f.read()
     else:
-        return HTMLResponse("Ошибка: Файл шаблона index.html не найден.", status_code=500)
+        return HTMLResponse("Ошибка: Файл шаблона index.html не найден в папке templates.", status_code=500)
     
     rendered_html = template.format(**(db_data | {"website_return_time":config.WEBSITE_RETURN_TIME, "max_rh":config.TARGET_RH}))
     return HTMLResponse(rendered_html)
@@ -82,35 +81,26 @@ async def get_ventilation_page():
     """Страница ручного управления проветриванием и сравнительной таблицы."""
     latest_ventilation_table = get_latest_climate_data('ventilation_table')
     latest_records = get_latest_climate_data('api_table')
-    if latest_records:
-        db_data = latest_records[0]
-    else:
-        api_log.warning(f"На сервер не приходят значения из базы данных")               
-        db_data = dict(db_nothing)
+    
+    db_data = latest_records[0] if latest_records else dict(db_nothing)
         
-    if latest_ventilation_table:
+    if latest_ventilation_table and latest_ventilation_table[0]['status_ventilation']:
         status_ventilation_table = latest_ventilation_table[0]
-        if status_ventilation_table['status_ventilation']:
-            vent_before = get_latest_climate_data('api_table', status_ventilation_table['ventilation_start'], status_ventilation_table['ventilation_start'])[0]             
-            vent_active = True
-            vent_start_time = vent_before['timestamp'] 
-            vent_now_time = db_data['timestamp']            
-        else:
-            vent_active = False
-            vent_before = dict(db_data)
-            vent_start_time = db_data['timestamp'] 
-            vent_now_time = db_data['timestamp']
+        vent_before = get_latest_climate_data('api_table', status_ventilation_table['ventilation_start'], status_ventilation_table['ventilation_start'])[0]             
+        vent_active = True
+        vent_start_time = vent_before['timestamp'] 
+        vent_now_time = db_data['timestamp']            
     else:
         vent_active = False
         vent_before = dict(db_data)
         vent_start_time = db_data['timestamp'] 
         vent_now_time = db_data['timestamp']
 
-    # Вычисляем разницу
+    # Вычисляем разницу показателей
     diffs = {
         'diff_basement_temp': db_data['basement_temp'] - vent_before['basement_temp'],
         'diff_basement_humi': db_data['basement_humi'] - vent_before['basement_humi'],
-        'diff_a_basement_humi': db_data['a_basement_humi']- vent_before['a_basement_humi'],
+        'diff_a_basement_humi': db_data['a_basement_humi'] - vent_before['a_basement_humi'],
         'diff_floor_temp': db_data['floor_temp'] - vent_before['floor_temp'],
         'diff_floor_humi': db_data['floor_humi'] - vent_before['floor_humi'],
         'diff_a_floor_humi': db_data['a_floor_humi'] - vent_before['a_floor_humi'],
@@ -138,6 +128,9 @@ async def get_ventilation_page():
         btn_start_disabled = ""
         btn_stop_disabled = "disabled"
 
+    # Превращаем все ключи исторического среза в переменные с префиксом before_ для HTML шаблона
+    before_data = {f"before_{k}": v for k, v in vent_before.items()}
+
     page_data = {
         "website_return_time": config.WEBSITE_RETURN_TIME,
         "btn_start_class": btn_start_class,
@@ -146,30 +139,17 @@ async def get_ventilation_page():
         "btn_stop_disabled": btn_stop_disabled,
         "vent_start_time": vent_start_time[11:16] if vent_start_time else "Нет запущенных циклов",
         'vent_now_time': vent_now_time[11:16],
-        
-        "b_temp_before": vent_before.get('basement_temp', 0.0),
-        "b_humi_before": vent_before.get('basement_humi', 0.0),
-        "b_ahumi_before": vent_before.get('a_basement_humi', 0.0),
-        "f_temp_before": vent_before.get('floor_temp', 0.0),
-        "f_humi_before": vent_before.get('floor_humi', 0.0),
-        "f_ahumi_before": vent_before.get('a_floor_humi', 0.0),
-
-        "b_temp_now": db_data.get('basement_temp', 0.0),
-        "b_humi_now": db_data.get('basement_humi', 0.0),
-        "b_ahumi_now": db_data.get('a_basement_humi', 0.0),
-        "f_temp_now": db_data.get('floor_temp', 0.0),
-        "f_humi_now": db_data.get('floor_humi', 0.0),
-        "f_ahumi_now": db_data.get('a_floor_humi', 0.0),
     }
 
-    html_path = os.path.join(config.PROJECT_DIR, "ventilation.html")
+    html_path = os.path.join(config.PROJECT_DIR, "templates", "ventilation.html")
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             template = f.read()
     else:
-        return HTMLResponse("Ошибка: Файл шаблона ventilation.html не найден.", status_code=500)
+        return HTMLResponse("Ошибка: Файл шаблона ventilation.html не найден в папке templates.", status_code=500)
 
-    rendered_html = template.format(**(page_data | diffs | style_classes))
+    # db_data предоставляет текущие значения без суффикса (floor_temp, floor_humi и т.д.)
+    rendered_html = template.format(**(db_data | before_data | diffs | style_classes | page_data))
     return HTMLResponse(rendered_html)
 
 @app.post("/api/ventilation/start")
@@ -190,8 +170,6 @@ async def start_ventilation():
                 api_log.info(f"[БД] Успешный старт проветривания: api_id={api_on_db['ventilation_start']}, timestamp={api_on_db['timestamp']}")
             else:
                 api_log.warning(f"На сервер не приходят значения из базы данных")
-        else:
-            pass
     else:
         latest_records = get_latest_climate_data('api_table')
         if latest_records: 
@@ -225,10 +203,7 @@ async def stop_ventilation():
                 api_log.info(f"[БД] Успешный стоп проветривания: api_id={api_on_db['stop_ventilation']}")
             else:
                 api_log.warning(f"На сервер не приходят значения из базы данных") 
-        else: 
-            pass
-    else:
-        pass
+
     return RedirectResponse(url="/ventilation", status_code=303)
 
 # --- ОТОПЛЕНИЕ ----------------------------------------------------------------------------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -236,161 +211,115 @@ async def stop_ventilation():
 @app.get("/heating", response_class=HTMLResponse)
 async def get_heating_page():
     """Страница ручного управления отоплением и сравнительной таблицы."""
-    heat_before = {}
     latest_heating_table = get_latest_climate_data("heating_table")
-    if latest_heating_table:
+    latest_records = get_latest_climate_data('api_table')
+    
+    db_data = latest_records[0] if latest_records else dict(db_nothing)
+
+    if latest_heating_table and latest_heating_table[0]["stop_heating"] == 0:
         status_heating_table = latest_heating_table[0]
-        if status_heating_table["stop_heating"]:            
-            latest_records = get_latest_climate_data('api_table')
-            if latest_records:
-                db_data = latest_records[0]
-            else:
-                api_log.warning(f"На сервер не приходят значения из базы данных")               
-                db_data = dict(db_nothing)
-
-            heat_active = False
-            heat_before = dict(db_data)
-            heat_start_time = db_data['timestamp'] 
-        else:
-            latest_records = get_latest_climate_data('api_table')
-            heat_before = get_latest_climate_data('api_table', status_heating_table["heating_start"], status_heating_table["heating_start"])[0]
-            if latest_records:
-                db_data = latest_records[0]
-            else:
-                api_log.warning(f"На сервер не приходят значения из базы данных")               
-                db_data = dict(db_nothing)
-                
-            heat_active = True
-            heat_start_time = heat_before['timestamp'] 
+        heat_before = get_latest_climate_data('api_table', status_heating_table["heating_start"], status_heating_table["heating_start"])[0]
+        heat_active = True
+        heat_start_time = heat_before['timestamp'] 
     else:
-        latest_records = get_latest_climate_data('api_table')
-        if latest_records:
-            db_data = latest_records[0]
-        else:
-            api_log.warning(f"На сервер не приходят значения из базы данных")               
-            db_data = dict(db_nothing)
-
-    if not heat_before:
-        heat_before = dict(db_data)
         heat_active = False
+        heat_before = dict(db_data)
         heat_start_time = db_data['timestamp']
 
+    # Вычисляем разницу для отопления (только температура и влажность подвала/пола)
     diffs = {
-        'diff_basement_temp': db_data.get('basement_temp', 0) - heat_before.get('basement_temp', 0),
-        'diff_basement_humi': db_data.get('basement_humi', 0) - heat_before.get('basement_humi', 0),
-        'diff_a_basement_humi': db_data.get('a_basement_humi', 0) - heat_before.get('a_basement_humi', 0),
-        'diff_floor_temp': db_data.get('floor_temp', 0) - heat_before.get('floor_temp', 0),
-        'diff_floor_humi': db_data.get('floor_humi', 0) - heat_before.get('floor_humi', 0),
-        'diff_a_floor_humi': db_data.get('a_floor_humi', 0) - heat_before.get('a_floor_humi', 0),
+        'diff_basement_temp': db_data['basement_temp'] - heat_before['basement_temp'],
+        'diff_basement_humi': db_data['basement_humi'] - heat_before['basement_humi'],
+        'diff_floor_temp': db_data['floor_temp'] - heat_before['floor_temp'],
+        'diff_floor_humi': db_data['floor_humi'] - heat_before['floor_humi'],
     }
 
     # Классы стилей для отопления (увеличение температуры — зеленый, падение — красный)
     style_classes = {
         'diff_basement_temp_class': "text-green-600 font-semibold" if diffs['diff_basement_temp'] > 0.1 else "text-red-600 font-semibold" if diffs['diff_basement_temp'] < -0.1 else "text-gray-500",
         "diff_basement_humi_class": "text-green-600 font-semibold" if diffs['diff_basement_humi'] < -0.5 else "text-red-600 font-semibold" if diffs['diff_basement_humi'] > 0.5 else "text-gray-500",
-        "diff_a_basement_humi_class": "text-gray-500",
         "diff_floor_temp_class": "text-green-600 font-semibold" if diffs['diff_floor_temp'] > 0.1 else "text-red-600 font-semibold" if diffs['diff_floor_temp'] < -0.1 else "text-gray-500",
         "diff_floor_humi_class": "text-green-600 font-semibold" if diffs['diff_floor_humi'] < -0.5 else "text-red-600 font-semibold" if diffs['diff_floor_humi'] > 0.5 else "text-gray-500",
-        "diff_a_floor_humi_class": "text-gray-500",
     }
+
+    # Перевод состояния в стиль кнопок (Оранжевый — Активно/Старт, Серый — неактивно)
+    if heat_active:
+        btn_start_class = "bg-gray-300 text-gray-500 cursor-not-allowed"
+        btn_stop_class = "bg-red-600 text-white hover:bg-red-700 shadow-md"
+        btn_start_disabled = "disabled"
+        btn_stop_disabled = ""
+    else:
+        btn_start_class = "bg-amber-500 text-white hover:bg-amber-600 shadow-md"
+        btn_stop_class = "bg-gray-300 text-gray-500 cursor-not-allowed"
+        btn_start_disabled = ""
+        btn_stop_disabled = "disabled"
+
+    # Превращаем все ключи исторического среза в переменные с префиксом before_ для HTML шаблона
+    before_data = {f"before_{k}": v for k, v in heat_before.items()}
 
     page_data = {
         "website_return_time": config.WEBSITE_RETURN_TIME,
-        "status_text": "АКТИВНО" if heat_active else "НЕАКТИВНО",
-        "status_class": "bg-amber-100 text-amber-800 border-amber-300" if heat_active else "bg-gray-100 text-gray-700 border-gray-300",
-        "heat_start_time": heat_start_time if heat_start_time else "Нет запущенных циклов",
-        
-        "b_temp_before": heat_before.get('basement_temp', 0.0),
-        "b_humi_before": heat_before.get('basement_humi', 0.0),
-        "b_ahumi_before": heat_before.get('a_basement_humi', 0.0),
-        "f_temp_before": heat_before.get('floor_temp', 0.0),
-        "f_humi_before": heat_before.get('floor_humi', 0.0),
-        "f_ahumi_before": heat_before.get('a_floor_humi', 0.0),
-
-        "b_temp_now": db_data.get('basement_temp', 0.0),
-        "b_humi_now": db_data.get('basement_humi', 0.0),
-        "b_ahumi_now": db_data.get('a_basement_humi', 0.0),
-        "f_temp_now": db_data.get('floor_temp', 0.0),
-        "f_humi_now": db_data.get('floor_humi', 0.0),
-        "f_ahumi_now": db_data.get('a_floor_humi', 0.0),
+        "btn_start_class": btn_start_class,
+        "btn_stop_class": btn_stop_class,
+        "btn_start_disabled": btn_start_disabled,
+        "btn_stop_disabled": btn_stop_disabled,
+        "heat_start_time": heat_start_time[11:16] if heat_start_time else "Нет запущенных циклов",
     }
 
-    html_path = os.path.join(config.PROJECT_DIR, "heating.html")
+    html_path = os.path.join(config.PROJECT_DIR, "templates", "heating.html")
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             template = f.read()
     else:
-        return HTMLResponse("Ошибка: Файл шаблона heating.html не найден.", status_code=500)
+        return HTMLResponse("Ошибка: Файл шаблона heating.html не найден в папке templates.", status_code=500)
 
-    rendered_html = template.format(**(page_data | diffs | style_classes))
+    # Передаем объединенный словарь, где текущие показатели берутся без суффиксов прямо из db_data
+    rendered_html = template.format(**(db_data | before_data | diffs | style_classes | page_data))
     return HTMLResponse(rendered_html)
 
 @app.post("/api/heating/start")
 async def start_heating():
     """Запись старта отопления в БД с привязкой ID и timestamp из api_table."""
-    api_id = None
-    api_timestamp = None
+    api_on_db = {}
+    latest_heating_table = get_latest_climate_data('heating_table')
+    is_heating_active = False
     
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, timestamp FROM api_table ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            if row:
-                api_id = row[0]
-                api_timestamp = row[1]
-    except Exception as e:
-        api_log.error(f"[БД] Не удалось прочитать api_table напрямую при старте отопления: {e}")
+    # Проверяем, запущено ли уже отопление
+    if latest_heating_table:
+        status_heating_table = latest_heating_table[0]
+        if status_heating_table['stop_heating'] == 0:
+            is_heating_active = True
+            
+    if not is_heating_active:
+        latest_records = get_latest_climate_data('api_table')
+        if latest_records: 
+            api_on_db['timestamp'] = latest_records[0]['timestamp']
+            api_on_db['heating_start'] = latest_records[0]['id']
+            api_on_db['stop_heating'] = 0
+            write_climate_data('heating_table', api_on_db)
+            api_log.info(f"[БД] Успешный старт отопления: api_id={api_on_db['heating_start']}, timestamp={api_on_db['timestamp']}")
+        else:
+            api_log.warning(f"На сервер не приходят значения из базы данных")
 
-    if api_id is None:
-        api_id = 1
-        api_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    query = "INSERT INTO heating_table (timestamp, heating_start, stop_heating) VALUES (?, ?, 0)"
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (api_timestamp, api_id))
-            conn.commit()
-        api_log.info(f"[БД] Успешный старт отопления: api_id={api_id}, timestamp={api_timestamp}")
-    except Exception as e:
-        api_log.error(f"[БД] Ошибка записи старта отопления: {e}")
     return RedirectResponse(url="/heating", status_code=303)
 
 @app.post("/api/heating/stop")
 async def stop_heating():
     """Запись остановки отопления в БД с фиксацией ID текущей записи из api_table."""
-    api_id = None
-    api_timestamp = None
-    
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, timestamp FROM api_table ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            if row:
-                api_id = row[0]
-                api_timestamp = row[1]
-    except Exception as e:
-        api_log.error(f"[БД] Не удалось прочитать api_table напрямую при остановке отопления: {e}")
-
-    if api_id is None:
-        api_id = 1
-        api_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM heating_table ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            if row:
-                heat_row_id = row[0]
-                cursor.execute("UPDATE heating_table SET stop_heating = ? WHERE id = ?", (api_id, heat_row_id))
-                conn.commit()
+    api_on_db = {}
+    latest_heating_table = get_latest_climate_data('heating_table')
+    if latest_heating_table:
+        status_heating_table = latest_heating_table[0]
+        # Если отопление в данный момент запущено (stop_heating == 0)
+        if status_heating_table['stop_heating'] == 0:
+            latest_records = get_latest_climate_data('api_table')
+            if latest_records:
+                api_on_db['timestamp'] = status_heating_table['timestamp']
+                api_on_db['heating_start'] = status_heating_table['heating_start']
+                api_on_db['stop_heating'] = latest_records[0]['id']
+                write_climate_data('heating_table', api_on_db, row_id=status_heating_table['id'])
+                api_log.info(f"[БД] Успешный стоп отопления: api_id={api_on_db['stop_heating']}")
             else:
-                cursor.execute("INSERT INTO heating_table (timestamp, heating_start, stop_heating) VALUES (?, 0, ?)", (api_timestamp, api_id))
-                conn.commit()
-        api_log.info(f"[БД] Успешный стоп отопления: api_id={api_id}")
-    except Exception as e:
-        api_log.error(f"[БД] Ошибка записи остановки отопления: {e}")
+                api_log.warning(f"На сервер не приходят значения из базы данных") 
+                
     return RedirectResponse(url="/heating", status_code=303)

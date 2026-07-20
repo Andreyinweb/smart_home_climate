@@ -1,5 +1,4 @@
-   
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -9,25 +8,22 @@
     <meta http-equiv="refresh" content="{website_return_time}">
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
-    <div class="max-w-5xl mx-auto space-y-8">  
-   
-   
-   
-   
+    <div class="max-w-5xl mx-auto space-y-8"> 
+
         <!-- НАВИГАЦИОННАЯ ПАНЕЛЬ -->
         <nav class="bg-white shadow-sm border border-gray-200 rounded-2xl p-2 flex flex-wrap gap-2 justify-between items-center">
             <div class="flex items-center gap-2 pl-4">
-                <span class="text-xl">🔥</span>
-                <span class="font-bold text-gray-800">Отопление</span>
+                <span class="text-xl">💨</span>
+                <span class="font-bold text-gray-800">Проветривание</span>
             </div>
             <div class="flex gap-2">
                 <a href="/" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
                     Главная
                 </a>
-                <a href="/ventilation" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
+                <a href="/ventilation" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow-sm transition">
                     💨 Проветривание
                 </a>
-                <a href="/heating" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow-sm transition">
+                <a href="/heating" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
                     🔥 Отопление
                 </a>
             </div>
@@ -37,24 +33,18 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">Управление отоплением</h2>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Статус запуска: 
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold border {status_class}">
-                            {status_text}
-                        </span>
-                    </p>
-                    <p class="text-xs text-gray-400 mt-2">Время старта цикла: <span class="font-semibold text-gray-600">{heat_start_time}</span></p>
+                    <h2 class="text-xl font-bold text-gray-800">Управление проветриванием</h2>
+                    <p class="text-xs text-gray-400 mt-2">Время старта цикла: <span class="font-semibold text-gray-600">{vent_start_time}</span></p>
                 </div>
                 <div class="flex gap-3">
-                    <form action="/api/heating/start" method="post">
-                        <button type="submit" class="px-6 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm shadow-md hover:bg-amber-600 transition">
-                            Начать отопление
+                    <form action="/api/ventilation/start" method="post">
+                        <button type="submit" {btn_start_disabled} class="px-6 py-3 {btn_start_class} rounded-xl font-bold text-sm transition">
+                            Начать проветривание
                         </button>
                     </form>
-                    <form action="/api/heating/stop" method="post">
-                        <button type="submit" class="px-6 py-3 bg-red-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-red-700 transition">
-                            Закончить отопление
+                    <form action="/api/ventilation/stop" method="post">
+                        <button type="submit" {btn_stop_disabled} class="px-6 py-3 {btn_stop_class} rounded-xl font-bold text-sm transition">
+                            Закончить проветривание
                         </button>
                     </form>
                 </div>
@@ -67,49 +57,62 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                                <th class="py-4 px-6">Показатель / Зона</th>
-                                <th class="py-4 px-6">До начала</th>
-                                <th class="py-4 px-6">Текущее значение</th>
-                                <th class="py-4 px-6">Изменение (динамика)</th>
+                                <th class="py-3 px-5">Показатель</th>
+                                <th class="py-3 px-5">Начало <span class="font-semibold text-blue-600">{vent_start_time}</span></th>
+                                <th class="py-3 px-5">Сейчас <span class="font-semibold text-blue-600">{vent_now_time}</span></th>
+                                <th class="py-3 px-5">Изменение</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-sm">
                             <!-- Подвал Т -->
                             <tr>
                                 <td class="py-4 px-6 font-medium text-gray-700">Подвал - Температура</td>
-                                <td class="py-4 px-6 text-gray-500">{b_temp_before:.1f} °C</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{b_temp_now:.1f} °C</td>
+                                <td class="py-4 px-6 text-gray-500">{before_basement_temp:.1f} °C</td>
+                                <td class="py-4 px-6 text-gray-900 font-medium">{basement_temp:.1f} °C</td>
                                 <td class="py-4 px-6 {diff_basement_temp_class}">{diff_basement_temp:+.1f} °C</td>
                             </tr>
                             <!-- Подвал ОВ -->
                             <tr>
                                 <td class="py-4 px-6 font-medium text-gray-700">Подвал - Влажность (ОВ)</td>
-                                <td class="py-4 px-6 text-gray-500">{b_humi_before:.1f} %</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{b_humi_now:.1f} %</td>
+                                <td class="py-4 px-6 text-gray-500">{before_basement_humi:.1f} %</td>
+                                <td class="py-4 px-6 text-gray-900 font-medium">{basement_humi:.1f} %</td>
                                 <td class="py-4 px-6 {diff_basement_humi_class}">{diff_basement_humi:+.1f} %</td>
+                            </tr>
+                            <!-- Подвал АВ -->
+                            <tr>
+                                <td class="py-4 px-6 font-medium text-gray-700">Подвал - Абс. влажность (АВ)</td>
+                                <td class="py-4 px-6 text-gray-500">{before_a_basement_humi:.2f} г/м³</td>
+                                <td class="py-4 px-6 text-gray-900 font-medium">{a_basement_humi:.2f} г/м³</td>
+                                <td class="py-4 px-6 {diff_a_basement_humi_class}">{diff_a_basement_humi:+.2f} г/м³</td>
                             </tr>
                             <!-- Пол Т -->
                             <tr class="bg-gray-50/50">
                                 <td class="py-4 px-6 font-medium text-gray-700">Пол - Температура</td>
-                                <td class="py-4 px-6 text-gray-500">{f_temp_before:.1f} °C</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{f_temp_now:.1f} °C</td>
+                                <td class="py-4 px-6 text-gray-500">{before_floor_temp:.1f} °C</td>
+                                <td class="py-4 px-6 text-gray-900 font-medium">{floor_temp:.1f} °C</td>
                                 <td class="py-4 px-6 {diff_floor_temp_class}">{diff_floor_temp:+.1f} °C</td>
                             </tr>
                             <!-- Пол ОВ -->
                             <tr class="bg-gray-50/50">
                                 <td class="py-4 px-6 font-medium text-gray-700">Пол - Влажность (ОВ)</td>
-                                <td class="py-4 px-6 text-gray-500">{f_humi_before:.1f} %</td>
-                                <td class="py-4 px-6 text-red-600 font-semibold">{f_humi_now:.1f} %</td>
+                                <td class="py-4 px-6 text-gray-500">{before_floor_humi:.1f} %</td>
+                                <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td>
                                 <td class="py-4 px-6 {diff_floor_humi_class}">{diff_floor_humi:+.1f} %</td>
+                            </tr>
+                            <!-- Пол АВ -->
+                            <tr class="bg-gray-50/50">
+                                <td class="py-4 px-6 font-medium text-gray-700">Пол - Абс. влажность (АВ)</td>
+                                <td class="py-4 px-6 text-gray-500">{before_a_floor_humi:.2f} г/м³</td>
+                                <td class="py-4 px-6 text-red-600 font-semibold">{a_floor_humi:.2f} г/м³</td>
+                                <td class="py-4 px-6 {diff_a_floor_humi_class}">{diff_a_floor_humi:+.2f} г/м³</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+       
 
-        
     </div>
 </body>
 </html>
-
