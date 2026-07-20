@@ -229,18 +229,21 @@ async def get_heating_page():
         status_heating_table = latest_heating_table[0]
         heat_before = get_latest_climate_data('api_table', status_heating_table["heating_start"], status_heating_table["heating_start"])[0]
         heat_active = True
-        heat_start_time = heat_before['timestamp'] 
+        heat_start_time = heat_before['timestamp']
+        heat_now_time =  db_data['timestamp']
     else:
         heat_active = False
         heat_before = dict(db_data)
         heat_start_time = db_data['timestamp']
+        heat_now_time =  db_data['timestamp']
+
 
     # Вычисляем разницу для отопления (только температура и влажность подвала/пола)
     diffs = {
         'diff_basement_temp': db_data['basement_temp'] - heat_before['basement_temp'],
         'diff_basement_humi': db_data['basement_humi'] - heat_before['basement_humi'],
         'diff_floor_temp': db_data['floor_temp'] - heat_before['floor_temp'],
-        'diff_floor_humi': db_data['floor_humi'] - heat_before['floor_humi'],
+        'diff_floor_humi': db_data['floor_humi'] - heat_before['floor_humi']
     }
 
     # Классы стилей для отопления (увеличение температуры — зеленый, падение — красный)
@@ -248,7 +251,7 @@ async def get_heating_page():
         'diff_basement_temp_class': "text-green-600 font-semibold" if diffs['diff_basement_temp'] > 0.1 else "text-red-600 font-semibold" if diffs['diff_basement_temp'] < -0.1 else "text-gray-500",
         "diff_basement_humi_class": "text-green-600 font-semibold" if diffs['diff_basement_humi'] < -0.5 else "text-red-600 font-semibold" if diffs['diff_basement_humi'] > 0.5 else "text-gray-500",
         "diff_floor_temp_class": "text-green-600 font-semibold" if diffs['diff_floor_temp'] > 0.1 else "text-red-600 font-semibold" if diffs['diff_floor_temp'] < -0.1 else "text-gray-500",
-        "diff_floor_humi_class": "text-green-600 font-semibold" if diffs['diff_floor_humi'] < -0.5 else "text-red-600 font-semibold" if diffs['diff_floor_humi'] > 0.5 else "text-gray-500",
+        "diff_floor_humi_class": "text-green-600 font-semibold" if diffs['diff_floor_humi'] < -0.5 else "text-red-600 font-semibold" if diffs['diff_floor_humi'] > 0.5 else "text-gray-500"
     }
 
     # Динамическая настройка кнопок отопления
@@ -272,7 +275,8 @@ async def get_heating_page():
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,
         "btn_stop_disabled": btn_stop_disabled,
-        "heat_start_time": heat_start_time[11:16] if heat_start_time else "Нет запущенных циклов",
+        "heat_start_time": heat_start_time[11:16],
+        'heat_now_time': heat_now_time[11:16] 
     }
 
     html_path = os.path.join(config.PROJECT_DIR, "templates", "heating.html")

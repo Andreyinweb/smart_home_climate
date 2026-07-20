@@ -34,7 +34,6 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Управление отоплением</h2>
-                    <p class="text-xs text-gray-400 mt-2">Время старта цикла: <span class="font-semibold text-gray-600">{heat_start_time}</span></p>
                 </div>
                 <div class="flex gap-3">
                     <form action="/api/heating/start" method="post">
@@ -52,14 +51,13 @@
 
             <!-- СРАВНИТЕЛЬНАЯ ТАБЛИЦА -->
             <div>
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Сравнительный анализ показателей</h3>
                 <div class="overflow-x-auto border border-gray-100 rounded-xl">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                                <th class="py-4 px-6">Показатель / Зона</th>
-                                <th class="py-4 px-6">До начала</th>
-                                <th class="py-4 px-6">Текущее значение</th>
+                                <th class="py-4 px-6">Показатель</th>
+                                <th class="py-4 px-6">Начало <span class="font-semibold text-blue-600">{heat_start_time}</span></th>
+                                <th class="py-4 px-6">Текущее <span class="font-semibold text-blue-600">{heat_now_time}</span></th>
                                 <th class="py-4 px-6">Изменение (динамика)</th>
                             </tr>
                         </thead>
