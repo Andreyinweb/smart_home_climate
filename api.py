@@ -15,14 +15,15 @@ api_log.info(f"Сервер запускается, перезагрузка = {
 
 app = FastAPI(title="Smart Home Climate API")
 
-db_nothing = {'id':1, 'timestamp': "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ", 'street_temp': 0.0, 'basement_temp': 0.0, 'floor_temp': 0.0, 'difference_temp': 0.0,
-                            'average_temp': 0.0, 'street_humi': 0.0, 'basement_humi': 0.0, 'floor_humi': 0.0, 'street_voltage': 0.0,
-                            'basement_voltage': 0.0, 'floor_voltage': 0.0, 'gas_meter': 0, 'a_floor_humi': 0.0, 'dp_floor': 0.0,
-                            'a_street_humi': 0.0, 'dp_street': 0.0, 'a_basement_humi': 0.0, 'dp_basement': 0.0, 'humidity_difference': 0.0,
-                            'vent_status': True, 'vent_time_val': 0.0, 'sim_a_basement_humi': 0.0, 'sim_basement_humi': 0.0, 'sim_floor_humi': 0.0,
-                            'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
-                            'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
-                            }
+db_nothing = {
+    'id': 1, 'timestamp': "НЕТ ДАННЫХ ИЗ БАЗЫ ДАННЫХ", 'street_temp': 0.0, 'basement_temp': 0.0, 'floor_temp': 0.0, 'difference_temp': 0.0,
+    'average_temp': 0.0, 'street_humi': 0.0, 'basement_humi': 0.0, 'floor_humi': 0.0, 'street_voltage': 0.0,
+    'basement_voltage': 0.0, 'floor_voltage': 0.0, 'gas_meter': 0, 'a_floor_humi': 0.0, 'dp_floor': 0.0,
+    'a_street_humi': 0.0, 'dp_street': 0.0, 'a_basement_humi': 0.0, 'dp_basement': 0.0, 'humidity_difference': 0.0,
+    'vent_status': True, 'vent_time_val': 0.0, 'sim_a_basement_humi': 0.0, 'sim_basement_humi': 0.0, 'sim_floor_humi': 0.0,
+    'heating_delta': 0.0, 'heat_status': True, 'floor_temp_heated': 0.0, 'basement_temp_heated': 0.0, 'basement_humi_heated': 0.0,                
+    'a_basement_humi_heated': 0.0, 'floor_humi_heated': 0.0, 'a_floor_humi_heated': 0.0
+}
 
 data_rendered = {} # TODO
 
@@ -100,15 +101,10 @@ async def get_ventilation_page():
             vent_start_time = db_data['timestamp'] 
             vent_now_time = db_data['timestamp']
     else:
-        # status_ventilation_table['status_ventilation'] = False      
-        # status_ventilation_table['timestamp'] = db_data['timestamp']
-        # status_ventilation_table['ventilation_start'] = 1
-        # status_ventilation_table['stop_ventilation'] = 1
         vent_active = False
         vent_before = dict(db_data)
         vent_start_time = db_data['timestamp'] 
         vent_now_time = db_data['timestamp']
-
 
     # Вычисляем разницу
     diffs = {
@@ -130,10 +126,24 @@ async def get_ventilation_page():
         "diff_a_floor_humi_class": "text-green-600 font-semibold" if diffs['diff_a_floor_humi'] < -0.1 else "text-red-600 font-semibold" if diffs['diff_a_floor_humi'] > 0.1 else "text-gray-500",
     }
 
+    # Настройки отображения кнопок на основе статуса проветривания
+    if vent_active:
+        btn_start_class = "bg-gray-300 text-gray-500 cursor-not-allowed"
+        btn_stop_class = "bg-red-600 text-white hover:bg-red-700 shadow-md"
+        btn_start_disabled = "disabled"
+        btn_stop_disabled = ""
+    else:
+        btn_start_class = "bg-green-600 text-white hover:bg-green-700 shadow-md"
+        btn_stop_class = "bg-gray-300 text-gray-500 cursor-not-allowed"
+        btn_start_disabled = ""
+        btn_stop_disabled = "disabled"
+
     page_data = {
         "website_return_time": config.WEBSITE_RETURN_TIME,
-        "status_text": "АКТИВНО" if vent_active else "НЕАКТИВНО",
-        "status_class": "bg-green-100 text-green-800 border-green-300" if vent_active else "bg-gray-100 text-gray-700 border-gray-300",
+        "btn_start_class": btn_start_class,
+        "btn_stop_class": btn_stop_class,
+        "btn_start_disabled": btn_start_disabled,
+        "btn_stop_disabled": btn_stop_disabled,
         "vent_start_time": vent_start_time[11:16] if vent_start_time else "Нет запущенных циклов",
         'vent_now_time': vent_now_time[11:16],
         
@@ -181,7 +191,7 @@ async def start_ventilation():
             else:
                 api_log.warning(f"На сервер не приходят значения из базы данных")
         else:
-            None
+            pass
     else:
         latest_records = get_latest_climate_data('api_table')
         if latest_records: 
@@ -215,11 +225,10 @@ async def stop_ventilation():
                 api_log.info(f"[БД] Успешный стоп проветривания: api_id={api_on_db['stop_ventilation']}")
             else:
                 api_log.warning(f"На сервер не приходят значения из базы данных") 
-
         else: 
-            None
+            pass
     else:
-        None
+        pass
     return RedirectResponse(url="/ventilation", status_code=303)
 
 # --- ОТОПЛЕНИЕ ----------------------------------------------------------------------------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

@@ -10,8 +10,6 @@
 <body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
     <div class="max-w-5xl mx-auto space-y-8"> 
 
-
-
         <!-- НАВИГАЦИОННАЯ ПАНЕЛЬ -->
         <nav class="bg-white shadow-sm border border-gray-200 rounded-2xl p-2 flex flex-wrap gap-2 justify-between items-center">
             <div class="flex items-center gap-2 pl-4">
@@ -36,22 +34,16 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Управление проветриванием</h2>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Статус запуска: 
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold border {status_class}">
-                            {status_text}
-                        </span>
-                    </p>
                     <!-- <p class="text-xs text-gray-400 mt-2">Время старта цикла: <span class="font-semibold text-gray-600">{vent_start_time}</span></p> -->
                 </div>
                 <div class="flex gap-3">
                     <form action="/api/ventilation/start" method="post">
-                        <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-green-700 transition">
+                        <button type="submit" {btn_start_disabled} class="px-6 py-3 {btn_start_class} rounded-xl font-bold text-sm transition">
                             Начать проветривание
                         </button>
                     </form>
                     <form action="/api/ventilation/stop" method="post">
-                        <button type="submit" class="px-6 py-3 bg-red-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-red-700 transition">
+                        <button type="submit" {btn_stop_disabled} class="px-6 py-3 {btn_stop_class} rounded-xl font-bold text-sm transition">
                             Закончить проветривание
                         </button>
                     </form>
