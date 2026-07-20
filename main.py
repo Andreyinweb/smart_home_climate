@@ -39,12 +39,7 @@ settings_in_db['target_rh'] = config.TARGET_RH
 settings_in_db['absolute_humidity_tolerance'] = config.ABSOLUTE_HUMIDITY_TOLERANCE
 settings_in_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-try:
-   success = write_climate_data('settings_table', settings_in_db, row_id=1)
-   if success:
-      work_log.info("[БД] Данные успешно записаны в таблицу 'settings_table'")
-except Exception as db_err:
-   work_log.error(f"[БД] Ошибка settings_table подготовки данных для записи: {db_err}")
+write_climate_data('settings_table', settings_in_db, row_id=1)
 
 
 # data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
@@ -98,15 +93,9 @@ async def polling_task():
             data_sensors_all['average_temp'] = get_average_difference_temp()
 
             print(f"Запись в БД: {data_sensors_all}") #TODO
-        # 3. Запись датчиков в table_sensor_data
-            
-            try:
-                success = write_climate_data('table_sensor_data', data_sensors_all)
-                if success:
-                    work_log.info("[БД] Данные успешно записаны в таблицу 'table_sensor_data'")
-            except Exception as db_err:
-                work_log.error(f"[БД] Ошибка подготовки данных для записи: {db_err}")
-##########################################################################################################################################
+        # 3. Запись датчиков в table_sensor_data            
+            work_log.info("[БД] Данные успешно записаны в таблицу 'table_sensor_data'")
+########################################################################################
         # 4. Расчёт данных
             db_data ={}
             db_data = dict(data_sensors_all)
@@ -164,16 +153,11 @@ async def polling_task():
                 db_data['floor_humi_heated'] = db_data['floor_humi']
                 db_data['a_floor_humi_heated'] = db_data['a_floor_humi']
         # 5. Запись датчиков в api_table
-            try:
-                success = write_climate_data("api_table", db_data)
-                if success:
-                    work_log.info("[БД] Данные успешно записаны в таблицу 'api_table'")
-            except Exception as db_err:
-                work_log.error(f"[БД] Ошибка подготовки данных для записи: {db_err}")
+            write_climate_data('api_table', db_data)
 
         # 6. Пауза
         work_log.info(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
-        print(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
+        print(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...") # TODO
         await asyncio.sleep(config.INTERVAL_SECONDS)
 
 async def start_services():

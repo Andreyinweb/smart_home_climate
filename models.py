@@ -11,17 +11,17 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def write_climate_data(name_table, data_sensors_all: dict, row_id: int = None) -> bool:
+def write_climate_data(name_table, data_all: dict, row_id: int = None) -> bool:
     """
     Записывает текущие показатели в таблицу. 
     Если передан row_id, перезаписывает (или создает) строку с этим ID.
     """
-    names = list(data_sensors_all.keys())
-    incoming_data = list(data_sensors_all.values())
+    names = list(data_all.keys())
+    incoming_data = list(data_all.values())
 
     if row_id is not None:
         # Добавляем id в список полей и значений для INSERT OR REPLACE
-        names.append("id")
+        names.append('id')
         incoming_data.append(row_id)
         
         columns = ", ".join(names)
@@ -38,8 +38,10 @@ def write_climate_data(name_table, data_sensors_all: dict, row_id: int = None) -
             cursor = conn.cursor()
             cursor.execute(query, tuple(incoming_data))
             conn.commit()
+            work_log.info(f"[БД] Данные успешно записаны в таблицу {name_table}")
         return True
     except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка записи в базу данных: {e}")
         print(f"[БД] Ошибка записи в базу данных: {e}")
         return False
 
@@ -85,6 +87,7 @@ def get_latest_climate_data(name_table: str, start_id: int = None, stop_id: int 
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
     except sqlite3.Error as e:
+        work_log.info(f"[БД] Ошибка чтения из базы данных: {e}")
         print(f"[БД] Ошибка чтения из базы данных: {e}")
         return []
 
@@ -104,5 +107,6 @@ def get_average_difference_temp() -> float:
                 return round(row["avg_diff"], 2)
             return config.T_FLOOR_MAC_DIFF
     except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка при расчете среднего значения difference_temp: {e}")
         print(f"[БД] Ошибка при расчете среднего значения difference_temp: {e}")
         return config.T_FLOOR_MAC_DIFF

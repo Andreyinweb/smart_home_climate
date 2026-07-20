@@ -42,7 +42,7 @@
                             {status_text}
                         </span>
                     </p>
-                    <p class="text-xs text-gray-400 mt-2">Время старта цикла: <span class="font-semibold text-gray-600">{vent_start_time}</span></p>
+                    <!-- <p class="text-xs text-gray-400 mt-2">Время старта цикла: <span class="font-semibold text-gray-600">{vent_start_time}</span></p> -->
                 </div>
                 <div class="flex gap-3">
                     <form action="/api/ventilation/start" method="post">
@@ -65,10 +65,10 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                                <th class="py-4 px-6">Показатель / Зона</th>
-                                <th class="py-4 px-6">До начала</th>
-                                <th class="py-4 px-6">Текущее значение</th>
-                                <th class="py-4 px-6">Изменение (динамика)</th>
+                                <th class="py-3 px-5">Показатель</th>
+                                <th class="py-3 px-5">Начало <span class="font-semibold text-blue-600">{vent_start_time}</span></th>
+                                <th class="py-3 px-5">Сейчас <span class="font-semibold text-blue-600">{vent_now_time}</span></th>
+                                <th class="py-3 px-5">Изменение</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-sm">
