@@ -1,85 +1,55 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мониторинг климата подвала — Газ</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <meta http-equiv="refresh" content="{website_return_time}">
-</head>
-<body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
-    <div class="max-w-5xl mx-auto space-y-8"> 
+{% extends "base.html" %}
 
-        <!-- НАВИГАЦИОННАЯ ПАНЕЛЬ -->
-        <nav class="bg-white shadow-sm border border-gray-200 rounded-2xl p-2 flex flex-wrap gap-2 justify-between items-center">
-            <div class="flex items-center gap-2 pl-4">
-                <span class="text-xl">📟</span>
-                <span class="font-bold text-gray-800">Учет газа</span>
-            </div>
-            <div class="flex gap-2">
-                <a href="/" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    Главная
-                </a>
-                <a href="/ventilation" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    💨 Пров-ние
-                </a>
-                <a href="/heating" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    🔥 От-ние
-                </a>
-                <a href="/gas" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow-sm transition">
-                    📟 Газ
-                </a>
-            </div>
-        </nav>
+{% block title %}Счетчик газа — Мониторинг климата{% endblock %}
 
-        <!-- ПАНЕЛЬ УПРАВЛЕНИЯ -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
-            <div class="border-b border-gray-100 pb-4">
-                <h2 class="text-xl font-bold text-gray-800">Ввод показаний счетчика газа</h2>
-            </div>
+{% block content %}
+<div class="dashboard-grid">
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                
-                <!-- Текущее значение -->
-                <div class="bg-blue-50/50 border border-blue-100/40 rounded-2xl p-6 space-y-4">
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Текущие показания</span>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-3xl font-black text-gray-800 tracking-tight">{current_gas}</span>
-                    </div>
-                    <div class="pt-2 border-t border-blue-100/60 flex justify-between text-xs text-gray-400">
-                        <span>Последнее обновление БД:</span>
-                        <span class="font-semibold text-gray-600">{timestamp}</span>
-                    </div>
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">🔥 Показания счетчика газа</h2>
+                <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
+                    Ввод и актуализация показаний газового счетчика
                 </div>
-
-                <!-- Форма отправки -->
-                <form action="/api/gas/update" method="post" class="space-y-4">
-                    <div class="space-y-2">
-                        <label for="gas_meter" class="block text-sm font-bold text-gray-700">Новые показания счётчика (м³):</label>
-                        <div class="relative rounded-xl shadow-sm">
-                            <input 
-                                type="number" 
-                                name="gas_meter" 
-                                id="gas_meter" 
-                                step="any" 
-                                value="{gas_input_value}" 
-                                required 
-                                placeholder="Например: 12450.75" 
-                                class="w-full pl-4 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-                            >
-                            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                                <span class="text-sm font-bold text-gray-400">м³</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md transition-all duration-150 flex items-center justify-center gap-2">
-                        💾 Сохранить в базу данных
-                    </button>
-                </form>
-
             </div>
         </div>
 
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+            <div class="text-gray" style="font-size: 0.85rem;">Текущие показания в системе:</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #0284c7; margin-top: 4px;">
+                {{ current_gas if current_gas else 'Не установлено' }}
+            </div>
+            <div class="text-gray" style="font-size: 0.8rem; margin-top: 6px;">
+                Время замера: <span class="val-bold">{{ timestamp if timestamp else '—' }}</span>
+            </div>
+        </div>
+
+        <form action="/api/gas/update" method="post" style="display: flex; flex-direction: column; gap: 14px;">
+            <div>
+                <label for="gas_meter" style="display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px;">
+                    Новое значение счетчика (м³):
+                </label>
+                <input
+                    type="number"
+                    id="gas_meter"
+                    name="gas_meter"
+                    step="0.001"
+                    min="0"
+                    placeholder="Например: 1234.567"
+                    value="{{ gas_input_value if gas_input_value else '' }}"
+                    required
+                    style="width: 100%; max-width: 300px; padding: 8px 12px; font-size: 1rem; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; transition: border-color 0.2s;"
+                />
+            </div>
+
+            <div>
+                <button type="submit" class="btn btn-start">
+                    💾 Сохранить показания
+                </button>
+            </div>
+        </form>
     </div>
-</body>
-</html>
+
+</div>
+{% endblock %}
