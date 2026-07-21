@@ -1,119 +1,107 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мониторинг климата подвала</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <meta http-equiv="refresh" content="{website_return_time}">
-</head>
-<body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
-    <div class="max-w-5xl mx-auto space-y-8"> 
+{% extends "base.html" %}
 
-        <!-- НАВИГАЦИОННАЯ ПАНЕЛЬ -->
-        <nav class="bg-white shadow-sm border border-gray-200 rounded-2xl p-2 flex flex-wrap gap-2 justify-between items-center">
-            <div class="flex items-center gap-2 pl-4">
-                <span class="text-xl">💨</span>
-                <span class="font-bold text-gray-800">Проветривание</span>
-            </div>
-            <div class="flex gap-2">
-                <a href="/" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    Главная
-                </a>
-                <a href="/ventilation" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow-sm transition">
-                    💨 Пров-ние
-                </a>
-                <a href="/heating" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    🔥 От-ние
-                </a>
-                <a href="/gas" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    📟 Газ
-                </a>
-            </div>
-        </nav>
+{% block title %}Проветривание — Мониторинг климата{% endblock %}
 
-        <!-- ПАНЕЛЬ УПРАВЛЕНИЯ -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-800">Управление проветриванием</h2>
-                </div>
-                <div class="flex gap-3">
-                    <form action="/api/ventilation/start" method="post">
-                        <button type="submit" {btn_start_disabled} class="px-6 py-3 {btn_start_class} rounded-xl font-bold text-sm transition">
-                            Начать проветривание
-                        </button>
-                    </form>
-                    <form action="/api/ventilation/stop" method="post">
-                        <button type="submit" {btn_stop_disabled} class="px-6 py-3 {btn_stop_class} rounded-xl font-bold text-sm transition">
-                            Закончить проветривание
-                        </button>
-                    </form>
-                </div>
-            </div>
+{% block content %}
+<div class="dashboard-grid">
 
-            <!-- СРАВНИТЕЛЬНАЯ ТАБЛИЦА -->
+    <!-- Управление проветриванием -->
+    <div class="card">
+        <div class="card-header">
             <div>
-                <div class="overflow-x-auto border border-gray-100 rounded-xl">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                                <th class="py-3 px-5">Показатель</th>
-                                <th class="py-3 px-5">Начало <span class="font-semibold text-blue-600">{vent_start_time}</span></th>
-                                <th class="py-3 px-5">Сейчас <span class="font-semibold text-blue-600">{vent_now_time}</span></th>
-                                <th class="py-3 px-5">Изменение</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 text-sm">
-                            <!-- Подвал Т -->
-                            <tr>
-                                <td class="py-4 px-6 font-medium text-gray-700">Подвал - Температура</td>
-                                <td class="py-4 px-6 text-gray-500">{before_basement_temp:.1f} °C</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{basement_temp:.1f} °C</td>
-                                <td class="py-4 px-6 {diff_basement_temp_class}">{diff_basement_temp:+.1f} °C</td>
-                            </tr>
-                            <!-- Подвал ОВ -->
-                            <tr>
-                                <td class="py-4 px-6 font-medium text-gray-700">Подвал - Влажность (ОВ)</td>
-                                <td class="py-4 px-6 text-gray-500">{before_basement_humi:.1f} %</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{basement_humi:.1f} %</td>
-                                <td class="py-4 px-6 {diff_basement_humi_class}">{diff_basement_humi:+.1f} %</td>
-                            </tr>
-                            <!-- Подвал АВ -->
-                            <tr>
-                                <td class="py-4 px-6 font-medium text-gray-700">Подвал - Абс. влажность (АВ)</td>
-                                <td class="py-4 px-6 text-gray-500">{before_a_basement_humi:.2f} г/м³</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{a_basement_humi:.2f} г/м³</td>
-                                <td class="py-4 px-6 {diff_a_basement_humi_class}">{diff_a_basement_humi:+.2f} г/м³</td>
-                            </tr>
-                            <!-- Пол Т -->
-                            <tr class="bg-gray-50/50">
-                                <td class="py-4 px-6 font-medium text-gray-700">Пол - Температура</td>
-                                <td class="py-4 px-6 text-gray-500">{before_floor_temp:.1f} °C</td>
-                                <td class="py-4 px-6 text-gray-900 font-medium">{floor_temp:.1f} °C</td>
-                                <td class="py-4 px-6 {diff_floor_temp_class}">{diff_floor_temp:+.1f} °C</td>
-                            </tr>
-                            <!-- Пол ОВ -->
-                            <tr class="bg-gray-50/50">
-                                <td class="py-4 px-6 font-medium text-gray-700">Пол - Влажность (ОВ)</td>
-                                <td class="py-4 px-6 text-gray-500">{before_floor_humi:.1f} %</td>
-                                <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td>
-                                <td class="py-4 px-6 {diff_floor_humi_class}">{diff_floor_humi:+.1f} %</td>
-                            </tr>
-                            <!-- Пол АВ -->
-                            <tr class="bg-gray-50/50">
-                                <td class="py-4 px-6 font-medium text-gray-700">Пол - Абс. влажность (АВ)</td>
-                                <td class="py-4 px-6 text-gray-500">{before_a_floor_humi:.2f} г/м³</td>
-                                <td class="py-4 px-6 text-red-600 font-semibold">{a_floor_humi:.2f} г/м³</td>
-                                <td class="py-4 px-6 {diff_a_floor_humi_class}">{diff_a_floor_humi:+.2f} г/м³</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <h2 class="card-title">💨 Управление проветриванием</h2>
+                <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
+                    Ручной запуск и остановка цикла проветривания
                 </div>
             </div>
         </div>
-       
 
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+            <form action="/api/ventilation/start" method="post" style="margin: 0;">
+                <button type="submit" class="btn {{ btn_start_class if btn_start_class else 'btn-start' }}" {{ btn_start_disabled if btn_start_disabled else '' }}>
+                    ▶ Запустить проветривание
+                </button>
+            </form>
+            <form action="/api/ventilation/stop" method="post" style="margin: 0;">
+                <button type="submit" class="btn {{ btn_stop_class if btn_stop_class else 'btn-disabled' }}" {{ btn_stop_disabled if btn_stop_disabled else '' }}>
+                    ⏹ Остановить проветривание
+                </button>
+            </form>
+        </div>
+
+        <div style="padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem;" class="text-gray">
+            Старт цикла: <span class="val-bold text-blue">{{ vent_start_time if vent_start_time else '—' }}</span> |
+            Текущее время: <span class="val-bold text-blue">{{ vent_now_time if vent_now_time else '—' }}</span>
+        </div>
     </div>
-</body>
-</html>
+
+    <!-- Таблица показателей до и во время проветривания -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">📊 Сравнение показателей цикла</h2>
+        </div>
+
+        <table class="table-compact">
+            <thead>
+                <tr>
+                    <th>Зона / Параметр</th>
+                    <th>До пуска</th>
+                    <th>Текущие</th>
+                    <th>Дельта (Δ)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="val-bold">Подвал Т (°C)</td>
+                    <td>{{ "%.1f"|format(before_basement_temp) if before_basement_temp is defined and before_basement_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(basement_temp) if basement_temp is defined and basement_temp is not none else '—' }}</td>
+                    <td class="{{ diff_basement_temp_class if diff_basement_temp_class else 'text-gray' }}">
+                        {{ "%+.1f"|format(diff_basement_temp) if diff_basement_temp is defined and diff_basement_temp is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="val-bold">Подвал ОВ (%)</td>
+                    <td>{{ "%.1f"|format(before_basement_humi) if before_basement_humi is defined and before_basement_humi is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(basement_humi) if basement_humi is defined and basement_humi is not none else '—' }}</td>
+                    <td class="{{ diff_basement_humi_class if diff_basement_humi_class else 'text-gray' }}">
+                        {{ "%+.1f"|format(diff_basement_humi) if diff_basement_humi is defined and diff_basement_humi is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="val-bold">Подвал АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(before_a_basement_humi) if before_a_basement_humi is defined and before_a_basement_humi is not none else '—' }}</td>
+                    <td>{{ "%.2f"|format(a_basement_humi) if a_basement_humi is defined and a_basement_humi is not none else '—' }}</td>
+                    <td class="{{ diff_a_basement_humi_class if diff_a_basement_humi_class else 'text-gray' }}">
+                        {{ "%+.2f"|format(diff_a_basement_humi) if diff_a_basement_humi is defined and diff_a_basement_humi is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="val-bold">Пол Т (°C)</td>
+                    <td>{{ "%.1f"|format(before_floor_temp) if before_floor_temp is defined and before_floor_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(floor_temp) if floor_temp is defined and floor_temp is not none else '—' }}</td>
+                    <td class="{{ diff_floor_temp_class if diff_floor_temp_class else 'text-gray' }}">
+                        {{ "%+.1f"|format(diff_floor_temp) if diff_floor_temp is defined and diff_floor_temp is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="val-bold">Пол ОВ (%)</td>
+                    <td>{{ "%.1f"|format(before_floor_humi) if before_floor_humi is defined and before_floor_humi is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(floor_humi) if floor_humi is defined and floor_humi is not none else '—' }}</td>
+                    <td class="{{ diff_floor_humi_class if diff_floor_humi_class else 'text-gray' }}">
+                        {{ "%+.1f"|format(diff_floor_humi) if diff_floor_humi is defined and diff_floor_humi is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="val-bold">Пол АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(before_a_floor_humi) if before_a_floor_humi is defined and before_a_floor_humi is not none else '—' }}</td>
+                    <td>{{ "%.2f"|format(a_floor_humi) if a_floor_humi is defined and a_floor_humi is not none else '—' }}</td>
+                    <td class="{{ diff_a_floor_humi_class if diff_a_floor_humi_class else 'text-gray' }}">
+                        {{ "%+.2f"|format(diff_a_floor_humi) if diff_a_floor_humi is defined and diff_a_floor_humi is not none else '—' }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

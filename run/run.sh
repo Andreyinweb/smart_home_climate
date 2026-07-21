@@ -139,7 +139,7 @@ API_FILE="$LOG_DIR/api_log.log"
 #################################################################################### Проверка Python #########################################################
 
 # Проверяем текущую версию Python
-current_version=$(python3 --version 2>&1 | cut -d' ' -f2)
+current_version=$(python3.12 --version 2>&1 | cut -d' ' -f2)
 
 
 if [[ "$current_version" == *"$desired_version"* ]]; then
@@ -187,19 +187,9 @@ else
             exit 0
         fi
 
-        # Этап 5: Настройка версии по умолчанию
-        echo "Python $desired_version установлен."
-        if ask_confirm "Сделать Python $desired_version версией по умолчанию (обновить ссылку python3)?"; then
-            sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
-            sudo update-alternatives --set python3 /usr/bin/python3.12
-            echo "Ссылка python3 теперь ведет на версию $desired_version"
-        else
-            echo "Ссылка python3 не изменена. Для ручной настройки выполните:"
-            echo "  sudo update-alternatives --config python3"
-        fi
 
         # Проверка результата
-        new_version=$(python3 --version 2>&1 | cut -d' ' -f2)
+        new_version=$(python3.12 --version 2>&1 | cut -d' ' -f2)
         echo "Установка завершена. Текущая версия Python: $new_version"
     fi
 fi
@@ -216,7 +206,7 @@ if [ -d "$VENV_DIR" ]; then
     if [ ! -d "$VENV_PATH" ]; then
         echo "Виртуальное окружение $VENV_NAME не существует."
         if ask_confirm "Создать виртуальное окружение  $VENV_NAME ?"; then
-            python3 -m venv "$VENV_PATH"
+            python3.12 -m venv "$VENV_PATH"
             echo "Виртуальное окружение успешно создано в $VENV_PATH"
             
             # Активируем и устанавливаем базовые пакеты (опционально)
@@ -276,9 +266,9 @@ fi
 
 echo "########################################### Запуск run_program.py #############################"
 source "$VENV_PATH/bin/activate"
-python3 run/run_program.py
+python3.12 run/run_program.py
 
 echo "Проверка завершена."
 echo "######################## Пуск основной программы проекта main.py ######################"
 
-python3 main.py
+python3.12 main.py

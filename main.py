@@ -96,9 +96,8 @@ async def polling_task():
                 data_sensors_all['gas_meter'] = latest_records[0]['gas_meter']
             
             print(f"Запись в БД: {data_sensors_all}") #TODO
-        # 3. Запись датчиков в table_sensor_data 
-            write_climate_data('table_sensor_data', data_sensors_all)           
-            work_log.info("[БД] Данные успешно записаны в таблицу 'table_sensor_data'")
+        # 3. Запись датчиков в table_sensor_data         
+            write_climate_data('table_sensor_data', data_sensors_all)          
 ########################################################################################
         # 4. Расчёт данных
             db_data ={}

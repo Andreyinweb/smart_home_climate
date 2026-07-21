@@ -1,193 +1,153 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мониторинг климата подвала</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <meta http-equiv="refresh" content="{website_return_time}">
-</head>
-<body class="bg-gray-100 text-gray-900 font-sans min-h-screen p-4 sm:p-6 lg:p-8">
-    <div class="max-w-5xl mx-auto space-y-8">   
-        <!-- НАВИГАЦИОННАЯ ПАНЕЛЬ -->
-        <nav class="bg-white shadow-sm border border-gray-200 rounded-2xl p-2 flex flex-wrap gap-2 justify-between items-center">
-            <div class="flex items-center gap-2 pl-4">
-                <span class="text-xl">💨</span>
-                <span class="font-bold text-gray-800">Проветривание</span>
-            </div>
-            <div class="flex gap-2">
-                <a href="/" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow-sm transition">                
-                    Главная
-                </a>
-                <a href="/ventilation" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    💨 Пров-ние
-                </a>
-                <a href="/heating" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    🔥 От-ние
-                </a>
-                <a href="/gas" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
-                    📟 Газ
-                </a>
-            </div>
-        </nav>
+{% extends "base.html" %}
 
-        <!-- ТАБЛИЦА 1: ТЕКУЩИЕ ПОКАЗАТЕЛИ -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="p-6 border-b border-gray-100">
-                <h2 class="text-xl font-bold text-gray-800">Текущие показатели</h2>
-                <p class="text-sm text-gray-500">  Дата : <span class="font-semibold text-blue-600">{timestamp}</span></p>
-                <p class="text-xs text-gray-500 mt-1">ОВ пол = <span class="font-semibold text-blue-600">{max_rh:.1f}%</span></p>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                            <th class="py-4 px-6"></th>
-                            <th class="py-4 px-6">Улица</th>
-                            <th class="py-4 px-6">Подвал</th>
-                            <th class="py-4 px-6">Пол</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 text-sm">
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Т</td>
-                            <td class="py-4 px-6">{street_temp:.1f} °C</td>
-                            <td class="py-4 px-6">{basement_temp:.1f} °C</td>
-                            <td class="py-4 px-6">{floor_temp:.1f} °C</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
-                            <td class="py-4 px-6">{street_humi:.1f} %</td>
-                            <td class="py-4 px-6">{basement_humi:.1f} %</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{floor_humi:.1f} %</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
-                            <td class="py-4 px-6">{a_street_humi:.2f} г/м³</td>
-                            <td class="py-4 px-6">{a_basement_humi:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{a_floor_humi:.2f} г/м³</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">ТР</td>
-                            <td class="py-4 px-6">{dp_street:.1f} °C</td>
-                            <td class="py-4 px-6">{dp_basement:.1f} °C</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{dp_floor:.1f} °C</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div class="text-sm font-semibold text-gray-600">
-                    Проветривание: <span class="text-gray-900">{humidity_difference:.2f} г/м³</span>
-                    <span class="px-3 py-1 rounded-full text-xs font-bold {vent_class}">
-                        {msg_vent_status} — {vent_reason}
-                    </span>
-                    <span class="text-sm font-semibold ml-0 sm:ml-4">Отопление:</span>
-                    <span class="px-3 py-1 rounded-full text-xs font-bold {heat_class}">
-                        {msg_heat_status} {heat_info}
-                    </span>
+{% block title %}Главная — Мониторинг климата{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+
+    <!-- ТАБЛИЦА 1: ТЕКУЩИЕ ПОКАЗАТЕЛИ -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">📊 Текущие показатели</h2>
+                <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
+                    Дата: <span class="text-blue val-bold">{{ timestamp if timestamp else '—' }}</span> | ОВ пол max: <span class="text-blue val-bold">{{ "%.1f"|format(max_rh) if max_rh is defined and max_rh is not none else '0.0' }}%</span>
                 </div>
             </div>
         </div>
 
-        <!-- ТАБЛИЦА 2: РАСЧЕТНЫЕ ДАННЫЕ (ПРОВЕТРИВАНИЕ) -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden {vent_display_class}">
-            <div class="p-6 border-b border-gray-100">
-                <h2 class="text-xl font-bold text-gray-800">ПРОВЕТРИВАНИЕ</h2>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                            <th class="py-4 px-6"></th>
-                            <th class="py-4 px-6">Улица </th>
-                            <th class="py-4 px-6">Подвал</th>
-                            <th class="py-4 px-6">П о л</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 text-sm">
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Т</td>
-                            <td class="py-4 px-6">{street_temp:.1f} °C</td>
-                            <td class="py-4 px-6">{basement_temp:.1f} °C</td>
-                            <td class="py-4 px-6 text-blue-600 font-semibold">{floor_temp:.1f} °C</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
-                            <td class="py-4 px-6">{street_humi:.1f} %</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_basement_humi:.1f} %</td>
-                            <td class="py-4 px-6 text-red-600 font-semibold">{sim_floor_humi:.1f} %</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
-                            <td class="py-4 px-6">{a_street_humi:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_a_basement_humi:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{sim_a_basement_humi:.2f} г/м³</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <table class="table-compact">
+            <thead>
+                <tr>
+                    <th>Зона</th>
+                    <th>Улица</th>
+                    <th>Подвал</th>
+                    <th>Пол</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="val-bold">Т (°C)</td>
+                    <td>{{ "%.1f"|format(street_temp) if street_temp is defined and street_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(basement_temp) if basement_temp is defined and basement_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(floor_temp) if floor_temp is defined and floor_temp is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">ОВ (%)</td>
+                    <td>{{ "%.1f"|format(street_humi) if street_humi is defined and street_humi is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(basement_humi) if basement_humi is defined and basement_humi is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.1f"|format(floor_humi) if floor_humi is defined and floor_humi is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(a_street_humi) if a_street_humi is defined and a_street_humi is not none else '—' }}</td>
+                    <td>{{ "%.2f"|format(a_basement_humi) if a_basement_humi is defined and a_basement_humi is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.2f"|format(a_floor_humi) if a_floor_humi is defined and a_floor_humi is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">ТР (°C)</td>
+                    <td>{{ "%.1f"|format(dp_street) if dp_street is defined and dp_street is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(dp_basement) if dp_basement is defined and dp_basement is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.1f"|format(dp_floor) if dp_floor is defined and dp_floor is not none else '—' }}</td>
+                </tr>
+            </tbody>
+        </table>
 
-        <!-- ТАБЛИЦА 3: ДАННЫЕ ОТОПЛЕНИЯ -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden {heat_display_class}">
-            <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-800">ОТОПЛЕНИЕ</h2>
-                </div>
+        <!-- Стутус работы систем -->
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+            <div>
+                <strong>Проветривание:</strong> {{ "%.2f"|format(humidity_difference) if humidity_difference is defined and humidity_difference is not none else '0.00' }} г/м³
+                <span class="badge {{ vent_class if vent_class else 'badge-gray' }}">{{ msg_vent_status if msg_vent_status else 'НЕТ' }} — {{ vent_reason if vent_reason else '' }}</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-100">
-                            <th class="py-4 px-6"></th>
-                            <th class="py-4 px-6">Улица </th>
-                            <th class="py-4 px-6">Подвал</th>
-                            <th class="py-4 px-6">П о л</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 text-sm">
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">Т</td>
-                            <td class="py-4 px-6">{street_temp:.1f} °C</td>
-                            <td class="py-4 px-6 text-amber-600 font-semibold">{basement_temp_heated:.1f} °C</td>
-                            <td class="py-4 px-6 text-amber-600 font-semibold">{floor_temp_heated:.1f} °C</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">ОВ</td>
-                            <td class="py-4 px-6">{street_humi:.1f} %</td>
-                            <td class="py-4 px-6 text-gray-600">{basement_humi_heated:.1f} %</td>
-                            <td class="py-4 px-6 text-emerald-600 font-bold">{floor_humi_heated:.1f} %</td>
-                        </tr>
-                        <tr>
-                            <td class="py-4 px-6 font-medium text-gray-700">АВ</td>
-                            <td class="py-4 px-6">{a_street_humi:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{a_basement_humi_heated:.2f} г/м³</td>
-                            <td class="py-4 px-6 text-gray-600">{a_floor_humi_heated:.2f} г/м³</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div>
+                <strong>Отопление:</strong>
+                <span class="badge {{ heat_class if heat_class else 'badge-gray' }}">{{ msg_heat_status if msg_heat_status else 'НЕТ' }} {{ heat_info if heat_info else '' }}</span>
             </div>
         </div>
-        
-        <!-- Заряды батарей -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
-            <div class="flex flex-wrap gap-2">
-                <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
-                    Заряд батареи Улица: {street_voltage:.3f} В
-                </span>
-                <span class="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold">
-                    Заряд батареи Подвал: {basement_voltage:.3f} В
-                </span>
-                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
-                    Заряд батареи Пол: {floor_voltage:.3f} В
-                </span>
-            </div>
-        </div>
-    
-     
-        
-        
     </div>
-</body>
-</html>
+
+    <!-- ТАБЛИЦА 2: РАСЧЕТНЫЕ ДАННЫЕ (ПРОВЕТРИВАНИЕ) -->
+    <div class="card {{ vent_display_class if vent_display_class else '' }}">
+        <div class="card-header">
+            <h2 class="card-title">💨 Моделирование: Проветривание</h2>
+        </div>
+        <table class="table-compact">
+            <thead>
+                <tr>
+                    <th>Параметр</th>
+                    <th>Улица</th>
+                    <th>Подвал</th>
+                    <th>Пол</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="val-bold">Т (°C)</td>
+                    <td>{{ "%.1f"|format(street_temp) if street_temp is defined and street_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(basement_temp) if basement_temp is defined and basement_temp is not none else '—' }}</td>
+                    <td class="text-blue">{{ "%.1f"|format(floor_temp) if floor_temp is defined and floor_temp is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">ОВ (%)</td>
+                    <td>{{ "%.1f"|format(street_humi) if street_humi is defined and street_humi is not none else '—' }}</td>
+                    <td class="text-gray">{{ "%.1f"|format(sim_basement_humi) if sim_basement_humi is defined and sim_basement_humi is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.1f"|format(sim_floor_humi) if sim_floor_humi is defined and sim_floor_humi is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(a_street_humi) if a_street_humi is defined and a_street_humi is not none else '—' }}</td>
+                    <td class="text-gray">{{ "%.2f"|format(sim_a_basement_humi) if sim_a_basement_humi is defined and sim_a_basement_humi is not none else '—' }}</td>
+                    <td class="text-gray">{{ "%.2f"|format(sim_a_basement_humi) if sim_a_basement_humi is defined and sim_a_basement_humi is not none else '—' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ТАБЛИЦА 3: РАСЧЕТНЫЕ ДАННЫЕ (ОТОПЛЕНИЕ) -->
+    <div class="card {{ heat_display_class if heat_display_class else '' }}">
+        <div class="card-header">
+            <h2 class="card-title">🔥 Моделирование: Отопление</h2>
+        </div>
+        <table class="table-compact">
+            <thead>
+                <tr>
+                    <th>Параметр</th>
+                    <th>Улица</th>
+                    <th>Подвал</th>
+                    <th>Пол</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="val-bold">Т (°C)</td>
+                    <td>{{ "%.1f"|format(street_temp) if street_temp is defined and street_temp is not none else '—' }}</td>
+                    <td class="text-amber">{{ "%.1f"|format(basement_temp_heated) if basement_temp_heated is defined and basement_temp_heated is not none else '—' }}</td>
+                    <td class="text-amber">{{ "%.1f"|format(floor_temp_heated) if floor_temp_heated is defined and floor_temp_heated is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">ОВ (%)</td>
+                    <td>{{ "%.1f"|format(street_humi) if street_humi is defined and street_humi is not none else '—' }}</td>
+                    <td class="text-gray">{{ "%.1f"|format(basement_humi_heated) if basement_humi_heated is defined and basement_humi_heated is not none else '—' }}</td>
+                    <td class="text-green">{{ "%.1f"|format(floor_humi_heated) if floor_humi_heated is defined and floor_humi_heated is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(a_street_humi) if a_street_humi is defined and a_street_humi is not none else '—' }}</td>
+                    <td class="text-gray">{{ "%.2f"|format(a_basement_humi_heated) if a_basement_humi_heated is defined and a_basement_humi_heated is not none else '—' }}</td>
+                    <td class="text-gray">{{ "%.2f"|format(a_floor_humi_heated) if a_floor_humi_heated is defined and a_floor_humi_heated is not none else '—' }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ЗАРЯДЫ БАТАРЕЙ -->
+    <div class="card">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; font-size: 0.85rem;">
+            <span class="badge badge-green">🔋 Батарея Улица: {{ "%.3f"|format(street_voltage) if street_voltage is defined and street_voltage is not none else '0.000' }} В</span>
+            <span class="badge badge-amber">🔋 Батарея Подвал: {{ "%.3f"|format(basement_voltage) if basement_voltage is defined and basement_voltage is not none else '0.000' }} В</span>
+            <span class="badge badge-gray">🔋 Батарея Пол: {{ "%.3f"|format(floor_voltage) if floor_voltage is defined and floor_voltage is not none else '0.000' }} В</span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
