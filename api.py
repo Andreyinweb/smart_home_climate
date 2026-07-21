@@ -1,7 +1,8 @@
 import os
 import logging
 from datetime import datetime
-from fastapi import FastAPI, Form
+from urllib.parse import parse_qs
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from settings import config
 from models import get_latest_climate_data, write_climate_data, get_db_connection
@@ -229,14 +230,13 @@ async def get_heating_page():
         status_heating_table = latest_heating_table[0]
         heat_before = get_latest_climate_data('api_table', status_heating_table["heating_start"], status_heating_table["heating_start"])[0]
         heat_active = True
-        heat_start_time = heat_before['timestamp']
-        heat_now_time =  db_data['timestamp']
+        heat_start_time = heat_before['timestamp'] 
+        heat_now_time = db_data['timestamp']
     else:
         heat_active = False
         heat_before = dict(db_data)
         heat_start_time = db_data['timestamp']
-        heat_now_time =  db_data['timestamp']
-
+        heat_now_time = db_data['timestamp']
 
     # Вычисляем разницу для отопления (только температура и влажность подвала/пола)
     diffs = {
@@ -275,8 +275,8 @@ async def get_heating_page():
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,
         "btn_stop_disabled": btn_stop_disabled,
-        "heat_start_time": heat_start_time[11:16],
-        'heat_now_time': heat_now_time[11:16] 
+        "heat_start_time": heat_start_time[11:16] if heat_start_time else "Нет запущенных циклов",
+        'heat_now_time': heat_now_time
     }
 
     html_path = os.path.join(config.PROJECT_DIR, "templates", "heating.html")
@@ -336,3 +336,75 @@ async def stop_heating():
                 api_log.warning(f"На сервер не приходят значения из базы данных") 
                 
     return RedirectResponse(url="/heating", status_code=303)
+
+# --- ГАЗ --- ############################################################################################################################################
+
+@app.get("/gas", response_class=HTMLResponse)
+async def get_gas_page():
+    """Страница ввода и отображения показаний счетчика газа."""
+    latest_records = get_latest_climate_data('api_table')
+    if not latest_records:
+        api_log.warning("На сервер не приходят значения из базы данных для страницы газа")
+        return get_no_data_response()
+        
+    db_data = latest_records[0]
+    gas_val = db_data.get('gas_meter')
+    
+    # Форматируем показания для отображения
+    gas_display = f"{gas_val:.3f} м³" if gas_val is not None else "Не установлено"
+    gas_input_val = f"{gas_val:.3f}" if gas_val is not None else ""
+    
+    html_path = os.path.join(config.PROJECT_DIR, "templates", "gas.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            template = f.read()
+    else:
+        return HTMLResponse("Ошибка: Файл шаблона gas.html не найден в папке templates.", status_code=500)
+        
+    rendered_html = template.format(
+        website_return_time=config.WEBSITE_RETURN_TIME,
+        current_gas=gas_display,
+        gas_input_value=gas_input_val,
+        timestamp=db_data.get('timestamp', '—')
+    )
+    return HTMLResponse(rendered_html)
+
+@app.post("/api/gas/update")
+async def update_gas_meter(request: Request):
+    """Обновление показаний счетчика газа в последней строке таблиц api_table и table_sensor_data."""
+    # Получаем сырое тело запроса для парсинга без зависимости python-multipart
+    body = await request.body()
+    parsed_data = parse_qs(body.decode("utf-8"))
+    gas_meter_val = parsed_data.get('gas_meter')
+
+    if not gas_meter_val:
+        api_log.warning("В запросе отсутствует поле gas_meter")
+        return RedirectResponse(url="/gas", status_code=303)
+
+    try:
+        gas_meter = float(gas_meter_val[0])
+    except ValueError:
+        api_log.warning("Не удалось преобразовать значение gas_meter в число с плавающей точкой")
+        return RedirectResponse(url="/gas", status_code=303)
+
+    # 1. Обновление в api_table (последняя строка)
+    latest_api = get_latest_climate_data('api_table')
+    if latest_api:
+        last_api_id = latest_api[0]['id']
+        latest_api[0]['gas_meter'] = gas_meter
+        write_climate_data('api_table', latest_api[0], row_id=last_api_id)
+        api_log.info(f"[БД] Успешно обновлен счетчик газа в api_table (id={last_api_id}): {gas_meter}")
+    else:
+        api_log.warning("api_table пуста, не удалось обновить счетчик газа")
+        
+    # 2. Обновление в table_sensor_data (последняя строка)
+    latest_sensor = get_latest_climate_data('table_sensor_data')
+    if latest_sensor:
+        last_sensor_id = latest_sensor[0]['id']
+        latest_sensor[0]['gas_meter'] = gas_meter
+        write_climate_data('table_sensor_data', latest_sensor[0], row_id=last_sensor_id)
+        api_log.info(f"[БД] Успешно обновлен счетчик газа в table_sensor_data (id={last_sensor_id}): {gas_meter}")
+    else:
+        api_log.warning("table_sensor_data пуста, не удалось обновить счетчик газа")
+
+    return RedirectResponse(url="/gas", status_code=303)

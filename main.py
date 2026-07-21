@@ -91,9 +91,13 @@ async def polling_task():
 
             # Получение среднего исторического значения разницы температур из БД
             data_sensors_all['average_temp'] = get_average_difference_temp()
-
+            latest_records = get_latest_climate_data('table_sensor_data')
+            if latest_records:
+                data_sensors_all['gas_meter'] = latest_records[0]['gas_meter']
+            
             print(f"Запись в БД: {data_sensors_all}") #TODO
-        # 3. Запись датчиков в table_sensor_data            
+        # 3. Запись датчиков в table_sensor_data 
+            write_climate_data('table_sensor_data', data_sensors_all)           
             work_log.info("[БД] Данные успешно записаны в таблицу 'table_sensor_data'")
 ########################################################################################
         # 4. Расчёт данных

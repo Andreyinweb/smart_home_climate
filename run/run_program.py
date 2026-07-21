@@ -133,7 +133,7 @@ check_or_create_database(database_file)
 
 # Создаём таблицу table_sensor_data
 fields_db = """ (
-            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             street_temp REAL,
             basement_temp REAL,
