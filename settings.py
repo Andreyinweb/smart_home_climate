@@ -16,8 +16,10 @@ class AppConfig:
    MODE: str = os.environ.get("MODE", "DEV")  
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
    T_FLOOR_MAC_DIFF: float = float(os.environ.get("T_FLOOR_MAC_DIFF", 2.4))
-   TARGET_RH: float = float(os.environ.get("TARGET_RH", 60.0))
    ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
+   MINIMUM_HUMIDITY: float = float(os.environ.get("MINIMUM_HUMIDITY", 60.0))
+   TARGET_RH: float = float(os.environ.get("TARGET_RH", 70.0))
+   DANGEROUS_HUMIDITY: float = float(os.environ.get("DANGEROUS_HUMIDITY", 80.0))   
 
    def __init__(self):
       # 1. Основной лог работы приложения (климат, БД, опросы датчиков)

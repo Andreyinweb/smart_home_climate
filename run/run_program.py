@@ -196,14 +196,16 @@ fields_db = []
 # Создаём таблицу settings_table
 fields_db = """ (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
     mode TEXT, 
     interval_seconds INTEGER, 
     max_retries INTEGER, 
     website_return_time INTEGER, 
     t_floor_mac_diff REAL, 
-    target_rh REAL, 
     absolute_humidity_tolerance REAL,
-    timestamp TEXT
+    minimum_humidity  REAL,
+    target_rh REAL,
+    dangerous_humidity REAL    
     )
     """
 create_table(db_path=database_file, table_name='settings_table', fields=fields_db)

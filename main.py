@@ -13,34 +13,10 @@ from api import app
 from models import write_climate_data, get_average_difference_temp, get_latest_climate_data
 
 work_log = logging.getLogger("climat_app.main")
-work_log.info(f"------------------------------------------------------------------------------------")
 work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 print(f"main запущена. MODE = {config.MODE}.")
 
 receiver = XiaomiBLEReceiver()
-
-settings_in_db = {}
-latest_records = get_latest_climate_data('table_sensor_data')
-if latest_records:
-   in_db_sensor_data = latest_records[0]
-   if in_db_sensor_data['average_temp']:
-      settings_in_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
-      config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
-   else:
-      settings_in_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
-else:
-   settings_in_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
-
-settings_in_db['mode'] = config.MODE
-settings_in_db['interval_seconds'] = config.INTERVAL_SECONDS
-settings_in_db['max_retries'] = config.MAX_RETRIES
-settings_in_db['website_return_time'] = config.WEBSITE_RETURN_TIME
-settings_in_db['target_rh'] = config.TARGET_RH
-settings_in_db['absolute_humidity_tolerance'] = config.ABSOLUTE_HUMIDITY_TOLERANCE
-settings_in_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-write_climate_data('settings_table', settings_in_db, row_id=1)
-
 
 # data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
 #         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
