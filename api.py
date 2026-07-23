@@ -8,11 +8,11 @@ from fastapi.templating import Jinja2Templates
 
 from settings import config
 from models import get_latest_climate_data, write_climate_data, get_db_connection
+import operations
 
 api_log = logging.getLogger("api_app.api")
 work_log = logging.getLogger("climat_app.api")
 api_log.info("-------------------------------------------------------------------------------------------------")
-api_log.info(f"Сервер запускается, перезагрузка = {config.WEBSITE_RETURN_TIME} с.")
 
 app = FastAPI(title="Smart Home Climate API")
 data_rendered = {}
@@ -22,12 +22,13 @@ templates = Jinja2Templates(directory=os.path.join(config.PROJECT_DIR, "template
 
 def get_no_data_response(request: Request):
     """Возвращает страницу ожидания данных, если в БД пусто."""
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
     html_path = os.path.join(config.PROJECT_DIR, 'templates', 'no_data.html')
     if os.path.exists(html_path):
         return templates.TemplateResponse(
             request=request,
             name="no_data.html",
-            context={"website_return_time": config.WEBSITE_RETURN_TIME},
+            context={"website_return_time": WEBSITE_RETURN_TIME},
             status_code=503
         )
     return HTMLResponse(
@@ -44,6 +45,9 @@ async def get_raw_data():
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
     """Сборка дашборда на основе данных из БД и Jinja2 шаблона."""
+    (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
+    MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
+    MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY) = operations.settings_in_db()
     latest_records = get_latest_climate_data('api_table')    
     if not latest_records:
         api_log.warning("На сервер не приходят значения из базы данных")
@@ -74,8 +78,8 @@ async def get_dashboard(request: Request):
     db_data['heat_display_class'] = "" 
 
     context = {
-        "website_return_time": config.WEBSITE_RETURN_TIME,
-        "max_rh": config.TARGET_RH,
+        "website_return_time": WEBSITE_RETURN_TIME,
+        "max_rh": TARGET_RH,
         **db_data
     }
 
@@ -84,6 +88,7 @@ async def get_dashboard(request: Request):
 @app.get("/ventilation", response_class=HTMLResponse)
 async def get_ventilation_page(request: Request):
     """Страница ручного управления проветриванием и сравнительной таблицы."""
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
     latest_records = get_latest_climate_data('api_table')
     if not latest_records:
         api_log.warning("На сервер не приходят значения из базы данных")
@@ -150,7 +155,7 @@ async def get_ventilation_page(request: Request):
     vent_now_str = vent_now_time[11:16] if len(str(vent_now_time)) >= 16 else str(vent_now_time)
 
     context = {
-        "website_return_time": config.WEBSITE_RETURN_TIME,
+        "website_return_time": WEBSITE_RETURN_TIME,
         "btn_start_class": btn_start_class,
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,
@@ -216,6 +221,7 @@ async def stop_ventilation():
 @app.get("/heating", response_class=HTMLResponse)
 async def get_heating_page(request: Request):
     """Страница ручного управления отоплением и сравнительной таблицы."""
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
     latest_records = get_latest_climate_data('api_table')
     if not latest_records:
         api_log.warning("На сервер не приходят значения из базы данных")
@@ -274,7 +280,7 @@ async def get_heating_page(request: Request):
     heat_now_str = heat_now_time[11:16] if len(str(heat_now_time)) >= 16 else str(heat_now_time)
 
     context = {
-        "website_return_time": config.WEBSITE_RETURN_TIME,
+        "website_return_time": WEBSITE_RETURN_TIME,
         "btn_start_class": btn_start_class,
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,
@@ -337,6 +343,7 @@ async def stop_heating():
 @app.get("/gas", response_class=HTMLResponse)
 async def get_gas_page(request: Request):
     """Страница ввода и отображения показаний счетчика газа."""
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
     latest_records = get_latest_climate_data('api_table')
     if not latest_records:
         api_log.warning("На сервер не приходят значения из базы данных для страницы газа")
@@ -349,7 +356,7 @@ async def get_gas_page(request: Request):
     gas_input_val = f"{gas_val:.3f}" if gas_val is not None else ""
     
     context = {
-        "website_return_time": config.WEBSITE_RETURN_TIME,
+        "website_return_time": WEBSITE_RETURN_TIME,
         "current_gas": gas_display,
         "gas_input_value": gas_input_val,
         "timestamp": db_data.get('timestamp', '—')

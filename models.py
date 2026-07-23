@@ -113,32 +113,32 @@ def get_average_difference_temp() -> float:
         return config.T_FLOOR_MAC_DIFF
     
 # Запись настроек в базу данных
-work_log.info("-"*50)
-settings_in_db = {}
+work_log.info("-"*60)
+settings_out_db = {}
 
 latest_settings = get_latest_climate_data('settings_table')
 if not latest_settings:
-    settings_in_db['mode'] = config.MODE
-    settings_in_db['interval_seconds'] = config.INTERVAL_SECONDS
-    settings_in_db['max_retries'] = config.MAX_RETRIES
-    settings_in_db['website_return_time'] = config.WEBSITE_RETURN_TIME
-    settings_in_db['absolute_humidity_tolerance'] = config.ABSOLUTE_HUMIDITY_TOLERANCE
-    settings_in_db['minimum_humidity'] = config.MINIMUM_HUMIDITY
-    settings_in_db['target_rh'] = config.TARGET_RH
-    settings_in_db['dangerous_humidity'] = config.DANGEROUS_HUMIDITY
-    settings_in_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    settings_out_db['mode'] = config.MODE
+    settings_out_db['interval_seconds'] = config.INTERVAL_SECONDS
+    settings_out_db['max_retries'] = config.MAX_RETRIES
+    settings_out_db['website_return_time'] = config.WEBSITE_RETURN_TIME
+    settings_out_db['absolute_humidity_tolerance'] = config.ABSOLUTE_HUMIDITY_TOLERANCE
+    settings_out_db['minimum_humidity'] = config.MINIMUM_HUMIDITY
+    settings_out_db['target_rh'] = config.TARGET_RH
+    settings_out_db['dangerous_humidity'] = config.DANGEROUS_HUMIDITY
+    settings_out_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 else:
-    settings_in_db = latest_settings[0]
+    settings_out_db = latest_settings[0]
 
 latest_records = get_latest_climate_data('table_sensor_data')
 if latest_records:
    in_db_sensor_data = latest_records[0]
    if in_db_sensor_data['average_temp']:
-      settings_in_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
+      settings_out_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
       config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
    else:
-      settings_in_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
+      settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
 else:
-   settings_in_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
+   settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
 
-write_climate_data('settings_table', settings_in_db, row_id=1)
+write_climate_data('settings_table', settings_out_db, row_id=1)

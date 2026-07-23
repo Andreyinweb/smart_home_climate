@@ -5,6 +5,7 @@ import struct
 import logging
 from bleak import BleakClient
 from settings import config
+import operations
 
 work_log = logging.getLogger("climat_app.ble_receiver")
 
@@ -76,6 +77,8 @@ class XiaomiBLEReceiver:
         return result
 
     async def sensor_get_sensors_all(self):
+        # Загрузка переменных из базы данных
+        MAX_RETRIES = operations.settings_in_db()[4]
         data_sensors_all = {} 
         # 1. Сбор данных со всех датчиков
         for name in config.NAME_SENSOR_MAC:
@@ -85,7 +88,7 @@ class XiaomiBLEReceiver:
                     retries = 0
                     
                     # Опрос датчика с ограничением по количеству попыток
-                    while "temp" not in data and retries < config.MAX_RETRIES:
+                    while "temp" not in data and retries < MAX_RETRIES:
                         retries += 1
                         try:
                             data = await self.get_sensor_data(config.MAC_DICT[name])

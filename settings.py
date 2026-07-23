@@ -12,15 +12,25 @@ load_dotenv()
 class AppConfig:
 
    PROJECT_DIR: str = Path.cwd()
-   # APP configuration
-   MODE: str = os.environ.get("MODE", "DEV")  
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
-   T_FLOOR_MAC_DIFF: float = float(os.environ.get("T_FLOOR_MAC_DIFF", 2.4))
-   ABSOLUTE_HUMIDITY_TOLERANCE: float = float(os.environ.get("ABSOLUTE_HUMIDITY_TOLERANCE", 0.5))
-   MINIMUM_HUMIDITY: float = float(os.environ.get("MINIMUM_HUMIDITY", 60.0))
-   TARGET_RH: float = float(os.environ.get("TARGET_RH", 70.0))
-   DANGEROUS_HUMIDITY: float = float(os.environ.get("DANGEROUS_HUMIDITY", 80.0))   
+   # APP start configuration
+   MODE = "FLOOR"  # Есть датчик температуры пола, всего 3 датчика: у улицы, в подвале и у пола
+   # MODE = "TWO_SENSORS"  # Расчёт температуры у пола, всего 2 датчика: у улицы и в подвале
+   # MODE = "SENSORS_ONE"  # Есть датчик температуры подвала, всего 1 датчик. Данные улицы берутся с сайта погоды. 
 
+   # Интервалов опроса в секундах
+   INTERVAL_SECONDS = 300
+   # Максимальное количество повторных попыток опроса датчиков
+   MAX_RETRIES = 5
+   # Время в секундах, через которое сайт возвращает результат
+   WEBSITE_RETURN_TIME = 390
+   # Физические параметры для расчетов
+   T_FLOOR_MAC_DIFF = 2.5  # Разница температур между воздухом в подвале и самым холодным углом пола
+   ABSOLUTE_HUMIDITY_TOLERANCE = 0.5  # Погрешность абсолютной влажности
+   MINIMUM_HUMIDITY = 60  # Отличная относительная влажность у пола, плесени не будет точно
+   TARGET_RH = 70.0    # Целевая относительная влажность у пола для предотвращения плесени
+   DANGEROUS_HUMIDITY = 80  # ОПАСНАЯ относительная влажность у пола, рост плесени
+   
    def __init__(self):
       # 1. Основной лог работы приложения (климат, БД, опросы датчиков)
       self.work_log = self.setup_logger("climat_app", f"{self.PROJECT_DIR}/logs/work_log.log")

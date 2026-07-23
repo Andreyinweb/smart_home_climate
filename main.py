@@ -7,14 +7,12 @@ import logging
 from datetime import datetime
 
 from settings import config
-from ble_receiver import XiaomiBLEReceiver
-import operations
-from api import app
 from models import write_climate_data, get_average_difference_temp, get_latest_climate_data
+import operations
+from ble_receiver import XiaomiBLEReceiver
+from api import app
 
 work_log = logging.getLogger("climat_app.main")
-work_log.info(f"Программа запущена. MODE = {config.MODE}.")
-print(f"main запущена. MODE = {config.MODE}.")
 
 receiver = XiaomiBLEReceiver()
 
@@ -31,9 +29,13 @@ data_sensors_all = {}
 async def polling_task():
     """Фоновый асинхронный опрос BLE датчиков и сохранение результатов в БД."""
     work_log.info("Запуск фонового циклического опроса датчиков...")
-    
-    
+
     while True:
+        # Загрузка переменных из базы данных
+        (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
+             MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
+             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY) = operations.settings_in_db()
+        
         # Запрос ко всем датчикам.
         data_sensors_all = await receiver.sensor_get_sensors_all()
 
@@ -42,16 +44,16 @@ async def polling_task():
             data_sensors_all['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Вычисление difference_temp в зависимости от режима работы
-            if config.MODE == 'TWO_SENSORS':
-                data_sensors_all['difference_temp'] = config.T_FLOOR_MAC_DIFF
-            elif config.MODE == 'FLOOR':
+            if MODE == 'TWO_SENSORS':
+                data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
+            elif MODE == 'FLOOR':
                 # Проверяем наличие необходимых данных перед расчетом
                 if 'basement_temp' in data_sensors_all and 'floor_temp' in data_sensors_all:
                     data_sensors_all['difference_temp'] = round(
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
                 elif 'basement_temp' in data_sensors_all and not ('floor_temp' in data_sensors_all):
-                    data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - config.T_FLOOR_MAC_DIFF           
+                    data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - T_FLOOR_MAC_DIFF           
                     abs_basement_humi = operations.calculate_absolute_humidity(data_sensors_all['basement_temp'], data_sensors_all['basement_humi'])
                     data_sensors_all['floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], abs_basement_humi)
                     data_sensors_all['floor_voltage'] = 0.0
@@ -59,11 +61,11 @@ async def polling_task():
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
                 else:
-                    data_sensors_all['difference_temp'] = config.T_FLOOR_MAC_DIFF
+                    data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
                     work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчиков basement или floor")
             else:
-                data_sensors_all['difference_temp'] = config.T_FLOOR_MAC_DIFF
-                data_sensors_all['average_temp'] = config.T_FLOOR_MAC_DIFF
+                data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
+                data_sensors_all['average_temp'] = T_FLOOR_MAC_DIFF
 
             # Получение среднего исторического значения разницы температур из БД
             data_sensors_all['average_temp'] = get_average_difference_temp()
@@ -87,7 +89,7 @@ async def polling_task():
             # Расчет проветривания с учетом абсолютной погрешности ABSOLUTE_HUMIDITY_TOLERANCE (0.5 г/м³)
             db_data['humidity_difference'] = round(db_data['a_basement_humi'] - db_data['a_street_humi'], 2)
 
-            if db_data['humidity_difference'] >= config.ABSOLUTE_HUMIDITY_TOLERANCE:        
+            if db_data['humidity_difference'] >= ABSOLUTE_HUMIDITY_TOLERANCE:        
                 db_data['vent_status'] = True
                 if abs(db_data['basement_temp'] - db_data["street_temp"]):
                     db_data['vent_time_val'] = round(10.4 / math.sqrt(abs(db_data['basement_temp'] - db_data["street_temp"])))
@@ -105,7 +107,7 @@ async def polling_task():
             # Расчет компенсационного нагрева (Отопление)
             db_data['heating_delta'] = 0.0
 
-            if db_data['vent_status'] and db_data['floor_humi'] > config.TARGET_RH:
+            if db_data['vent_status'] and db_data['floor_humi'] > TARGET_RH:
                 db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(db_data['floor_temp'], db_data['a_street_humi'])
                 db_data['heat_status'] = True
                 db_data['basement_temp_heated'] = round(db_data['basement_temp'] + db_data['heating_delta'], 1)
@@ -114,7 +116,7 @@ async def polling_task():
                 db_data['floor_humi_heated'] = operations.calculate_relative_humidity(db_data['floor_temp_heated'], db_data['a_street_humi'])
                 db_data['a_floor_humi_heated'] = db_data['a_street_humi']
 
-            elif not db_data['vent_status'] and db_data['floor_humi'] > config.TARGET_RH:
+            elif not db_data['vent_status'] and db_data['floor_humi'] > TARGET_RH:
                 db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(db_data['floor_temp'], db_data['a_floor_humi'])
                 db_data['heat_status'] = True
                 db_data['basement_temp_heated'] = round(db_data['basement_temp'] + db_data['heating_delta'], 1)
@@ -135,9 +137,9 @@ async def polling_task():
             write_climate_data('api_table', db_data)
 
         # 6. Пауза
-        work_log.info(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...")
-        print(f"Ожидание {config.INTERVAL_SECONDS} секунд до следующей итерации опроса...") # TODO
-        await asyncio.sleep(config.INTERVAL_SECONDS)
+        work_log.info(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...")
+        print(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...") # TODO
+        await asyncio.sleep(INTERVAL_SECONDS)
 
 async def start_services():
     """Асинхронный запуск веб-сервера и фонового опроса одновременно."""
