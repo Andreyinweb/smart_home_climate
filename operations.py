@@ -83,11 +83,11 @@ def calculating_temperature_from_humidity(temp: float, ah: float):
     """
     TARGET_RH = settings_in_db()[8]
     temp_heating = round(temp,1)
-    for delta in range(1, 300):
+    for delta in range(0, 300):
         relative_humidity = calculate_relative_humidity(temp_heating, ah)
         if relative_humidity < TARGET_RH:
             break
-        temp_heating = temp_heating + delta * 0.1
+        temp_heating = temp_heating + 0.1
     
     return temp_heating, round(delta*0.1, 1)
 

@@ -5,7 +5,6 @@ from settings import config
 
 work_log = logging.getLogger("climat_app.models")
 
-
 def get_db_connection():
     """Создает подключение к базе данных SQLite с включенным автокоммитом."""
     conn = sqlite3.connect(config.DB_PATH)
@@ -114,6 +113,7 @@ def get_average_difference_temp() -> float:
     
 # Запись настроек в базу данных
 work_log.info("-"*60)
+work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 settings_out_db = {}
 
 latest_settings = get_latest_climate_data('settings_table')

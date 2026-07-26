@@ -9,7 +9,14 @@
     <div class="card">
         <div class="card-header">
             <div>
-                <h2 class="card-title">📊 Текущие показатели</h2>
+                <h2 class="card-title">
+                    📊 Текущие показатели
+                    {% if active_mode %}
+                    <span class="badge badge-green" style="font-size: 0.8rem; font-weight: normal; vertical-align: middle; margin-left: 6px;">
+                        {{ active_mode }}
+                    </span>
+                    {% endif %}
+                </h2>
                 <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
                     Дата: <span class="text-blue val-bold">{{ timestamp if timestamp else '—' }}</span> | ОВ пол max: <span class="text-blue val-bold">{{ "%.1f"|format(max_rh) if max_rh is defined and max_rh is not none else '0.0' }}%</span>
                 </div>
@@ -53,7 +60,7 @@
             </tbody>
         </table>
 
-        <!-- Стутус работы систем -->
+        <!-- Статус работы систем -->
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
             <div>
                 <strong>Проветривание:</strong> {{ "%.2f"|format(humidity_difference) if humidity_difference is defined and humidity_difference is not none else '0.00' }} г/м³
