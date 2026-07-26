@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Any, Dict
 from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request
@@ -17,7 +16,7 @@ work_log = logging.getLogger("climat_app.api")
 api_log.info("-" * 97)
 
 app = FastAPI(title="Smart Home Climate API")
-data_rendered: Dict[str, Any] = {}
+data_rendered = {}
 
 app.mount(
     "/static",
@@ -29,7 +28,7 @@ templates = Jinja2Templates(
 )
 
 
-def safe_diff(val1: Any, val2: Any) -> float:
+def safe_diff(val1, val2) -> float:
     """Безопасное вычисление разницы между двумя числовыми значениями."""
     if val1 is not None and val2 is not None:
         return float(val1) - float(val2)
@@ -57,7 +56,7 @@ def get_no_data_response(request: Request) -> HTMLResponse:
 
 
 @app.get("/api/data")
-async def get_raw_data() -> Dict[str, Any]:
+async def get_raw_data():
     """Получение сырых данных в формате JSON."""
     return data_rendered
 
@@ -119,28 +118,14 @@ async def get_dashboard(request: Request):
     # --- Определение текущего активного режима ---
     active_modes = []
 
-    # Проверка проветривания (автоматического и ручного)
-    is_vent_active = db_data.get("msg_vent_status") == "ДА" or db_data.get(
-        "vent_status"
-    ) in (True, "ДА", 1)
-    if not is_vent_active:
-        latest_vent = get_latest_climate_data("ventilation_table")
-        if latest_vent and latest_vent[0].get("status_ventilation"):
-            is_vent_active = True
-
-    if is_vent_active:
+    # Проверка проветривания
+    latest_vent = get_latest_climate_data("ventilation_table")
+    if latest_vent and latest_vent[0].get("status_ventilation"):
         active_modes.append("Проветривание")
 
-    # Проверка отопления (автоматического и ручного)
-    is_heat_active = db_data.get("msg_heat_status") == "ДА" or db_data.get(
-        "heat_status"
-    ) in (True, "ДА", 1)
-    if not is_heat_active:
-        latest_heat = get_latest_climate_data("heating_table")
-        if latest_heat and latest_heat[0].get("stop_heating") == 0:
-            is_heat_active = True
-
-    if is_heat_active:
+    # Проверка отопления 
+    latest_heat = get_latest_climate_data("heating_table")
+    if latest_heat and latest_heat[0]["status_heating"]:
         active_modes.append("Отопление")
 
     db_data["active_mode"] = ", ".join(active_modes) if active_modes else ""
@@ -154,7 +139,6 @@ async def get_dashboard(request: Request):
     return templates.TemplateResponse(
         request=request, name="index.html", context=context
     )
-
 
 @app.get("/ventilation", response_class=HTMLResponse)
 async def get_ventilation_page(request: Request):
@@ -299,7 +283,7 @@ async def get_ventilation_page(request: Request):
 @app.post("/api/ventilation/start")
 async def start_ventilation():
     """Запись старта проветривания в БД с привязкой ID и timestamp из api_table."""
-    api_on_db: Dict[str, Any] = {}
+    api_on_db = {}
     latest_ventilation_table = get_latest_climate_data("ventilation_table")
 
     can_start = True
@@ -329,7 +313,7 @@ async def start_ventilation():
 @app.post("/api/ventilation/stop")
 async def stop_ventilation():
     """Запись остановки проветривания в БД с фиксацией ID текущей записи из api_table."""
-    api_on_db: Dict[str, Any] = {}
+    api_on_db = {}
     latest_ventilation_table = get_latest_climate_data("ventilation_table")
 
     if latest_ventilation_table:
@@ -486,19 +470,20 @@ async def get_heating_page(request: Request):
 @app.post("/api/heating/start")
 async def start_heating():
     """Запись старта отопления в БД с привязкой ID и timestamp из api_table."""
-    api_on_db: Dict[str, Any] = {}
+    api_on_db = {}
     latest_heating_table = get_latest_climate_data("heating_table")
-    is_heating_active = False
 
+    can_start = True
     if latest_heating_table:
         status_heating_table = latest_heating_table[0]
-        if status_heating_table.get("stop_heating") == 0:
-            is_heating_active = True
+        if status_heating_table["status_heating"]:
+            can_start = False
 
-    if not is_heating_active:
+    if can_start:
         latest_records = get_latest_climate_data("api_table")
         if latest_records:
             api_on_db["timestamp"] = latest_records[0]["timestamp"]
+            api_on_db["status_heating"] = True
             api_on_db["heating_start"] = latest_records[0]["id"]
             api_on_db["stop_heating"] = 0
             write_climate_data("heating_table", api_on_db)
@@ -515,18 +500,17 @@ async def start_heating():
 @app.post("/api/heating/stop")
 async def stop_heating():
     """Запись остановки отопления в БД с фиксацией ID текущей записи из api_table."""
-    api_on_db: Dict[str, Any] = {}
+    api_on_db = {}
     latest_heating_table = get_latest_climate_data("heating_table")
-
+    
     if latest_heating_table:
         status_heating_table = latest_heating_table[0]
-        if status_heating_table.get("stop_heating") == 0:
+        if status_heating_table["status_heating"]:
             latest_records = get_latest_climate_data("api_table")
             if latest_records:
-                api_on_db["timestamp"] = status_heating_table.get("timestamp")
-                api_on_db["heating_start"] = status_heating_table.get(
-                    "heating_start"
-                )
+                api_on_db["timestamp"] = status_heating_table["timestamp"]
+                api_on_db["status_heating"] = False
+                api_on_db["heating_start"] = status_heating_table["heating_start"]
                 api_on_db["stop_heating"] = latest_records[0]["id"]
                 write_climate_data(
                     "heating_table",

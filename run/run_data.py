@@ -14,4 +14,4 @@ desired_version="3.12"
 # Нужно дописать макадреса
 BASEMENT_MAC=
 STREET_MAC=
-FLOOR_MAC=  
+FLOOR_MAC= 
