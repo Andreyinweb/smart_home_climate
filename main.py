@@ -110,9 +110,9 @@ async def polling_task():
             db_data['heating_delta'] = 0.0
 
             if db_data['vent_status'] and db_data['sim_floor_humi'] > TARGET_RH:
-                db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(db_data['sim_floor_humi'], db_data['a_street_humi'])
+                db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(db_data['floor_temp'], db_data['a_street_humi'])
                 db_data['heat_status'] = True
-                db_data['basement_temp_heated'] = round(db_data['basement_temp'] + db_data['heating_delta'], 1)
+                db_data['basement_temp_heated'] = round((db_data['basement_temp'] + db_data['heating_delta']), 1)
                 db_data['basement_humi_heated'] = operations.calculate_relative_humidity(db_data['basement_temp_heated'], db_data['a_street_humi'])
                 db_data['a_basement_humi_heated'] = db_data['a_street_humi']
                 db_data['floor_humi_heated'] = operations.calculate_relative_humidity(db_data['floor_temp_heated'], db_data['a_street_humi'])
