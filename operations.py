@@ -1,5 +1,7 @@
 import math
 from typing import Tuple
+import calendar
+from datetime import datetime
 from settings import config
 import logging
 import models
@@ -20,13 +22,14 @@ def settings_in_db():
         MINIMUM_HUMIDITY = settings_in_db['minimum_humidity'] # 7
         TARGET_RH = settings_in_db['target_rh']  # 8
         DANGEROUS_HUMIDITY =settings_in_db['dangerous_humidity'] # 9
+        PRICE_GAS = settings_in_db['price_gas'] # 10
     else:
         work_log.error("Невозможно получить данные из базы settings_table.")
         exit(1)
 
     return (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
              MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
-             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY)
+             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS)
 
 def calculate_absolute_humidity(temp: float, humi: float) -> float:
     """
@@ -91,3 +94,48 @@ def calculating_temperature_from_humidity(temp: float, ah: float):
     
     return temp_heating, round(delta*0.1, 1)
 
+
+
+def coefficient_gas(street_temp: float, basement_temp: float, gas_difference: float, timestamp: str) -> float:
+    """
+    Расчет коэффициента расхода газа.
+    """
+    if street_temp is None or basement_temp is None or gas_difference is None or timestamp is None:
+        return 0.0
+
+    temp_diff = abs(basement_temp - street_temp)
+    if temp_diff == 0:
+        return 0.0
+
+    try:
+        dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return 0.0
+
+    # Прошедшее время от начала месяца в часах (с дробной частью)
+    hours_passed = (dt.day - 1) * 24 + dt.hour + dt.minute / 60 + dt.second / 3600
+
+    if hours_passed == 0:
+        return 0.0
+
+    # Количество дней в текущем месяце (28, 29, 30 или 31)
+    days_in_month = calendar.monthrange(dt.year, dt.month)[1]
+
+    # Прогнозируемый расход за весь месяц на 1 градус разницы температур
+    gas_per_hour = gas_difference / hours_passed
+    gas_per_month = gas_per_hour * 24 * days_in_month
+
+    coefficient = round(gas_per_month / temp_diff, 3)
+    return coefficient
+
+# def coefficient_gas (street_temp: float, basement_temp: float, gas_difference: float, timestamp: str) -> float:
+#     """
+#     Расчет коэффициента расхода газа.
+#     """
+#     if street_temp is None or basement_temp is None or gas_difference is None or timestamp is None:
+#         return 0.0
+#     variable_hour = (int(timestamp[8:10]) - 1) * 24 + int(timestamp[11:13])
+#     temp_diff = abs(basement_temp - street_temp)
+
+#     coefficient = round(((gas_difference/variable_hour) / temp_diff)*24*31, 3) if temp_diff != 0 else 0.0
+#     return coefficient

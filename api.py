@@ -75,6 +75,7 @@ async def get_dashboard(request: Request):
         minimum_humidity,
         target_rh,
         dangerous_humidity,
+        price_gas
     ) = operations.settings_in_db()
 
     latest_records = get_latest_climate_data("api_table")
@@ -530,27 +531,26 @@ async def stop_heating():
 async def get_gas_page(request: Request):
     """Страница ввода и отображения показаний счетчика газа."""
     website_return_time = operations.settings_in_db()[3]
-    latest_records = get_latest_climate_data("api_table")
+    latest_records = get_latest_climate_data("gas_table")
 
     if not latest_records:
-        api_log.warning(
-            "На сервер не приходят значения из базы данных для страницы газа"
-        )
-        return get_no_data_response(request)
+        gas_val = config.START_OF_MONTH_GAS_METER
+        gas_display = gas_val
+        gas_input_val = ""
+        timestamp_val = "Первое число текущего месяца"
 
-    db_data = latest_records[0]
-    gas_val = db_data.get("gas_meter")
-
-    gas_display = (
-        f"{gas_val:.3f} м³" if gas_val is not None else "Не установлено"
-    )
-    gas_input_val = f"{gas_val:.3f}" if gas_val is not None else ""
+    else:
+        db_data = latest_records[0]
+        gas_val = db_data.get("gas_meter")
+        gas_display = (f"{gas_val:.3f} м³")
+        gas_input_val = f"{gas_val:.3f}" if gas_val is not None else ""
+        timestamp_val =db_data["timestamp"]
 
     context = {
         "website_return_time": website_return_time,
         "current_gas": gas_display,
         "gas_input_value": gas_input_val,
-        "timestamp": db_data.get("timestamp", "—"),
+        "timestamp": timestamp_val
     }
 
     return templates.TemplateResponse(
@@ -576,27 +576,32 @@ async def update_gas_meter(request: Request):
             "Не удалось преобразовать значение gas_meter в число с плавающей точкой"
         )
         return RedirectResponse(url="/gas", status_code=303)
-
-    latest_api = get_latest_climate_data("api_table")
-    if latest_api:
-        last_api_id = latest_api[0]["id"]
-        latest_api[0]["gas_meter"] = gas_meter
-        write_climate_data("api_table", latest_api[0], row_id=last_api_id)
-        api_log.info(
-            f"[БД] Успешно обновлен счетчик газа в api_table (id={last_api_id}): {gas_meter}"
-        )
-    else:
-        api_log.warning("api_table пуста, не удалось обновить счетчик газа")
-
+    gas_out_db = {}
     latest_sensor = get_latest_climate_data("table_sensor_data")
     if latest_sensor:
         last_sensor_id = latest_sensor[0]["id"]
-        latest_sensor[0]["gas_meter"] = gas_meter
+        gas_out_db ['timestamp'] = latest_sensor[0]["timestamp"]        
+        gas_out_db ['gas_meter'] = gas_meter
+        latest_gas = get_latest_climate_data("gas_table")
+
+        if latest_gas:            
+            gas_out_db ['start_of_month_gas_meter'] = latest_gas[0]["start_of_month_gas_meter"]
+            gas_out_db ['gas_difference'] = round(gas_meter - gas_out_db ['start_of_month_gas_meter'], 3)
+            gas_out_db ['coefficient_gas'] = operations.coefficient_gas (latest_sensor[0]["street_temp"], latest_sensor[0]["basement_temp"], gas_out_db ['gas_difference'], latest_sensor[0]["timestamp"])
+            gas_out_db ['price_gas'] = operations.settings_in_db()[10]
+            gas_out_db ['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
+        else:
+            gas_out_db ['start_of_month_gas_meter'] = config.START_OF_MONTH_GAS_METER
+            gas_out_db ['gas_difference'] = round(gas_meter - gas_out_db ['start_of_month_gas_meter'], 3)
+            gas_out_db ['coefficient_gas'] = operations.coefficient_gas (latest_sensor[0]["street_temp"], latest_sensor[0]["basement_temp"], gas_out_db ['gas_difference'], latest_sensor[0]["timestamp"])
+            gas_out_db ['price_gas'] = operations.settings_in_db()[10]
+            gas_out_db ['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
+
         write_climate_data(
-            "table_sensor_data", latest_sensor[0], row_id=last_sensor_id
+            "gas_table", gas_out_db, row_id=last_sensor_id
         )
         api_log.info(
-            f"[БД] Успешно обновлен счетчик газа в table_sensor_data (id={last_sensor_id}): {gas_meter}"
+            f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}"
         )
     else:
         api_log.warning(

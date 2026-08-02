@@ -36,7 +36,7 @@ async def polling_task():
         # Загрузка переменных из базы данных
         (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
              MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
-             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY) = operations.settings_in_db()
+             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
         
         # Запрос ко всем датчикам.
         data_sensors_all = await receiver.sensor_get_sensors_all()
@@ -54,6 +54,9 @@ async def polling_task():
                     data_sensors_all['difference_temp'] = round(
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
+                    data_sensors_all['sensor_or_calc_street'] = True
+                    data_sensors_all['sensor_or_calc_basement'] = True
+                    data_sensors_all['sensor_or_calc_floor'] = True
                 elif 'basement_temp' in data_sensors_all and not ('floor_temp' in data_sensors_all):
                     data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - T_FLOOR_MAC_DIFF           
                     abs_basement_humi = operations.calculate_absolute_humidity(data_sensors_all['basement_temp'], data_sensors_all['basement_humi'])
@@ -62,18 +65,21 @@ async def polling_task():
                     data_sensors_all['difference_temp'] = round(
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
+                    data_sensors_all['sensor_or_calc_street'] = True
+                    data_sensors_all['sensor_or_calc_basement'] = True
+                    data_sensors_all['sensor_or_calc_floor'] = False
                 else:
                     data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
-                    work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчиков basement или floor")
-            else:
+                    work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчикa basement")
+            else: # MODE == 'SENSORS_ONE'
                 data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
                 data_sensors_all['average_temp'] = T_FLOOR_MAC_DIFF
+                data_sensors_all['sensor_or_calc_street'] = False
+                data_sensors_all['sensor_or_calc_basement'] = True
+                data_sensors_all['sensor_or_calc_floor'] = False
 
             # Получение среднего исторического значения разницы температур из БД
             data_sensors_all['average_temp'] = get_average_difference_temp()
-            latest_records = get_latest_climate_data('table_sensor_data')
-            if latest_records:
-                data_sensors_all['gas_meter'] = latest_records[0]['gas_meter']
             
             print(f"Запись в БД: {data_sensors_all}") #TODO
         # 3. Запись датчиков в table_sensor_data         

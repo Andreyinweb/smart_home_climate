@@ -30,7 +30,11 @@ class AppConfig:
    MINIMUM_HUMIDITY = 60  # Отличная относительная влажность у пола, плесени не будет точно
    TARGET_RH = 70.0    # Целевая относительная влажность у пола для предотвращения плесени
    DANGEROUS_HUMIDITY = 80  # ОПАСНАЯ относительная влажность у пола, рост плесени
-   
+
+   PRICE_GAS = 7.96 # Цена газа
+
+   START_OF_MONTH_GAS_METER = 36766.0  # Начальное значение счетчика газа в начале месяца
+
    def __init__(self):
       # 1. Основной лог работы приложения (климат, БД, опросы датчиков)
       self.work_log = self.setup_logger("climat_app", f"{self.PROJECT_DIR}/logs/work_log.log")

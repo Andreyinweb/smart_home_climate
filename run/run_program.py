@@ -131,6 +131,39 @@ def create_backup(source_file, backup_dir, max_backups=100):
 # Проверяем и создаем базу данных"
 check_or_create_database(database_file)
 
+fields_db = []
+# Создаём таблицу settings_table
+fields_db = """ (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    mode TEXT, 
+    interval_seconds INTEGER, 
+    max_retries INTEGER, 
+    website_return_time INTEGER, 
+    t_floor_mac_diff REAL, 
+    absolute_humidity_tolerance REAL,
+    minimum_humidity  REAL,
+    target_rh REAL,
+    dangerous_humidity REAL,
+    price_gas REAL   
+    )
+    """
+create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
+
+# Создаём таблицу gas_table
+fields_db = """ (
+            id INTEGER,
+            timestamp TEXT NOT NULL,
+            gas_meter REAL,
+            start_of_month_gas_meter REAL,
+            gas_difference REAL,
+            coefficient_gas REAL,
+            price_gas REAL,
+            cost_of_gas REAL
+        )
+        """
+create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
+
 # Создаём таблицу table_sensor_data
 fields_db = """ (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,7 +179,9 @@ fields_db = """ (
             street_voltage REAL,
             basement_voltage REAL,
             floor_voltage REAL,
-            gas_meter
+            sensor_or_calc_street BOOLEAN,
+            sensor_or_calc_basement BOOLEAN,
+            sensor_or_calc_floor BOOLEAN
         )
         """
 create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
@@ -167,7 +202,6 @@ fields_db = """ (
     street_voltage REAL,
     basement_voltage REAL,
     floor_voltage REAL,
-    gas_meter REAL,
     a_floor_humi REAL,
     dp_floor REAL,
     a_street_humi REAL,
@@ -187,28 +221,14 @@ fields_db = """ (
     basement_humi_heated REAL,
     a_basement_humi_heated REAL,
     floor_humi_heated REAL,
-    a_floor_humi_heated REAL
+    a_floor_humi_heated REAL,
+    sensor_or_calc_street BOOLEAN,
+    sensor_or_calc_basement BOOLEAN,
+    sensor_or_calc_floor BOOLEAN
     )
     """
 create_table(db_path=database_file, table_name='api_table', fields=fields_db)
 
-fields_db = []
-# Создаём таблицу settings_table
-fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT,
-    mode TEXT, 
-    interval_seconds INTEGER, 
-    max_retries INTEGER, 
-    website_return_time INTEGER, 
-    t_floor_mac_diff REAL, 
-    absolute_humidity_tolerance REAL,
-    minimum_humidity  REAL,
-    target_rh REAL,
-    dangerous_humidity REAL    
-    )
-    """
-create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
 
 fields_db = []
 # Создаём таблицу ventilation_table

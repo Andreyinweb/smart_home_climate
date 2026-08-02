@@ -126,6 +126,7 @@ if not latest_settings:
     settings_out_db['minimum_humidity'] = config.MINIMUM_HUMIDITY
     settings_out_db['target_rh'] = config.TARGET_RH
     settings_out_db['dangerous_humidity'] = config.DANGEROUS_HUMIDITY
+    settings_out_db['price_gas'] = config.PRICE_GAS
     settings_out_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 else:
     settings_out_db = latest_settings[0]
