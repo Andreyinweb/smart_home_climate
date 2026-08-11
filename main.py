@@ -87,20 +87,20 @@ async def polling_task():
 ########################################################################################
         # 4. Расчёт данных
             db_data ={}
-            db_data = dict(data_sensors_all)
+            db_data['timestamp'] = data_sensors_all['timestamp']
             for name in config.sensor_name:
                 # Расчет абсолютных влажностей
-                db_data["a_" + name + "_humi"] = operations.calculate_absolute_humidity(db_data[name + "_temp"], db_data[name + "_humi"])
+                db_data["a_" + name + "_humi"] = operations.calculate_absolute_humidity(data_sensors_all[name + "_temp"], data_sensors_all[name + "_humi"])
                 # Расчет точек росы
-                db_data["dp_" + name] = operations.calculate_dew_point(db_data[name + "_temp"], db_data[name + "_humi"])
+                db_data["dp_" + name] = operations.calculate_dew_point(data_sensors_all[name + "_temp"], data_sensors_all[name + "_humi"])
 
             # Расчет проветривания с учетом абсолютной погрешности ABSOLUTE_HUMIDITY_TOLERANCE (0.5 г/м³)
             db_data['humidity_difference'] = round(db_data['a_basement_humi'] - db_data['a_street_humi'], 2)
 
             if db_data['humidity_difference'] >= ABSOLUTE_HUMIDITY_TOLERANCE:        
                 db_data['vent_status'] = True
-                if abs(db_data['basement_temp'] - db_data["street_temp"]):
-                    db_data['vent_time_val'] = round(10.4 / math.sqrt(abs(db_data['basement_temp'] - db_data["street_temp"])))
+                if abs(data_sensors_all['basement_temp'] - data_sensors_all["street_temp"]):
+                    db_data['vent_time_val'] = round(10.4 / math.sqrt(abs(data_sensors_all['basement_temp'] - data_sensors_all["street_temp"])))
                 else:
                     db_data['vent_time_val'] = 0
             else:
@@ -109,25 +109,25 @@ async def polling_task():
             
             # Моделирование замещения (Проветривание)
             db_data['sim_a_basement_humi'] = db_data['a_street_humi']
-            db_data['sim_basement_humi'] = operations.calculate_relative_humidity(db_data['basement_temp'], db_data['sim_a_basement_humi'])
-            db_data['sim_floor_humi'] = operations.calculate_relative_humidity(db_data['floor_temp'], db_data['sim_a_basement_humi'])
+            db_data['sim_basement_humi'] = operations.calculate_relative_humidity(data_sensors_all['basement_temp'], db_data['sim_a_basement_humi'])
+            db_data['sim_floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], db_data['sim_a_basement_humi'])
 
             # Расчет компенсационного нагрева (Отопление)
             db_data['heating_delta'] = 0.0
 
             if db_data['vent_status'] and db_data['sim_floor_humi'] > TARGET_RH:
-                db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(db_data['floor_temp'], db_data['a_street_humi'])
+                db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(data_sensors_all['floor_temp'], db_data['a_street_humi'])
                 db_data['heat_status'] = True
-                db_data['basement_temp_heated'] = round((db_data['basement_temp'] + db_data['heating_delta']), 1)
+                db_data['basement_temp_heated'] = round((data_sensors_all['basement_temp'] + db_data['heating_delta']), 1)
                 db_data['basement_humi_heated'] = operations.calculate_relative_humidity(db_data['basement_temp_heated'], db_data['a_street_humi'])
                 db_data['a_basement_humi_heated'] = db_data['a_street_humi']
                 db_data['floor_humi_heated'] = operations.calculate_relative_humidity(db_data['floor_temp_heated'], db_data['a_street_humi'])
                 db_data['a_floor_humi_heated'] = db_data['a_street_humi']
 
-            elif not db_data['vent_status'] and db_data['floor_humi'] > TARGET_RH:
-                db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(db_data['floor_temp'], db_data['a_floor_humi'])
+            elif not db_data['vent_status'] and data_sensors_all['floor_humi'] > TARGET_RH:
+                db_data['floor_temp_heated'], db_data['heating_delta'] = operations.calculating_temperature_from_humidity(data_sensors_all['floor_temp'], db_data['a_floor_humi'])
                 db_data['heat_status'] = True
-                db_data['basement_temp_heated'] = round(db_data['basement_temp'] + db_data['heating_delta'], 1)
+                db_data['basement_temp_heated'] = round(data_sensors_all['basement_temp'] + db_data['heating_delta'], 1)
                 db_data['basement_humi_heated'] = operations.calculate_relative_humidity(db_data['basement_temp_heated'], db_data['a_basement_humi'])
                 db_data['a_basement_humi_heated'] = db_data['a_basement_humi']
                 db_data['floor_humi_heated'] = operations.calculate_relative_humidity(db_data['floor_temp_heated'], db_data['a_floor_humi'])
@@ -135,11 +135,11 @@ async def polling_task():
             else:
                 db_data['heat_status'] = False
                 db_data['heating_delta'] = 0.0
-                db_data['basement_temp_heated'] = db_data['basement_temp']
-                db_data['basement_humi_heated'] = db_data['basement_humi']
+                db_data['basement_temp_heated'] = data_sensors_all['basement_temp']
+                db_data['basement_humi_heated'] = data_sensors_all['basement_humi']
                 db_data['a_basement_humi_heated'] = db_data['a_basement_humi']
-                db_data['floor_temp_heated'] = db_data['floor_temp']
-                db_data['floor_humi_heated'] = db_data['floor_humi']
+                db_data['floor_temp_heated'] = data_sensors_all['floor_temp']
+                db_data['floor_humi_heated'] = data_sensors_all['floor_humi']
                 db_data['a_floor_humi_heated'] = db_data['a_floor_humi']
         # 5. Запись датчиков в api_table
             write_climate_data('api_table', db_data)

@@ -37,14 +37,14 @@ def safe_diff(val1, val2) -> float:
 
 def get_no_data_response(request: Request) -> HTMLResponse:
     """Возвращает страницу ожидания данных, если в БД пусто."""
-    website_return_time = operations.settings_in_db()[3]
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
     html_path = os.path.join(config.PROJECT_DIR, "templates", "no_data.html")
 
     if os.path.exists(html_path):
         return templates.TemplateResponse(
             request=request,
             name="no_data.html",
-            context={"website_return_time": website_return_time},
+            context={"website_return_time": WEBSITE_RETURN_TIME},
             status_code=503,
         )
 
@@ -64,26 +64,20 @@ async def get_raw_data():
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
     """Сборка дашборда на основе данных из БД и Jinja2 шаблона."""
-    (
-        date_settings,
-        mode,
-        interval_seconds,
-        website_return_time,
-        max_retries,
-        t_floor_mac_diff,
-        absolute_humidity_tolerance,
-        minimum_humidity,
-        target_rh,
-        dangerous_humidity,
-        price_gas
-    ) = operations.settings_in_db()
+    # Загрузка переменных из базы данных
+    (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
+    MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
+    MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
 
-    latest_records = get_latest_climate_data("api_table")
-    if not latest_records:
+    latest_records_api = get_latest_climate_data("api_table")
+    latest_records_sensor = get_latest_climate_data("table_sensor_data")
+
+    if not latest_records_api or not latest_records_sensor:
         api_log.warning("На сервер не приходят значения из базы данных")
         return get_no_data_response(request)
-
-    db_data = latest_records[0]
+    
+    del latest_records_api[0]["timestamp"]
+    db_data = latest_records_sensor[0] | latest_records_api[0]
 
     # --- Обработка статусов и описания проветривания ---
     if db_data.get("vent_status") and db_data.get("vent_time_val"):
@@ -132,8 +126,8 @@ async def get_dashboard(request: Request):
     db_data["active_mode"] = ", ".join(active_modes) if active_modes else ""
 
     context = {
-        "website_return_time": website_return_time,
-        "max_rh": target_rh,
+        "website_return_time": WEBSITE_RETURN_TIME,
+        "max_rh": TARGET_RH,
         **db_data,
     }
 
@@ -144,14 +138,15 @@ async def get_dashboard(request: Request):
 @app.get("/ventilation", response_class=HTMLResponse)
 async def get_ventilation_page(request: Request):
     """Страница ручного управления проветриванием и сравнительной таблицы."""
-    website_return_time = operations.settings_in_db()[3]
-    latest_records = get_latest_climate_data("api_table")
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
+    latest_records_api = get_latest_climate_data("api_table")
+    latest_records_sensor = get_latest_climate_data("table_sensor_data")
 
-    if not latest_records:
+    if not latest_records_api or not latest_records_sensor:
         api_log.warning("На сервер не приходят значения из базы данных")
         return get_no_data_response(request)
-
-    db_data = latest_records[0]
+    del latest_records_api[0]["timestamp"]
+    db_data = latest_records_sensor[0] | latest_records_api[0]
     latest_ventilation_table = get_latest_climate_data("ventilation_table")
 
     if latest_ventilation_table and latest_ventilation_table[0].get(
@@ -160,13 +155,12 @@ async def get_ventilation_page(request: Request):
         status_ventilation_table = latest_ventilation_table[0]
         vent_start_id = status_ventilation_table.get("ventilation_start")
         before_records = (
-            get_latest_climate_data(
-                "api_table", vent_start_id, vent_start_id
-            )
+            get_latest_climate_data("api_table", vent_start_id, vent_start_id)[0] | 
+            get_latest_climate_data("table_sensor_data", vent_start_id, vent_start_id)[0]
             if vent_start_id
             else []
         )
-        vent_before = before_records[0] if before_records else dict(db_data)
+        vent_before = before_records if before_records else dict(db_data)
         vent_active = True
         vent_start_time = vent_before.get(
             "timestamp", db_data.get("timestamp", "—")
@@ -263,7 +257,7 @@ async def get_ventilation_page(request: Request):
     )
 
     context = {
-        "website_return_time": website_return_time,
+        "website_return_time": WEBSITE_RETURN_TIME,
         "btn_start_class": btn_start_class,
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,
@@ -294,11 +288,14 @@ async def start_ventilation():
             can_start = False
 
     if can_start:
-        latest_records = get_latest_climate_data("api_table")
-        if latest_records:
+        latest_records_api = get_latest_climate_data("api_table")
+        latest_records_sensor = get_latest_climate_data("table_sensor_data")
+        if latest_records_api and latest_records_sensor:
+            del latest_records_api[0]["timestamp"]
+            latest_records = latest_records_sensor[0] | latest_records_api[0]
             api_on_db["status_ventilation"] = True
-            api_on_db["timestamp"] = latest_records[0]["timestamp"]
-            api_on_db["ventilation_start"] = latest_records[0]["id"]
+            api_on_db["timestamp"] = latest_records["timestamp"]
+            api_on_db["ventilation_start"] = latest_records["id"]
             api_on_db["stop_ventilation"] = 0
             write_climate_data("ventilation_table", api_on_db)
             api_log.info(
@@ -347,27 +344,27 @@ async def stop_ventilation():
 @app.get("/heating", response_class=HTMLResponse)
 async def get_heating_page(request: Request):
     """Страница ручного управления отоплением и сравнительной таблицы."""
-    website_return_time = operations.settings_in_db()[3]
-    latest_records = get_latest_climate_data("api_table")
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
+    latest_records_api = get_latest_climate_data("api_table")
+    latest_records_sensor = get_latest_climate_data("table_sensor_data")
 
-    if not latest_records:
+    if not latest_records_api or not latest_records_sensor:
         api_log.warning("На сервер не приходят значения из базы данных")
         return get_no_data_response(request)
-
-    db_data = latest_records[0]
+    del latest_records_api[0]["timestamp"]
+    db_data = latest_records_sensor[0] | latest_records_api[0]
     latest_heating_table = get_latest_climate_data("heating_table")
 
     if latest_heating_table and latest_heating_table[0].get("stop_heating") == 0:
         status_heating_table = latest_heating_table[0]
         heat_start_id = status_heating_table.get("heating_start")
         before_records = (
-            get_latest_climate_data(
-                "api_table", heat_start_id, heat_start_id
-            )
+            get_latest_climate_data("api_table", heat_start_id, heat_start_id)[0] |
+            get_latest_climate_data("table_sensor_data", heat_start_id, heat_start_id)[0]
             if heat_start_id
             else []
         )
-        heat_before = before_records[0] if before_records else dict(db_data)
+        heat_before = before_records if before_records else dict(db_data)
         heat_active = True
         heat_start_time = heat_before.get(
             "timestamp", db_data.get("timestamp", "—")
@@ -450,7 +447,7 @@ async def get_heating_page(request: Request):
     )
 
     context = {
-        "website_return_time": website_return_time,
+        "website_return_time": WEBSITE_RETURN_TIME,
         "btn_start_class": btn_start_class,
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,
@@ -530,7 +527,7 @@ async def stop_heating():
 @app.get("/gas", response_class=HTMLResponse)
 async def get_gas_page(request: Request):
     """Страница ввода и отображения показаний счетчика газа."""
-    website_return_time = operations.settings_in_db()[3]
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
     latest_records = get_latest_climate_data("gas_table")
 
     if not latest_records:
@@ -547,7 +544,7 @@ async def get_gas_page(request: Request):
         timestamp_val =db_data["timestamp"]
 
     context = {
-        "website_return_time": website_return_time,
+        "website_return_time": WEBSITE_RETURN_TIME,
         "current_gas": gas_display,
         "gas_input_value": gas_input_val,
         "timestamp": timestamp_val
