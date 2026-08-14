@@ -27,9 +27,15 @@
             <thead>
                 <tr>
                     <th>Зона</th>
-                    <th>Улица</th>
-                    <th>Подвал</th>
-                    <th>Пол</th>
+                    <th>Улица<br>
+                        <span class="text-blue val-bold">{{ 'Датчик' if sensor_or_calc_street else 'Расчёт' }}</span>
+                    </th>
+                    <th>Подвал<br>
+                        <span class="text-blue val-bold">{{ 'Датчик' if sensor_or_calc_basement else 'Расчёт' }}</span>
+                    </th>
+                    <th>Пол<br>
+                        <span class="text-blue val-bold">{{ 'Датчик' if sensor_or_calc_floor else 'Расчёт' }}</span>
+                    </th>
                 </tr>
             </thead>
             <tbody>

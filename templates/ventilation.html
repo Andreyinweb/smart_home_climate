@@ -39,7 +39,7 @@
                     <th>Параметр</th>
                     <th>Пуск <span class="val-bold text-blue">{{ vent_start_time if vent_start_time else '—' }}</span> |</th>
                     <th>Текущие <span class="val-bold text-blue">{{ vent_now_time if vent_now_time else '—' }}</span></th>
-                    <th>Дельта</th>
+                    <th>Дельта <span class="val-bold text-blue">{{ vent_difference_time if vent_difference_time else '—' }}</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -94,6 +94,73 @@
             </tbody>
         </table>
     </div>
+<!-- Таблица начальных показателей -->
+    <div class="card-header">
+            <div>
+                <h2 class="card-title">📊 Начальные показатели</h2>
+                <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
+                    Время: <span class="text-blue val-bold">{{ vent_start_time if vent_start_time else '—' }}</span> 
+                </div>
+            </div>
+        </div>
+
+        <table class="table-compact">
+            <thead>
+                <tr>
+                    <th>Зона</th>
+                    <th>Улица<br>
+                        <span class="text-blue val-bold">{{ 'Датчик' if before_sensor_or_calc_street else 'Расчёт' }}</span>
+                    </th>
+                    <th>Подвал<br>
+                        <span class="text-blue val-bold">{{ 'Датчик' if before_sensor_or_calc_basement else 'Расчёт' }}</span>
+                    </th>
+                    <th>Пол<br>
+                        <span class="text-blue val-bold">{{ 'Датчик' if before_sensor_or_calc_floor else 'Расчёт' }}</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="val-bold">Т (°C)</td>
+                    <td>{{ "%.1f"|format(before_street_temp) if before_street_temp is defined and before_street_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(before_basement_temp) if before_basement_temp is defined and before_basement_temp is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(before_floor_temp) if before_floor_temp is defined and before_floor_temp is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">ОВ (%)</td>
+                    <td>{{ "%.1f"|format(before_street_humi) if before_street_humi is defined and before_street_humi is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(before_basement_humi) if before_basement_humi is defined and before_basement_humi is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.1f"|format(before_floor_humi) if before_floor_humi is defined and before_floor_humi is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(before_a_street_humi) if before_a_street_humi is defined and before_a_street_humi is not none else '—' }}</td>
+                    <td>{{ "%.2f"|format(before_a_basement_humi) if before_a_basement_humi is defined and before_a_basement_humi is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.2f"|format(before_a_floor_humi) if before_a_floor_humi is defined and before_a_floor_humi is not none else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="val-bold">ТР (°C)</td>
+                    <td>{{ "%.1f"|format(before_dp_street) if before_dp_street is defined and before_dp_street is not none else '—' }}</td>
+                    <td>{{ "%.1f"|format(before_dp_basement) if before_dp_basement is defined and before_dp_basement is not none else '—' }}</td>
+                    <td class="text-red">{{ "%.1f"|format(before_dp_floor) if before_dp_floor is defined and before_dp_floor is not none else '—' }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Статус работы систем -->
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+            <div>
+                <strong>Проветривание:</strong> {{ "%.2f"|format(before_humidity_difference) if before_humidity_difference is defined and before_humidity_difference is not none else '0.00' }} г/м³
+                
+            </div>
+
+    </div>
+
+
+
+
+
+
 
 </div>
 {% endblock %}

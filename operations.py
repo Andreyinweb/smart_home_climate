@@ -1,7 +1,7 @@
 import math
 from typing import Tuple
 import calendar
-from datetime import datetime
+from datetime import datetime, timedelta
 from settings import config
 import logging
 import models
@@ -128,14 +128,16 @@ def coefficient_gas(street_temp: float, basement_temp: float, gas_difference: fl
     coefficient = round(gas_per_month / temp_diff, 3)
     return coefficient
 
-# def coefficient_gas (street_temp: float, basement_temp: float, gas_difference: float, timestamp: str) -> float:
-#     """
-#     Расчет коэффициента расхода газа.
-#     """
-#     if street_temp is None or basement_temp is None or gas_difference is None or timestamp is None:
-#         return 0.0
-#     variable_hour = (int(timestamp[8:10]) - 1) * 24 + int(timestamp[11:13])
-#     temp_diff = abs(basement_temp - street_temp)
-
-#     coefficient = round(((gas_difference/variable_hour) / temp_diff)*24*31, 3) if temp_diff != 0 else 0.0
-#     return coefficient
+def get_time_difference_str(start_str: str, end_str: str, fmt: str = "%H:%M") -> str:
+    t_start = datetime.strptime(start_str, fmt)
+    t_end = datetime.strptime(end_str, fmt)
+    
+    diff = t_end - t_start
+    if diff.total_seconds() < 0:
+        diff += timedelta(days=1)
+        
+    total_minutes = int(diff.total_seconds() // 60)
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    
+    return f"{hours}:{minutes:02d}"

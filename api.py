@@ -166,11 +166,13 @@ async def get_ventilation_page(request: Request):
             "timestamp", db_data.get("timestamp", "—")
         )
         vent_now_time = db_data.get("timestamp", "—")
+        vent_difference_time = operations.get_time_difference_str(vent_start_time[11:16], vent_now_time[11:16])
     else:
         vent_active = False
         vent_before = dict(db_data)
         vent_start_time = db_data.get("timestamp", "—")
         vent_now_time = db_data.get("timestamp", "—")
+        vent_difference_time = operations.get_time_difference_str(vent_start_time[11:16], vent_now_time[11:16])
 
     diffs = {
         "diff_basement_temp": safe_diff(
@@ -264,6 +266,7 @@ async def get_ventilation_page(request: Request):
         "btn_stop_disabled": btn_stop_disabled,
         "vent_start_time": vent_start_str,
         "vent_now_time": vent_now_str,
+        "vent_difference_time": vent_difference_time,
         **db_data,
         **before_data,
         **diffs,
@@ -370,11 +373,13 @@ async def get_heating_page(request: Request):
             "timestamp", db_data.get("timestamp", "—")
         )
         heat_now_time = db_data.get("timestamp", "—")
+        heat_difference_time = operations.get_time_difference_str(heat_start_time[11:16], heat_now_time[11:16])
     else:
         heat_active = False
         heat_before = dict(db_data)
         heat_start_time = db_data.get("timestamp", "—")
         heat_now_time = db_data.get("timestamp", "—")
+        heat_difference_time = operations.get_time_difference_str(heat_start_time[11:16], heat_now_time[11:16])
 
     diffs = {
         "diff_basement_temp": safe_diff(
@@ -454,6 +459,7 @@ async def get_heating_page(request: Request):
         "btn_stop_disabled": btn_stop_disabled,
         "heat_start_time": heat_start_str,
         "heat_now_time": heat_now_str,
+        "heat_difference_time": heat_difference_time,
         **db_data,
         **before_data,
         **diffs,
@@ -587,19 +593,20 @@ async def update_gas_meter(request: Request):
             gas_out_db ['coefficient_gas'] = operations.coefficient_gas (latest_sensor[0]["street_temp"], latest_sensor[0]["basement_temp"], gas_out_db ['gas_difference'], latest_sensor[0]["timestamp"])
             gas_out_db ['price_gas'] = operations.settings_in_db()[10]
             gas_out_db ['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
+            if latest_gas[0]["gas_meter"] != gas_meter and latest_gas[0]["gas_meter"] < gas_meter and latest_gas[0]["id"] != last_sensor_id:
+                write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
+                api_log.info(f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
+            else:
+                api_log.info(f"[БД] Значение счетчика газа в gas_table (id={last_sensor_id}) не изменилось: {gas_meter}")
         else:
             gas_out_db ['start_of_month_gas_meter'] = config.START_OF_MONTH_GAS_METER
             gas_out_db ['gas_difference'] = round(gas_meter - gas_out_db ['start_of_month_gas_meter'], 3)
             gas_out_db ['coefficient_gas'] = operations.coefficient_gas (latest_sensor[0]["street_temp"], latest_sensor[0]["basement_temp"], gas_out_db ['gas_difference'], latest_sensor[0]["timestamp"])
             gas_out_db ['price_gas'] = operations.settings_in_db()[10]
             gas_out_db ['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
+            write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
+            api_log.info(f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
 
-        write_climate_data(
-            "gas_table", gas_out_db, row_id=last_sensor_id
-        )
-        api_log.info(
-            f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}"
-        )
     else:
         api_log.warning(
             "table_sensor_data пуста, не удалось обновить счетчик газа"
