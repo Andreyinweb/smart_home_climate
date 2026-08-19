@@ -1,8 +1,8 @@
 import math
-from typing import Tuple
+import statistics
+from typing import Tuple, List
 import calendar
 from datetime import datetime, timedelta
-from settings import config
 import logging
 import models
 
@@ -12,17 +12,17 @@ def settings_in_db():
     latest_settings = models.get_latest_climate_data('settings_table')
     if latest_settings:
         settings_in_db = latest_settings[0]
-        DATE_SETINGS = settings_in_db['timestamp'] # 0
-        MODE = settings_in_db['mode']              # 1
-        INTERVAL_SECONDS = settings_in_db['interval_seconds'] # 2
-        WEBSITE_RETURN_TIME = settings_in_db['website_return_time'] # 3
-        MAX_RETRIES = settings_in_db['max_retries'] # 4
-        T_FLOOR_MAC_DIFF = settings_in_db['t_floor_mac_diff'] # 5
-        ABSOLUTE_HUMIDITY_TOLERANCE = settings_in_db['absolute_humidity_tolerance'] # 6
-        MINIMUM_HUMIDITY = settings_in_db['minimum_humidity'] # 7
-        TARGET_RH = settings_in_db['target_rh']  # 8
-        DANGEROUS_HUMIDITY =settings_in_db['dangerous_humidity'] # 9
-        PRICE_GAS = settings_in_db['price_gas'] # 10
+        DATE_SETINGS = settings_in_db['timestamp']
+        MODE = settings_in_db['mode']
+        INTERVAL_SECONDS = settings_in_db['interval_seconds']
+        WEBSITE_RETURN_TIME = settings_in_db['website_return_time']
+        MAX_RETRIES = settings_in_db['max_retries']
+        T_FLOOR_MAC_DIFF = settings_in_db['t_floor_mac_diff']
+        ABSOLUTE_HUMIDITY_TOLERANCE = settings_in_db['absolute_humidity_tolerance']
+        MINIMUM_HUMIDITY = settings_in_db['minimum_humidity']
+        TARGET_RH = settings_in_db['target_rh']
+        DANGEROUS_HUMIDITY = settings_in_db['dangerous_humidity']
+        PRICE_GAS = settings_in_db['price_gas']
     else:
         work_log.error("Невозможно получить данные из базы settings_table.")
         exit(1)
@@ -37,11 +37,8 @@ def calculate_absolute_humidity(temp: float, humi: float) -> float:
     """
     if temp is None or humi is None:
         return 0.0
-    # Насыщенное давление пара (hPa)
     es = 6.112 * math.exp((17.67 * temp) / (temp + 243.5))
-    # Фактическое давление пара (hPa)
     e = es * (humi / 100.0)
-    # Вычисление абсолютной влажности (г/м³)
     ah = (216.7 * e) / (temp + 273.15)
     return round(ah, 2)
 
@@ -59,17 +56,38 @@ def calculate_relative_humidity(temp: float, ah: float) -> float:
     """
     Обратный расчет относительной влажности (%) по температуре и абсолютной влажности.
     """
-    if temp is None or ah is None or temp < -273.15:
+    if temp is None or ah is None or temp < -273.15 or ah <= 0:
         return 0.0
     es = 6.112 * math.exp((17.67 * temp) / (temp + 243.5))
+    if es == 0:
+        return 0.0
     e = (ah * (temp + 273.15)) / 216.7
     rh = (e / es) * 100.0
     return min(100.0, max(0.0, round(rh, 2)))
 
+def calculate_median(values: List[float]) -> float:
+    """Вычисляет медианное значение списка чисел."""
+    if not values:
+        return 0.0
+    return float(statistics.median(values))
+
+def calculate_winter_climate(
+    site_temp: float,
+    site_ah: float,
+    delta_temp: float,
+    delta_ah: float
+) -> Tuple[float, float, float]:
+    """
+    Вычисляет расчетную уличную температуру (T), абсолютную влажность (AH) и относительную влажность (RH)
+    для зимнего периода без уличного датчика.
+    """
+    temp_calc = round(site_temp + delta_temp, 2)
+    ah_calc = max(0.0001, round(site_ah + delta_ah, 4))
+    rh_calc = calculate_relative_humidity(temp_calc, ah_calc)
+    return temp_calc, ah_calc, rh_calc
+
 def analyze_ventilation(street_temp: float, a_street_humi: float, basement_temp: float, a_basement_humi: float) -> Tuple[str, str]:
-    """
-    Анализ возможности и безопасности проветривания.
-    """
+    """Анализ возможности и безопасности проветривания."""
     is_safe = a_street_humi < a_basement_humi
     has_draft = basement_temp > street_temp
     
@@ -81,25 +99,20 @@ def analyze_ventilation(street_temp: float, a_street_humi: float, basement_temp:
         return "НЕТ", "Тяги нет."
 
 def calculating_temperature_from_humidity(temp: float, ah: float):
-    """
-    Расчет температуры отопления.
-    """
+    """Расчет температуры отопления."""
     TARGET_RH = settings_in_db()[8]
-    temp_heating = round(temp,1)
+    temp_heating = round(temp, 1)
+    delta = 0
     for delta in range(0, 300):
         relative_humidity = calculate_relative_humidity(temp_heating, ah)
         if relative_humidity < TARGET_RH:
             break
         temp_heating = temp_heating + 0.1
     
-    return temp_heating, round(delta*0.1, 1)
-
-
+    return temp_heating, round(delta * 0.1, 1)
 
 def coefficient_gas(street_temp: float, basement_temp: float, gas_difference: float, timestamp: str) -> float:
-    """
-    Расчет коэффициента расхода газа.
-    """
+    """Расчет коэффициента расхода газа."""
     if street_temp is None or basement_temp is None or gas_difference is None or timestamp is None:
         return 0.0
 
@@ -112,16 +125,13 @@ def coefficient_gas(street_temp: float, basement_temp: float, gas_difference: fl
     except ValueError:
         return 0.0
 
-    # Прошедшее время от начала месяца в часах (с дробной частью)
     hours_passed = (dt.day - 1) * 24 + dt.hour + dt.minute / 60 + dt.second / 3600
 
     if hours_passed == 0:
         return 0.0
 
-    # Количество дней в текущем месяце (28, 29, 30 или 31)
     days_in_month = calendar.monthrange(dt.year, dt.month)[1]
 
-    # Прогнозируемый расход за весь месяц на 1 градус разницы температур
     gas_per_hour = gas_difference / hours_passed
     gas_per_month = gas_per_hour * 24 * days_in_month
 

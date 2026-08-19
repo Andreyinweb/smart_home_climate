@@ -1,5 +1,3 @@
-#  python3 main.py  # Точка входа для запуска сервера и фонового опроса
-
 import math
 import asyncio
 import uvicorn
@@ -7,8 +5,9 @@ import logging
 from datetime import datetime
 
 from settings import config
-from models import write_climate_data, get_average_difference_temp, get_latest_climate_data
+from models import write_climate_data, get_average_difference_temp, get_latest_climate_data, update_data_db
 import operations
+import weather_service
 from ble_receiver import XiaomiBLEReceiver
 from api import app
 
@@ -18,46 +17,72 @@ receiver = XiaomiBLEReceiver()
 
 print(f"main запущена. MODE = {config.MODE}.")
 
-# data_sensors_all = {"street":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
-#         "basement":{"temp":0.0, "humi":0.0, "voltage":0.0}, 
-#         "floor":{"temp":0.0, "humi":0.0, "voltage":0.0},
-#         'difference_temp':0.0,
-#         'average_temp':0.0,
-#         'timestamp': ""
-#         }
-
 data_sensors_all = {}
+last_calibrated_day = -1
 
 async def polling_task():
-    """Фоновый асинхронный опрос BLE датчиков и сохранение результатов в БД."""
+    """Фоновый асинхронный опрос BLE датчиков, OpenWeatherMap и сохранение результатов в БД."""
+    global last_calibrated_day
     work_log.info("Запуск фонового циклического опроса датчиков...")
 
     while True:
-        # Загрузка переменных из базы данных
+        current_now = datetime.now()
+        timestamp_str = current_now.strftime("%Y-%m-%d %H:%M:%S")
+
+
+
+        # 1. Загрузка настроек из базы данных
         (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
              MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
              MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
         
-        # Запрос ко всем датчикам.
-        data_sensors_all = await receiver.sensor_get_sensors_all()
+        # 2. Получение данных с сайта OpenWeatherMap с переданной единой меткой времени
+        weather_service.record_site_weather(timestamp=timestamp_str)
 
-        # 2. Обработка собранных данных (после того, как опрос ВСЕХ датчиков завершен)
+        # 3. Запрос к физическим BLE датчикам
+        data_sensors_all = await receiver.sensor_get_sensors_all()
+        
+        # Получение последних данных из БД для сравнения
+        before_db = {}
+        latest = get_latest_climate_data('table_sensor_data')
+        if latest:
+            before_db = latest[0]
+
         if data_sensors_all:
-            data_sensors_all['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            data_sensors_all['timestamp'] = timestamp_str
+
+            # Проверка наличия отклика от физического уличного датчика
+            has_street_physical = (
+                config.STREET_SENSOR_ENABLED and 
+                'street_temp' in data_sensors_all and 
+                data_sensors_all['street_temp'] is not None and
+                data_sensors_all['street_temp'] != 0.0
+            )
+
+            if has_street_physical:
+                data_sensors_all['sensor_or_calc_street'] = True
+            else:
+                # Физический уличный датчик демонтирован (Зима) - берем расчетные данные
+                calc_temp, calc_rh, street_flag = weather_service.get_calculated_street_climate(current_now.hour)
+                data_sensors_all['street_temp'] = calc_temp
+                data_sensors_all['street_humi'] = calc_rh
+                data_sensors_all['street_voltage'] = 0.0
+                data_sensors_all['sensor_or_calc_street'] = False
 
             # Вычисление difference_temp в зависимости от режима работы
             if MODE == 'TWO_SENSORS':
                 data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
             elif MODE == 'FLOOR':
-                # Проверяем наличие необходимых данных перед расчетом
                 if 'basement_temp' in data_sensors_all and 'floor_temp' in data_sensors_all:
                     data_sensors_all['difference_temp'] = round(
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
-                    data_sensors_all['sensor_or_calc_street'] = True
                     data_sensors_all['sensor_or_calc_basement'] = True
                     data_sensors_all['sensor_or_calc_floor'] = True
                 elif 'basement_temp' in data_sensors_all and not ('floor_temp' in data_sensors_all):
+                    if before_db and 'average_temp' in before_db:
+                        if update_data_db('settings_table', {'t_floor_mac_diff': before_db['average_temp'], 'timestamp': data_sensors_all['timestamp']}, row_id=1):
+                            T_FLOOR_MAC_DIFF = before_db['average_temp']
                     data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - T_FLOOR_MAC_DIFF           
                     abs_basement_humi = operations.calculate_absolute_humidity(data_sensors_all['basement_temp'], data_sensors_all['basement_humi'])
                     data_sensors_all['floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], abs_basement_humi)
@@ -65,36 +90,32 @@ async def polling_task():
                     data_sensors_all['difference_temp'] = round(
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
                     )
-                    data_sensors_all['sensor_or_calc_street'] = True
                     data_sensors_all['sensor_or_calc_basement'] = True
                     data_sensors_all['sensor_or_calc_floor'] = False
                 else:
                     data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
-                    work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчикa basement")
+                    work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчика basement")
             else: # MODE == 'SENSORS_ONE'
+                if before_db and 'average_temp' in before_db:
+                    if update_data_db('settings_table', {'t_floor_mac_diff': before_db['average_temp'], 'timestamp': data_sensors_all['timestamp']}, row_id=1):
+                        T_FLOOR_MAC_DIFF = before_db['average_temp']
                 data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
                 data_sensors_all['average_temp'] = T_FLOOR_MAC_DIFF
-                data_sensors_all['sensor_or_calc_street'] = False
                 data_sensors_all['sensor_or_calc_basement'] = True
                 data_sensors_all['sensor_or_calc_floor'] = False
 
-            # Получение среднего исторического значения разницы температур из БД
             data_sensors_all['average_temp'] = get_average_difference_temp()
             
-            print(f"Запись в БД: {data_sensors_all}") #TODO
-        # 3. Запись датчиков в table_sensor_data         
+            print(f"Запись в БД: {data_sensors_all}")
             write_climate_data('table_sensor_data', data_sensors_all)          
-########################################################################################
-        # 4. Расчёт данных
-            db_data ={}
-            db_data['timestamp'] = data_sensors_all['timestamp']
+
+            # 4. Расчёт показателей для api_table
+            db_data = {}
+            db_data['timestamp'] = timestamp_str
             for name in config.sensor_name:
-                # Расчет абсолютных влажностей
                 db_data["a_" + name + "_humi"] = operations.calculate_absolute_humidity(data_sensors_all[name + "_temp"], data_sensors_all[name + "_humi"])
-                # Расчет точек росы
                 db_data["dp_" + name] = operations.calculate_dew_point(data_sensors_all[name + "_temp"], data_sensors_all[name + "_humi"])
 
-            # Расчет проветривания с учетом абсолютной погрешности ABSOLUTE_HUMIDITY_TOLERANCE (0.5 г/м³)
             db_data['humidity_difference'] = round(db_data['a_basement_humi'] - db_data['a_street_humi'], 2)
 
             if db_data['humidity_difference'] >= ABSOLUTE_HUMIDITY_TOLERANCE:        
@@ -107,12 +128,10 @@ async def polling_task():
                 db_data['vent_status'] = False
                 db_data['vent_time_val'] = 0
             
-            # Моделирование замещения (Проветривание)
             db_data['sim_a_basement_humi'] = db_data['a_street_humi']
             db_data['sim_basement_humi'] = operations.calculate_relative_humidity(data_sensors_all['basement_temp'], db_data['sim_a_basement_humi'])
             db_data['sim_floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], db_data['sim_a_basement_humi'])
 
-            # Расчет компенсационного нагрева (Отопление)
             db_data['heating_delta'] = 0.0
 
             if db_data['vent_status'] and db_data['sim_floor_humi'] > TARGET_RH:
@@ -140,13 +159,17 @@ async def polling_task():
                 db_data['a_basement_humi_heated'] = db_data['a_basement_humi']
                 db_data['floor_temp_heated'] = data_sensors_all['floor_temp']
                 db_data['floor_humi_heated'] = data_sensors_all['floor_humi']
-                db_data['a_floor_humi_heated'] = db_data['a_floor_humi']
-        # 5. Запись датчиков в api_table
+                db_data['a_floor_humi_heated'] = data_sensors_all['floor_humi']
+
             write_climate_data('api_table', db_data)
 
-        # 6. Пауза
+        # 5. Запуск ежедневной калибровки часовых коэффициентов при смене дня
+        if last_calibrated_day != current_now.day:
+            weather_service.calibrate_hourly_coefficients()
+            last_calibrated_day = current_now.day
+        # 6. Ожидание до следующей итерации опроса
         work_log.info(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...")
-        print(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...") # TODO
+        print(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...")
         await asyncio.sleep(INTERVAL_SECONDS)
 
 async def start_services():
@@ -156,7 +179,7 @@ async def start_services():
         host=config.SERVER_HOST, 
         port=config.SERVER_PORT, 
         loop="asyncio",
-        log_config=None  # Отключаем дефолтный конфиг Uvicorn, сохраняя наши настройки логирования
+        log_config=None
     )
     server = uvicorn.Server(server_config)
     

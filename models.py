@@ -11,7 +11,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def write_climate_data(name_table, data_all: dict, row_id: int = None) -> bool:
+def write_climate_data(name_table: str, data_all: dict, row_id: int = None) -> bool:
     """
     Записывает текущие показатели в таблицу. 
     Если передан row_id, перезаписывает (или создает) строку с этим ID.
@@ -20,7 +20,6 @@ def write_climate_data(name_table, data_all: dict, row_id: int = None) -> bool:
     incoming_data = list(data_all.values())
 
     if row_id is not None:
-        # Добавляем id в список полей и значений для INSERT OR REPLACE
         names.append('id')
         incoming_data.append(row_id)
         
@@ -28,7 +27,6 @@ def write_climate_data(name_table, data_all: dict, row_id: int = None) -> bool:
         placeholders = ", ".join(["?"] * len(names))
         query = f"INSERT OR REPLACE INTO {name_table} ({columns}) VALUES ({placeholders})"
     else:
-        # Стандартный INSERT для добавления новой строки с автоинкрементом
         columns = ", ".join(names)
         placeholders = ", ".join(["?"] * len(names))
         query = f"INSERT INTO {name_table} ({columns}) VALUES ({placeholders})"
@@ -45,38 +43,53 @@ def write_climate_data(name_table, data_all: dict, row_id: int = None) -> bool:
         print(f"[БД] Ошибка записи в базу данных: {e}")
         return False
 
-def get_latest_climate_data(name_table: str, start_id: int = None, stop_id: int = None):
-    """
-    Возвращает записи из таблицы по условиям start_id и/или stop_id.
-    
-    - Если оба ID не указаны, возвращается последняя строка по ID.
-    - Если указан только start_id, возвращаются строки от start_id до конца.
-    - Если указан только stop_id, возвращаются строки от начала до stop_id.
-    - Если указаны оба ID и они равны, возвращается конкретная строка.
-    - Если указаны оба ID и они разные, возвращается выборка в этом диапазоне.
-    """
+def update_data_db(name_table: str, data_all: dict, row_id: int) -> bool:
+    """Обновляет указанные колонки в существующей строке по row_id."""
+    if not data_all or row_id is None:
+        work_log.error("[БД] Ошибка: не переданы данные для обновления или row_id")
+        return False
+
+    set_clause = ", ".join([f"{col} = ?" for col in data_all.keys()])
+    values = list(data_all.values())
+    values.append(row_id)
+
+    query = f"UPDATE {name_table} SET {set_clause} WHERE id = ?"
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(values))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                work_log.warning(f"[БД] Запись с id={row_id} в таблице {name_table} не найдена")
+                return False
+
+            work_log.info(f"[БД] Запись id={row_id} в {name_table} успешно обновлена")
+        return True
+    except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка обновления базы данных: {e}")
+        print(f"[БД] Ошибка обновления базы данных: {e}")
+        return False
+
+def get_latest_climate_data(name_table: str, start_id: int = None, stop_id: int = None) -> list:
+    """Возвращает записи из таблицы по условиям start_id и/или stop_id."""
     query = f"SELECT * FROM {name_table}"
     params = []
 
-    # Реализация логики условий в зависимости от переданных аргументов
     if start_id is None and stop_id is None:
-        # Возвращаем последнюю строку
         query += " ORDER BY ID DESC LIMIT 1"
     elif start_id is not None and stop_id is not None:
         if start_id == stop_id:
-            # Конкретная строка
             query += " WHERE ID = ?"
             params.append(start_id)
         else:
-            # Выборка по диапазону ID
             query += " WHERE ID >= ? AND ID <= ? ORDER BY ID ASC"
             params.extend([start_id, stop_id])
     elif start_id is not None:
-        # От start_id до конца таблицы
         query += " WHERE ID >= ? ORDER BY ID ASC"
         params.append(start_id)
-    else:  # stop_id is not None
-        # От начала таблицы до stop_id
+    else:
         query += " WHERE ID <= ? ORDER BY ID ASC"
         params.append(stop_id)
 
@@ -91,12 +104,8 @@ def get_latest_climate_data(name_table: str, start_id: int = None, stop_id: int 
         print(f"[БД] Ошибка чтения из базы данных: {e}")
         return []
 
-
 def get_average_difference_temp() -> float:
-    """
-    Вычисляет среднее значение всех данных из столбца difference_temp.
-    В случае ошибки или отсутствия данных возвращает config.T_FLOOR_MAC_DIFF
-    """
+    """Вычисляет среднее значение всех данных из столбца difference_temp."""
     query = "SELECT AVG(difference_temp) as avg_diff FROM table_sensor_data"
     try:
         with get_db_connection() as conn:
@@ -110,9 +119,70 @@ def get_average_difference_temp() -> float:
         work_log.error(f"[БД] Ошибка при расчете среднего значения difference_temp: {e}")
         print(f"[БД] Ошибка при расчете среднего значения difference_temp: {e}")
         return config.T_FLOOR_MAC_DIFF
-    
-# Запись настроек в базу данных
-work_log.info("-"*60)
+
+def get_hourly_coefficient(hour: int) -> dict:
+    """Возвращает калибровочные коэффициенты для указанного часа."""
+    query = "SELECT delta_temp, delta_ah FROM hourly_coefficients_table WHERE hour = ?"
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (hour,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return {'delta_temp': 0.0, 'delta_ah': 0.0}
+    except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка чтения коэффициентов для часа {hour}: {e}")
+        return {'delta_temp': 0.0, 'delta_ah': 0.0}
+
+def update_hourly_coefficient(hour: int, delta_temp: float, delta_ah: float, samples_count: int) -> bool:
+    """Обновляет коэффициенты в hourly_coefficients_table для конкретного часа."""
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    query = """
+        UPDATE hourly_coefficients_table
+        SET delta_temp = ?, delta_ah = ?, samples_count = ?, updated_at = ?
+        WHERE hour = ?
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (round(delta_temp, 3), round(delta_ah, 4), samples_count, now_str, hour))
+            conn.commit()
+            return True
+    except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка обновления коэффициента часа {hour}: {e}")
+        return False
+
+def get_calibration_data(max_time_diff_seconds: int = 600) -> list:
+    """
+    Выбирает совпадающие по времени записи из table_sensor_data и weather_site_table
+    для выполнения калибровки уличных коэффициентов.
+    """
+    query = """
+    SELECT 
+        CAST(strftime('%H', s.timestamp) AS INTEGER) AS hour_val,
+        s.street_temp,
+        s.street_humi,
+        w.site_temp,
+        w.site_ah
+    FROM table_sensor_data s
+    JOIN weather_site_table w 
+      ON ABS(strftime('%s', s.timestamp) - strftime('%s', w.timestamp)) <= ?
+    WHERE s.sensor_or_calc_street = 1
+      AND s.street_temp IS NOT NULL 
+      AND s.street_humi IS NOT NULL;
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (max_time_diff_seconds,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка запроса данных для калибровки: {e}")
+        return []
+
+work_log.info("-" * 60)
 work_log.info(f"Программа запущена. MODE = {config.MODE}.")
 settings_out_db = {}
 
@@ -133,13 +203,13 @@ else:
 
 latest_records = get_latest_climate_data('table_sensor_data')
 if latest_records:
-   in_db_sensor_data = latest_records[0]
-   if in_db_sensor_data['average_temp']:
-      settings_out_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
-      config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
-   else:
-      settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
+    in_db_sensor_data = latest_records[0]
+    if in_db_sensor_data.get('average_temp'):
+        settings_out_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
+        config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
+    else:
+        settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
 else:
-   settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
+    settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
 
 write_climate_data('settings_table', settings_out_db, row_id=1)

@@ -1,5 +1,3 @@
-# python3.12 settings.py  # Настройки для проекта Smart Home Climate
-
 import os
 import sys
 from pathlib import Path
@@ -10,7 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class AppConfig:
-
    PROJECT_DIR: str = Path.cwd()
    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
    # APP start configuration
@@ -77,7 +74,7 @@ class AppConfig:
       logger.addHandler(handler)
       logger.propagate = False  # Логи не дублируются в консоль Root логгера по умолчанию
       return logger
-   
+
 class BLEConfig:
    # BLE configuration
    INTERVAL_SECONDS: int = int(os.environ.get("INTERVAL_SECONDS", 300))
@@ -88,21 +85,29 @@ class BLEConfig:
       "STREET_MAC": os.environ.get("STREET_MAC", False),
       "BASEMENT_MAC": os.environ.get("BASEMENT_MAC", False),
       "FLOOR_MAC": os.environ.get("FLOOR_MAC", False)
-         }
+   }
    sensor_name = []
    for name in NAME_SENSOR_MAC:
       sensor_name.append(name[:-4].lower())
 
 class DatabaseConfig:
    # Data base configuration
-   DB_DIR: str = os.environ.get("DB_DIR")
-   DB_NAME: str = os.environ.get("DB_NAME")
+   DB_DIR: str = os.environ.get("DB_DIR", ".")
+   DB_NAME: str = os.environ.get("DB_NAME", "climate_data.sqlite3")
    DB_PATH: str = DB_DIR + "/" + DB_NAME
 
 class APIConfig:
    WEBSITE_RETURN_TIME: int = int(os.environ.get("WEBSITE_RETURN_TIME", "30"))
    SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
+
+   # Настройки OpenWeatherMap API
+   OPENWEATHER_API_KEY: str = os.environ.get("OPENWEATHER_API_KEY", "")
+
+   LOCATION_LAT: float = float(os.environ.get("LOCATION_LAT", 50.4501))
+   LOCATION_LON: float = float(os.environ.get("LOCATION_LON", 30.5234))
+   # Флаг активности уличного физического датчика (True - включен, False - зимовка/расчет)
+   STREET_SENSOR_ENABLED =True # False
 
 class Config(
    AppConfig,
