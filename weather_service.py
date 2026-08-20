@@ -11,6 +11,35 @@ import operations
 
 work_log = logging.getLogger("climat_app.weather_service")
 
+# def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
+#     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
+#     if not config.OPENWEATHER_API_KEY:
+#         work_log.warning("[WeatherAPI] OPENWEATHER_API_KEY не установлен в settings/env.")
+#         return None
+
+#     url = (
+#         f"https://api.openweathermap.org/data/2.5/weather?"
+#         f"lat={config.LOCATION_LAT}&lon={config.LOCATION_LON}"
+#         f"&appid={config.OPENWEATHER_API_KEY}&units=metric"
+#     )
+
+#     try:
+#         req = urllib.request.Request(url, headers={'User-Agent': 'ClimatApp/1.0'})
+#         with urllib.request.urlopen(req, timeout=10) as response:
+#             if response.status == 200:
+#                 data = json.loads(response.read().decode('utf-8'))
+#                 temp = float(data['main']['temp'])
+#                 humi = float(data['main']['humidity'])
+#                 return {'temp': temp, 'humi': humi}
+#             else:
+#                 work_log.error(f"[WeatherAPI] Код ответа сервера: {response.status}")
+#     except urllib.error.URLError as e:
+#         work_log.error(f"[WeatherAPI] Ошибка подключения к OpenWeatherMap: {e}")
+#     except Exception as e:
+#         work_log.error(f"[WeatherAPI] Ошибка при запросе погоды: {e}")
+
+#     return None
+
 def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
     if not config.OPENWEATHER_API_KEY:
@@ -18,9 +47,9 @@ def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
         return None
 
     url = (
-        f"https://api.openweathermap.org/data/2.5/weather?"
-        f"lat={config.LOCATION_LAT}&lon={config.LOCATION_LON}"
-        f"&appid={config.OPENWEATHER_API_KEY}&units=metric"
+        f"https://api.tomorrow.io/v4/weather/realtime?"
+        f"location={config.LOCATION_LAT},{config.LOCATION_LON}"
+        f"&apikey={config.OPENWEATHER_API_KEY}"
     )
 
     try:
@@ -28,13 +57,14 @@ def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
         with urllib.request.urlopen(req, timeout=10) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode('utf-8'))
-                temp = float(data['main']['temp'])
-                humi = float(data['main']['humidity'])
+                values = data['data']['values']
+                temp = float(values['temperature'])
+                humi = float(values['humidity'])
                 return {'temp': temp, 'humi': humi}
             else:
                 work_log.error(f"[WeatherAPI] Код ответа сервера: {response.status}")
     except urllib.error.URLError as e:
-        work_log.error(f"[WeatherAPI] Ошибка подключения к OpenWeatherMap: {e}")
+        work_log.error(f"[WeatherAPI] Ошибка подключения к Tomorrow.io: {e}")
     except Exception as e:
         work_log.error(f"[WeatherAPI] Ошибка при запросе погоды: {e}")
 
