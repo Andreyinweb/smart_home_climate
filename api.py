@@ -604,3 +604,99 @@ async def update_gas_meter(request: Request):
         )
 
     return RedirectResponse(url="/gas", status_code=303)
+
+@app.get("/settings", response_class=HTMLResponse)
+async def get_settings_page(request: Request):
+    """Страница просмотра и редактирования настроек программы."""
+    latest_settings = get_latest_climate_data("settings_table")
+
+    if not latest_settings:
+        settings_dict = {
+            "mode": config.MODE,
+            "interval_seconds": config.INTERVAL_SECONDS,
+            "max_retries": config.MAX_RETRIES,
+            "website_return_time": config.WEBSITE_RETURN_TIME,
+            "t_floor_mac_diff": config.T_FLOOR_MAC_DIFF,
+            "absolute_humidity_tolerance": config.ABSOLUTE_HUMIDITY_TOLERANCE,
+            "minimum_humidity": config.MINIMUM_HUMIDITY,
+            "target_rh": config.TARGET_RH,
+            "dangerous_humidity": config.DANGEROUS_HUMIDITY,
+            "price_gas": config.PRICE_GAS,
+        }
+    else:
+        settings_dict = latest_settings[0]
+
+    latest_sensor = get_latest_climate_data("table_sensor_data")
+    average_temp = "—"
+    if latest_sensor and latest_sensor[0].get("average_temp") is not None:
+        average_temp = latest_sensor[0]["average_temp"]
+
+    context = {
+        "website_return_time": settings_dict.get(
+            "website_return_time", config.WEBSITE_RETURN_TIME
+        ),
+        "average_temp": average_temp,
+        **settings_dict,
+    }
+
+    return templates.TemplateResponse(
+        request=request, name="settings.html", context=context
+    )
+
+
+@app.post("/api/settings/update")
+async def update_settings(request: Request):
+    """Обновление настроек в таблице settings_table."""
+    body = await request.body()
+    parsed_data = parse_qs(body.decode("utf-8"))
+
+    def parse_field(key, default, type_func):
+        val_list = parsed_data.get(key)
+        if val_list and val_list[0]:
+            try:
+                return type_func(val_list[0])
+            except ValueError:
+                pass
+        return default
+    latest_sensor = get_latest_climate_data("table_sensor_data")
+    if latest_sensor:
+        last_sensor_timestamp = latest_sensor[0]["timestamp"]
+    else:
+        last_sensor_timestamp = "—"
+    settings_to_write = {
+        "timestamp": last_sensor_timestamp,
+        "mode": parse_field("mode", config.MODE, str),
+        "interval_seconds": parse_field(
+            "interval_seconds", config.INTERVAL_SECONDS, int
+        ),
+        "max_retries": parse_field("max_retries", config.MAX_RETRIES, int),
+        "website_return_time": parse_field(
+            "website_return_time", config.WEBSITE_RETURN_TIME, int
+        ),
+        "t_floor_mac_diff": parse_field(
+            "t_floor_mac_diff", config.T_FLOOR_MAC_DIFF, float
+        ),
+        "absolute_humidity_tolerance": parse_field(
+            "absolute_humidity_tolerance",
+            config.ABSOLUTE_HUMIDITY_TOLERANCE,
+            float,
+        ),
+        "minimum_humidity": parse_field(
+            "minimum_humidity", config.MINIMUM_HUMIDITY, float
+        ),
+        "target_rh": parse_field("target_rh", config.TARGET_RH, float),
+        "dangerous_humidity": parse_field(
+            "dangerous_humidity", config.DANGEROUS_HUMIDITY, float
+        ),
+        "price_gas": parse_field("price_gas", config.PRICE_GAS, float),
+    }
+
+    success = write_climate_data("settings_table", settings_to_write, row_id=1)
+    if success:
+        api_log.info(
+            f"[БД] Настройки успешно обновлены в settings_table: {settings_to_write}"
+        )
+    else:
+        api_log.error("[БД] Ошибка при записи новых настроек в settings_table")
+
+    return RedirectResponse(url="/settings", status_code=303)
