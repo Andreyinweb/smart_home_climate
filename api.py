@@ -638,9 +638,6 @@ async def update_gas_meter(request: Request):
 
         average_street_temp = get_interval_average('table_sensor_data', 'street_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
         average_basement_temp = get_interval_average('table_sensor_data', 'basement_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
-        print(latest_sensor[0]["timestamp"][0:7]) # TODO: Удалить после тестирования
-        print(f"average_street_temp: {average_street_temp}") # TODO: Удалить после тестирования
-        print(f"average_basement_temp: {average_basement_temp}") # TODO: Удалить после тестирования
 
         gas_out_db['coefficient_gas'] = operations.coefficient_gas(
             average_street_temp, 

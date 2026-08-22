@@ -119,9 +119,18 @@ fields_db = """ (
     gas_meter REAL,
     start_of_month_gas_meter REAL,
     gas_difference REAL,
+    average_street_temp REAL,
+    average_basement_temp REAL,
+    delta_T REAL,
     coefficient_gas REAL,
+    gas_per_hour REAL,
+    gas_per_month REAL,
+    hot_water_per_month REAL,
+    hot_water_per_hour REAL,
     price_gas REAL,
-    cost_of_gas REAL
+    cost_of_gas REAL,
+    gas_forecast REAL,
+    projected_price REAL
 )
 """
 create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
