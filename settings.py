@@ -107,7 +107,7 @@ class APIConfig:
    LOCATION_LAT: float = float(os.environ.get("LOCATION_LAT", 50.4501))
    LOCATION_LON: float = float(os.environ.get("LOCATION_LON", 30.5234))
    # Флаг активности уличного физического датчика (True - включен, False - зимовка/расчет)
-   STREET_SENSOR_ENABLED =True # False
+   STREET_SENSOR_ENABLED = True # False
 
 class Config(
    AppConfig,

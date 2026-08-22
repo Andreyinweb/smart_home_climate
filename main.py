@@ -27,8 +27,6 @@ async def polling_task():
         current_now = datetime.now()
         timestamp_str = current_now.strftime("%Y-%m-%d %H:%M:%S")
 
-
-
         # 1. Загрузка настроек из базы данных
         (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
              MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
@@ -38,17 +36,14 @@ async def polling_task():
         weather_service.record_site_weather(timestamp=timestamp_str)
 
         # 3. Запрос к физическим BLE датчикам
-        data_sensors_all = await receiver.sensor_get_sensors_all()
-        
+        data_sensors_all = await receiver.sensor_get_sensors_all()               
         # Получение последних данных из БД для сравнения
         before_db = {}
         latest = get_latest_climate_data('table_sensor_data')
         if latest:
             before_db = latest[0]
-
         if data_sensors_all:
             data_sensors_all['timestamp'] = timestamp_str
-
             # Проверка наличия отклика от физического уличного датчика
             has_street_physical = (
                 config.STREET_SENSOR_ENABLED and 
@@ -56,7 +51,6 @@ async def polling_task():
                 data_sensors_all['street_temp'] is not None and
                 data_sensors_all['street_temp'] != 0.0
             )
-
             if has_street_physical:
                 data_sensors_all['sensor_or_calc_street'] = True
             else:
@@ -104,7 +98,7 @@ async def polling_task():
 
             data_sensors_all['average_temp'] = get_average_difference_temp()
             
-            print(f"Запись в БД: {data_sensors_all}")
+            print(f"Запись в БД: {data_sensors_all}") # TODO
             write_climate_data('table_sensor_data', data_sensors_all)          
 
             # 4. Расчёт показателей для api_table

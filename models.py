@@ -206,6 +206,7 @@ if latest_records:
     in_db_sensor_data = latest_records[0]
     if in_db_sensor_data.get('average_temp'):
         settings_out_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
+        settings_out_db['timestamp'] = in_db_sensor_data['timestamp']
         config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
     else:
         settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF

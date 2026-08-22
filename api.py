@@ -27,13 +27,11 @@ templates = Jinja2Templates(
     directory=os.path.join(config.PROJECT_DIR, "templates")
 )
 
-
 def safe_diff(val1, val2) -> float:
     """Безопасное вычисление разницы между двумя числовыми значениями."""
     if val1 is not None and val2 is not None:
         return float(val1) - float(val2)
     return 0.0
-
 
 def get_no_data_response(request: Request) -> HTMLResponse:
     """Возвращает страницу ожидания данных, если в БД пусто."""
@@ -54,12 +52,10 @@ def get_no_data_response(request: Request) -> HTMLResponse:
         status_code=500,
     )
 
-
 @app.get("/api/data")
 async def get_raw_data():
     """Получение сырых данных в формате JSON."""
     return data_rendered
-
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
@@ -277,7 +273,6 @@ async def get_ventilation_page(request: Request):
         request=request, name="ventilation.html", context=context
     )
 
-
 @app.post("/api/ventilation/start")
 async def start_ventilation():
     """Запись старта проветривания в БД с привязкой ID и timestamp из api_table."""
@@ -310,7 +305,6 @@ async def start_ventilation():
 
     return RedirectResponse(url="/ventilation", status_code=303)
 
-
 @app.post("/api/ventilation/stop")
 async def stop_ventilation():
     """Запись остановки проветривания в БД с фиксацией ID текущей записи из api_table."""
@@ -342,7 +336,6 @@ async def stop_ventilation():
                 api_log.warning("На сервер не приходят значения из базы данных")
 
     return RedirectResponse(url="/ventilation", status_code=303)
-
 
 @app.get("/heating", response_class=HTMLResponse)
 async def get_heating_page(request: Request):
@@ -470,7 +463,6 @@ async def get_heating_page(request: Request):
         request=request, name="heating.html", context=context
     )
 
-
 @app.post("/api/heating/start")
 async def start_heating():
     """Запись старта отопления в БД с привязкой ID и timestamp из api_table."""
@@ -499,7 +491,6 @@ async def start_heating():
             api_log.warning("На сервер не приходят значения из базы данных")
 
     return RedirectResponse(url="/heating", status_code=303)
-
 
 @app.post("/api/heating/stop")
 async def stop_heating():
