@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import operations
-from models import get_db_connection, get_latest_climate_data, write_climate_data
+from models import get_db_connection, get_latest_climate_data, write_climate_data, get_interval_average
 from settings import config
 
 api_log = logging.getLogger("api_app.api")
@@ -528,22 +528,56 @@ async def get_gas_page(request: Request):
     latest_records = get_latest_climate_data("gas_table")
 
     if not latest_records:
-        gas_val = config.START_OF_MONTH_GAS_METER
-        gas_display = gas_val
+        gas_val = None
+        start_gas_val = config.START_OF_MONTH_GAS_METER
+        gas_display = "Не установлено"
+        start_gas_display = f"{start_gas_val:.3f} м³" if start_gas_val is not None else "0.000 м³"
         gas_input_val = ""
+        start_gas_input_val = f"{start_gas_val:.3f}" if start_gas_val is not None else ""
         timestamp_val = "Первое число текущего месяца"
-
+        gas_diff_display = "0.000 м³"
+        cost_display = "0.00"
     else:
         db_data = latest_records[0]
         gas_val = db_data.get("gas_meter")
-        gas_display = (f"{gas_val:.3f} м³")
+        start_gas_val = db_data.get("start_of_month_gas_meter")
+        
+        if start_gas_val is None:
+            start_gas_val = config.START_OF_MONTH_GAS_METER
+
+        gas_display = f"{gas_val:.3f} м³" if gas_val is not None else "Не установлено"
+        start_gas_display = f"{start_gas_val:.3f} м³" if start_gas_val is not None else "0.000 м³"
+        
         gas_input_val = f"{gas_val:.3f}" if gas_val is not None else ""
-        timestamp_val =db_data["timestamp"]
+        start_gas_input_val = f"{start_gas_val:.3f}" if start_gas_val is not None else ""
+        timestamp_val = db_data.get("timestamp", "—")
+
+        # Расчет или получение разницы с начала месяца
+        gas_diff = db_data.get("gas_difference")
+        if gas_diff is None and gas_val is not None and start_gas_val is not None:
+            gas_diff = round(gas_val - start_gas_val, 3)
+        
+        gas_diff_display = f"{gas_diff:.3f} м³" if gas_diff is not None else "0.000 м³"
+
+        # Расчет или получение стоимости на данный момент
+        cost_val = db_data.get("cost_of_gas")
+        if cost_val is None and gas_diff is not None:
+            try:
+                price_gas = operations.settings_in_db()[10]
+                cost_val = round(gas_diff * price_gas, 2)
+            except Exception:
+                cost_val = 0.0
+
+        cost_display = f"{cost_val:.2f}" if cost_val is not None else "0.00"
 
     context = {
         "website_return_time": WEBSITE_RETURN_TIME,
         "current_gas": gas_display,
+        "start_of_month_gas": start_gas_display,
         "gas_input_value": gas_input_val,
+        "start_gas_input_value": start_gas_input_val,
+        "gas_difference": gas_diff_display,
+        "cost_of_gas": cost_display,
         "timestamp": timestamp_val
     }
 
@@ -557,7 +591,9 @@ async def update_gas_meter(request: Request):
     """Обновление показаний счетчика газа в таблицах api_table и table_sensor_data."""
     body = await request.body()
     parsed_data = parse_qs(body.decode("utf-8"))
+    
     gas_meter_val = parsed_data.get("gas_meter")
+    start_of_month_val = parsed_data.get("start_of_month_gas_meter")
 
     if not gas_meter_val:
         api_log.warning("В запросе отсутствует поле gas_meter")
@@ -570,33 +606,65 @@ async def update_gas_meter(request: Request):
             "Не удалось преобразовать значение gas_meter в число с плавающей точкой"
         )
         return RedirectResponse(url="/gas", status_code=303)
+
+    # Обработка введенного показания на начало месяца (если указано)
+    start_of_month_gas = None
+    if start_of_month_val and start_of_month_val[0].strip():
+        try:
+            start_of_month_gas = float(start_of_month_val[0])
+        except ValueError:
+            api_log.warning(
+                "Не удалось преобразовать значение start_of_month_gas_meter в число"
+            )
+
     gas_out_db = {}
     latest_sensor = get_latest_climate_data("table_sensor_data")
     if latest_sensor:
         last_sensor_id = latest_sensor[0]["id"]
-        gas_out_db ['timestamp'] = latest_sensor[0]["timestamp"]        
-        gas_out_db ['gas_meter'] = gas_meter
+        gas_out_db['timestamp'] = latest_sensor[0]["timestamp"]        
+        gas_out_db['gas_meter'] = gas_meter
         latest_gas = get_latest_climate_data("gas_table")
 
+        # Определение значения начала месяца
+        if start_of_month_gas is not None:
+            gas_out_db['start_of_month_gas_meter'] = start_of_month_gas
+        elif latest_gas and latest_gas[0].get("start_of_month_gas_meter") is not None:
+            gas_out_db['start_of_month_gas_meter'] = latest_gas[0]["start_of_month_gas_meter"]
+        else:
+            gas_out_db['start_of_month_gas_meter'] = config.START_OF_MONTH_GAS_METER
+
+        # Расчет разницы, коэффициента и стоимости
+        gas_out_db['gas_difference'] = round(gas_meter - gas_out_db['start_of_month_gas_meter'], 3)
+
+        average_street_temp = get_interval_average('table_sensor_data', 'street_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
+        average_basement_temp = get_interval_average('table_sensor_data', 'basement_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
+        print(latest_sensor[0]["timestamp"][0:7]) # TODO: Удалить после тестирования
+        print(f"average_street_temp: {average_street_temp}") # TODO: Удалить после тестирования
+        print(f"average_basement_temp: {average_basement_temp}") # TODO: Удалить после тестирования
+
+        gas_out_db['coefficient_gas'] = operations.coefficient_gas(
+            average_street_temp, 
+            average_basement_temp, 
+            gas_out_db['gas_difference'], 
+            latest_sensor[0]["timestamp"]
+        )
+        gas_out_db['price_gas'] = operations.settings_in_db()[10]
+        gas_out_db['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
+
         if latest_gas:            
-            gas_out_db ['start_of_month_gas_meter'] = latest_gas[0]["start_of_month_gas_meter"]
-            gas_out_db ['gas_difference'] = round(gas_meter - gas_out_db ['start_of_month_gas_meter'], 3)
-            gas_out_db ['coefficient_gas'] = operations.coefficient_gas (latest_sensor[0]["street_temp"], latest_sensor[0]["basement_temp"], gas_out_db ['gas_difference'], latest_sensor[0]["timestamp"])
-            gas_out_db ['price_gas'] = operations.settings_in_db()[10]
-            gas_out_db ['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
-            if latest_gas[0]["gas_meter"] != gas_meter and latest_gas[0]["gas_meter"] < gas_meter and latest_gas[0]["id"] != last_sensor_id:
+            prev_gas = latest_gas[0].get("gas_meter")
+            prev_start = latest_gas[0].get("start_of_month_gas_meter")
+            prev_id = latest_gas[0].get("id")
+
+            # Записываем в БД, если изменилось текущее значение, значение начала месяца или id записи
+            if (prev_gas != gas_meter) or (prev_start != gas_out_db['start_of_month_gas_meter']) or (prev_id != last_sensor_id):
                 write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
                 api_log.info(f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
             else:
                 api_log.info(f"[БД] Значение счетчика газа в gas_table (id={last_sensor_id}) не изменилось: {gas_meter}")
         else:
-            gas_out_db ['start_of_month_gas_meter'] = config.START_OF_MONTH_GAS_METER
-            gas_out_db ['gas_difference'] = round(gas_meter - gas_out_db ['start_of_month_gas_meter'], 3)
-            gas_out_db ['coefficient_gas'] = operations.coefficient_gas (latest_sensor[0]["street_temp"], latest_sensor[0]["basement_temp"], gas_out_db ['gas_difference'], latest_sensor[0]["timestamp"])
-            gas_out_db ['price_gas'] = operations.settings_in_db()[10]
-            gas_out_db ['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
             write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
-            api_log.info(f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
+            api_log.info(f"[БД] Успешно создан и обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
 
     else:
         api_log.warning(
@@ -604,6 +672,7 @@ async def update_gas_meter(request: Request):
         )
 
     return RedirectResponse(url="/gas", status_code=303)
+
 
 @app.get("/settings", response_class=HTMLResponse)
 async def get_settings_page(request: Request):

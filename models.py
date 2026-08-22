@@ -214,3 +214,75 @@ else:
     settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
 
 write_climate_data('settings_table', settings_out_db, row_id=1)
+
+######################################
+def get_interval_average(
+    name_table: str,
+    column_name: str,
+    interval_type: str = 'hour',
+    target_time: str = None
+) -> float:
+    """
+    Вычисляет среднее значение столбца за указанный интервал времени.
+
+    :param name_table: Имя таблицы в БД.
+    :param column_name: Имя столбца для вычисления среднего значения.
+    :param interval_type: Тип интервала ('hour'/'час', 'day'/'день', 'month'/'месяц').
+    :param target_time: Конкретная дата/время в формате строки (например, '2026-08-23 14:00', '2026-08-23', '2026-08').
+                        Если не передано, вычисляет за относительный интервал от текущего времени.
+    :return: Среднее значение (float), округленное до 2 знаков, или None.
+    """
+    normalized_interval = str(interval_type).strip().lower()
+    params = []
+
+    if target_time:
+        clean_time = str(target_time).strip()
+        if normalized_interval in ('hour', 'час'):
+            query = f"""
+                SELECT AVG({column_name}) AS avg_val
+                FROM {name_table}
+                WHERE strftime('%Y-%m-%d %H', timestamp) = ?
+            """
+            params.append(clean_time[:13])
+        elif normalized_interval in ('day', 'день'):
+            query = f"""
+                SELECT AVG({column_name}) AS avg_val
+                FROM {name_table}
+                WHERE strftime('%Y-%m-%d', timestamp) = ?
+            """
+            params.append(clean_time[:10])
+        elif normalized_interval in ('month', 'месяц'):
+            query = f"""
+                SELECT AVG({column_name}) AS avg_val
+                FROM {name_table}
+                WHERE strftime('%Y-%m', timestamp) = ?
+            """
+            params.append(clean_time[:7])
+        else:
+            work_log.error(f"[БД] Передан неподдерживаемый интервал времени: '{interval_type}'")
+            return None
+    else:
+        interval_map = {
+            'hour': '-1 hour', 'час': '-1 hour',
+            'day': '-1 day', 'день': '-1 day',
+            'month': '-1 month', 'месяц': '-1 month'
+        }
+        modifier = interval_map.get(normalized_interval, '-1 hour')
+        query = f"""
+            SELECT AVG({column_name}) AS avg_val
+            FROM {name_table}
+            WHERE timestamp >= datetime('now', '{modifier}')
+        """
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+            row = cursor.fetchone()
+            if row and row["avg_val"] is not None:
+                return round(float(row["avg_val"]), 2)
+            return None
+    except sqlite3.Error as e:
+        work_log.error(f"[БД] Ошибка вычисления среднего значения {column_name} в {name_table}: {e}")
+        print(f"[БД] Ошибка вычисления среднего значения {column_name} в {name_table}: {e}")
+        return None
