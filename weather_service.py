@@ -3,7 +3,6 @@ import urllib.request
 import urllib.error
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Tuple
 
 from settings import config
 import models
@@ -11,7 +10,7 @@ import operations
 
 work_log = logging.getLogger("climat_app.weather_service")
 
-# def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
+# def fetch_openweathermap_data():
 #     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
 #     if not config.OPENWEATHER_API_KEY:
 #         work_log.warning("[WeatherAPI] OPENWEATHER_API_KEY не установлен в settings/env.")
@@ -40,7 +39,7 @@ work_log = logging.getLogger("climat_app.weather_service")
 
 #     return None
 
-def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
+def fetch_openweathermap_data():
     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
     if not config.OPENWEATHER_API_KEY:
         work_log.warning("[WeatherAPI] OPENWEATHER_API_KEY не установлен в settings/env.")
@@ -70,7 +69,7 @@ def fetch_openweathermap_data() -> Optional[Dict[str, float]]:
 
     return None
 
-def record_site_weather(timestamp: str = None) -> Optional[Dict[str, float]]:
+def record_site_weather(timestamp: str = None):
     """Получает текущую погоду с сайта, высчитывает AH и записывает в weather_site_table."""
     weather_data = fetch_openweathermap_data()
     if not weather_data:
@@ -138,7 +137,7 @@ def calibrate_hourly_coefficients(max_time_diff_seconds: int = 600) -> None:
 
     work_log.info("[Калибровка] Калибровка часовых коэффициентов успешно завершена.")
 
-def get_calculated_street_climate(current_hour: int) -> Tuple[float, float, bool]:
+def get_calculated_street_climate(current_hour: int):
     """
     Рассчитывает уличный климат на основе последних данных сайта погоды и сохраненных коэффициентов.
     Возвращает: (street_temp, street_humi, sensor_or_calc_street = False)

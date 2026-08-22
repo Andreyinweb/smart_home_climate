@@ -17,12 +17,10 @@ receiver = XiaomiBLEReceiver()
 
 print(f"main запущена. MODE = {config.MODE}.")
 
-data_sensors_all = {}
-last_calibrated_day = -1
-
 async def polling_task():
-    """Фоновый асинхронный опрос BLE датчиков, OpenWeatherMap и сохранение результатов в БД."""
-    global last_calibrated_day
+    """Фоновый асинхронный опрос BLE датчиков, OpenWeatherMap и сохранение результатов в БД."""    
+    data_sensors_all = {}
+    last_calibrated_day = -1
     work_log.info("Запуск фонового циклического опроса датчиков...")
 
     while True:
