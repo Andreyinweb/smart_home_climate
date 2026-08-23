@@ -135,8 +135,8 @@ VENV_PATH="$VENV_DIR/$VENV_NAME"
 ENV_FILE="${PROJECT_DIR}/.env"
 # Пути для проверки log
 LOG_DIR="$PROJECT_DIR/logs"
-WORK_FILE="$LOG_DIR/work_log.log"
-API_FILE="$LOG_DIR/api_log.log"
+WORK_LOG="$LOG_DIR/work_log.log"
+API_LOG="$LOG_DIR/api_log.log"
 #################################################################################### Проверка Python #########################################################
 
 # Проверяем текущую версию Python
@@ -243,6 +243,12 @@ if [ "$env_dir" -eq 0 ]; then
     echo "DB_NAME = '$DATA_FILE'" >> $ENV_FILE
     echo "VENV_DIR = '$VENV_DIR'" >> $ENV_FILE
     echo "VENV_NAME = '$VENV_NAME'" >> $ENV_FILE
+    echo " " >> $ENV_FILE
+    echo "LOG_DIR = '$LOG_DIR'" >> $ENV_FILE
+    echo "WORK_LOG = '$WORK_LOG'" >> $ENV_FILE
+    echo "API_LOG = '$API_LOG'" >> $ENV_FILE
+    echo " " >> $ENV_FILE
+    echo "BACKUP = '$PROJECT_DIR/backup'" >> $ENV_FILE
 elif [ "$env_dir" -eq 2 ]; then 
     echo "Файл .env не был создан. Пожалуйста, создайте его вручную и добавьте необходимые переменные."
     exit 1
@@ -252,8 +258,8 @@ fi
 # Проверка папки logs
 check_or_create_dir "$LOG_DIR" 
 # Проверка файлов log (только если папка существует или была создана) 
-check_or_create_file "$WORK_FILE" "run/log.txt"
-check_or_create_file "$API_FILE" "run/log.txt"
+check_or_create_file "$WORK_LOG" "run/log.txt"
+check_or_create_file "$API_LOG" "run/log.txt"
 ####################################################### Проверка базы данных #######################################################
 # Проверка папки data
 check_or_create_dir "$DATA_DIR" 
@@ -275,6 +281,12 @@ source "$VENV_PATH/bin/activate"
 python3.12 run/run_program.py
 
 echo "Проверка завершена."
+# TODO удали
+# exit
+echo "########################################### Запуск run_migrator.py #############################"
+
+python3.12 run/migrator.py
+
 echo "######################## Пуск основной программы проекта main.py ######################"
 
 python3.12 main.py

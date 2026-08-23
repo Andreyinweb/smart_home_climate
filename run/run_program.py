@@ -1,15 +1,17 @@
 import os
 import sqlite3
 from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 
-try:
-    from run_data import PROJECT_DIR, DATA_DIR, DATA_FILE
-    database_file = os.path.join(DATA_DIR, DATA_FILE)
-    backup_dir = os.path.join(PROJECT_DIR, "backup")
-except ImportError:
-    from settings import config
-    database_file = config.DB_PATH
-    backup_dir = os.path.join(config.PROJECT_DIR, "backup")
+# Загрузка переменных окружения из файла .env
+load_dotenv()
+
+PROJECT_DIR: str = Path.cwd()
+DATA_DIR: str = str(os.environ.get("DB_DIR", PROJECT_DIR))
+DATA_FILE: str = str(os.environ.get("DB_NAME", "climate_data.sqlite3"))
+backup_dir: str = str(os.environ.get("BACKUP", f"{PROJECT_DIR}/backup"))
+database_file = DATA_DIR + "/" + DATA_FILE
 
 def check_or_create_database(db_file):
     if not os.path.exists(db_file):
@@ -243,4 +245,3 @@ if create_table(db_path=database_file, table_name='hourly_coefficients_table', f
     except Exception as e:
         print(f"Ошибка заполнения hourly_coefficients_table: {e}")
         
-create_backup(database_file, backup_dir)
