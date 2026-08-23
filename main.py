@@ -158,6 +158,7 @@ async def polling_task():
         # 5. Запуск ежедневной калибровки часовых коэффициентов при смене дня
         if last_calibrated_day != current_now.day:
             weather_service.calibrate_hourly_coefficients()
+            operations.create_backup(config.DB_PATH, config.BACKUP)
             last_calibrated_day = current_now.day
         # 6. Ожидание до следующей итерации опроса
         work_log.info(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...")

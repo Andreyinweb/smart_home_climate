@@ -1,3 +1,4 @@
+import os
 import math
 import statistics
 from typing import Tuple, List
@@ -151,3 +152,39 @@ def get_time_difference_str(start_str: str, end_str: str, fmt: str = "%H:%M") ->
     minutes = total_minutes % 60
     
     return f"{hours}:{minutes:02d}"
+
+
+def create_backup(source_file, backup_dir, max_backups=100):
+    try:
+        if not os.path.isfile(source_file):
+            raise FileNotFoundError(f"Файл не найден: {source_file}")
+
+        os.makedirs(backup_dir, exist_ok=True)
+
+        filename = os.path.basename(source_file)
+        name, ext = os.path.splitext(filename)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"{name}_{timestamp}{ext}"
+        backup_path = os.path.join(backup_dir, backup_name)
+
+        with open(source_file, 'rb') as src, open(backup_path, 'wb') as dst:
+            dst.write(src.read())
+
+        prefix = f"{name}_"
+        backups = [f for f in os.listdir(backup_dir) 
+                 if f.startswith(prefix) and f.endswith(ext)]
+        
+        if len(backups) > max_backups - 1:
+            backups.sort()
+            for old_backup in backups[:-max_backups]:
+                os.remove(os.path.join(backup_dir, old_backup))
+                print(f"Удалён старый бэкап: {old_backup}")
+        work_log.info(f"Резервная копия создана: {backup_path}")
+        print(f"Резервная копия создана: {backup_path}")
+        return backup_path
+
+    except Exception as e:
+        work_log.error(f"Ошибка при создании резервной копии: {e}")
+        print(f"Ошибка: {e}")
+        return None

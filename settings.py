@@ -9,7 +9,10 @@ load_dotenv()
 
 class AppConfig:
    PROJECT_DIR: str = Path.cwd()
-   LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
+   LOG_DIR: str = os.environ.get("LOG_DIR", f"{PROJECT_DIR}/logs")
+   WORK_LOG: str = os.environ.get("WORK_LOG", f"{PROJECT_DIR}/logs/work_log.log")
+   API_LOG: str = os.environ.get("API_LOG", f"{PROJECT_DIR}/logs/api_log.log")
+   BACKUP: str = os.environ.get("BACKUP", f"{PROJECT_DIR}/backup")
    # APP start configuration
    MODE = "FLOOR"  # Есть датчик температуры пола, всего 3 датчика: у улицы, в подвале и у пола
    # MODE = "TWO_SENSORS"  # Расчёт температуры у пола, всего 2 датчика: у улицы и в подвале
@@ -35,10 +38,9 @@ class AppConfig:
 
    def __init__(self):
       # 1. Основной лог работы приложения (климат, БД, опросы датчиков)
-      self.work_log = self.setup_logger("climat_app", f"{self.PROJECT_DIR}/logs/work_log.log")
+      self.work_log = self.setup_logger("climat_app", self.WORK_LOG)
       # 2. Лог для API и веб-сервера (запросы, роуты)
-      self.api_log = self.setup_logger("api_app", f"{self.PROJECT_DIR}/logs/api_log.log")
-      
+      self.api_log = self.setup_logger("api_app", self.API_LOG)
       # Перенаправляем стандартные логи Uvicorn в api_log.log и глушим их вывод в консоль
       if self.api_log.handlers:
          api_handler = self.api_log.handlers[0]

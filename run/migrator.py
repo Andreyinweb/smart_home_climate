@@ -214,7 +214,7 @@ def main():
     print("\n" + "=" * 80)
     print(" МИГРАЦИЯ УСПЕШНО ЗАВЕРШЕНА")
     print("=" * 80)
-    run_program.create_backup(target_db_path, backup_dir)
+    # run_program.create_backup(target_db_path, backup_dir)
 
 if __name__ == "__main__":
     main()
