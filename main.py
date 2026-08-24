@@ -26,22 +26,27 @@ async def polling_task():
     while True:
         current_now = datetime.now()
         timestamp_str = current_now.strftime("%Y-%m-%d %H:%M:%S")
-
-        # 1. Загрузка настроек из базы данных
-        (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
-             MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
-             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
-        
-        # 2. Получение данных с сайта OpenWeatherMap с переданной единой меткой времени
-        weather_service.record_site_weather(timestamp=timestamp_str)
-
-        # 3. Запрос к физическим BLE датчикам
-        data_sensors_all = await receiver.sensor_get_sensors_all()               
         # Получение последних данных из БД для сравнения
         before_db = {}
         latest = get_latest_climate_data('table_sensor_data')
         if latest:
             before_db = latest[0]
+
+        # 1. Загрузка настроек из базы данных
+        (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
+             MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
+             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
+                
+        if before_db:
+            now_id = before_db['id'] + 1
+        else:
+            now_id = 1
+        # 2. Получение данных с сайта OpenWeatherMap с переданной единой меткой времени
+        weather_service.record_site_weather(timestamp=timestamp_str, id=now_id)
+
+        # 3. Запрос к физическим BLE датчикам
+        data_sensors_all = await receiver.sensor_get_sensors_all()               
+
         if data_sensors_all:
             data_sensors_all['timestamp'] = timestamp_str
             # Проверка наличия отклика от физического уличного датчика
@@ -103,6 +108,7 @@ async def polling_task():
 
             # 4. Расчёт показателей для api_table
             db_data = {}
+            db_data['id'] = now_id
             db_data['timestamp'] = timestamp_str
             for name in config.sensor_name:
                 db_data["a_" + name + "_humi"] = operations.calculate_absolute_humidity(data_sensors_all[name + "_temp"], data_sensors_all[name + "_humi"])

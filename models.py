@@ -104,6 +104,39 @@ def get_latest_climate_data(name_table: str, start_id: int = None, stop_id: int 
         print(f"[БД] Ошибка чтения из базы данных: {e}")
         return []
 
+
+def get_climate_data_by_date(name_table: str, start_date=None, stop_date=None) -> list:
+    """Возвращает записи из таблицы по условиям start_date и/или stop_date по столбцу timestamp."""
+    query = f"SELECT * FROM {name_table}"
+    params = []
+
+    if start_date is None and stop_date is None:
+        query += " ORDER BY timestamp DESC LIMIT 1"
+    elif start_date is not None and stop_date is not None:
+        if start_date == stop_date:
+            query += " WHERE timestamp = ?"
+            params.append(start_date)
+        else:
+            query += " WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC"
+            params.extend([start_date, stop_date])
+    elif start_date is not None:
+        query += " WHERE timestamp >= ? ORDER BY timestamp ASC"
+        params.append(start_date)
+    else:
+        query += " WHERE timestamp <= ? ORDER BY timestamp ASC"
+        params.append(stop_date)
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        work_log.info(f"[БД] Ошибка чтения из базы данных: {e}")
+        print(f"[БД] Ошибка чтения из базы данных: {e}")
+        return []
+
 def get_average_difference_temp() -> float:
     """Вычисляет среднее значение всех данных из столбца difference_temp."""
     query = "SELECT AVG(difference_temp) as avg_diff FROM table_sensor_data"

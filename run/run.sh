@@ -265,15 +265,15 @@ check_or_create_file "$API_LOG" "run/log.txt"
 check_or_create_dir "$DATA_DIR" 
 ################################################ Делаем резервную копию run_data.py #######################################################
 
-# Проверяем существование директории
-if check_or_create_dir "$PROJECT_DIR/backup"; then    
-    cp run/run_data.py $PROJECT_DIR/backup/run_data_$(date +'%Y%m%d_%H%M%S').py
-    echo "Резервное копирование файла run_data.py в $PROJECT_DIR/backup/run_data_$(date +'%Y%m%d_%H%M%S').py"
-    # Удаляем старые бэкапы (кроме 10 последних)
-    ls -t $PROJECT_DIR/backup/run_data_*.py | tail -n +11 | xargs rm -f --
-else
-    echo "Не скопирован файла run_data.py нет папки $PROJECT_DIR/backup/"
-fi
+# # Проверяем существование директории
+# if check_or_create_dir "$PROJECT_DIR/backup"; then    
+#     cp run/run_data.py $PROJECT_DIR/backup/run_data_$(date +'%Y%m%d_%H%M%S').py
+#     echo "Резервное копирование файла run_data.py в $PROJECT_DIR/backup/run_data_$(date +'%Y%m%d_%H%M%S').py"
+#     # Удаляем старые бэкапы (кроме 10 последних)
+#     ls -t $PROJECT_DIR/backup/run_data_*.py | tail -n +11 | xargs rm -f --
+# else
+#     echo "Не скопирован файла run_data.py нет папки $PROJECT_DIR/backup/"
+# fi
 ################################################# Запуск run_program.py #######################################################
 
 echo "########################################### Запуск run_program.py #############################"

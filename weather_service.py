@@ -69,7 +69,7 @@ def fetch_openweathermap_data():
 
     return None
 
-def record_site_weather(timestamp: str = None):
+def record_site_weather(timestamp: str = None, id: int = None):
     """Получает текущую погоду с сайта, высчитывает AH и записывает в weather_site_table."""
     weather_data = fetch_openweathermap_data()
     if not weather_data:
@@ -84,6 +84,7 @@ def record_site_weather(timestamp: str = None):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     data_to_write = {
+        'id': id,
         'timestamp': timestamp,
         'site_temp': site_temp,
         'site_humi': site_humi,

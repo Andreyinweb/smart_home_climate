@@ -114,28 +114,6 @@ fields_db = """ (
     """
 create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
 
-# Создаём таблицу gas_table
-fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    gas_meter REAL,
-    start_of_month_gas_meter REAL,
-    gas_difference REAL,
-    average_street_temp REAL,
-    average_basement_temp REAL,
-    delta_T REAL,
-    coefficient_gas REAL,
-    gas_per_hour REAL,
-    gas_per_month REAL,
-    hot_water_per_month REAL,
-    hot_water_per_hour REAL,
-    price_gas REAL,
-    cost_of_gas REAL,
-    gas_forecast REAL,
-    projected_price REAL
-)
-"""
-create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
 
 # Создаём таблицу table_sensor_data
 fields_db = """ (
@@ -159,9 +137,35 @@ fields_db = """ (
 """
 create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
 
+
+# Создаём таблицу gas_table
+fields_db = """ (
+    id INTEGER ,
+    timestamp TEXT NOT NULL,
+    gas_meter REAL,
+    start_of_month_gas_meter REAL,
+    gas_difference REAL,
+    average_street_temp REAL,
+    average_basement_temp REAL,
+    delta_T REAL,
+    coefficient_gas REAL,
+    gas_per_hour REAL,
+    gas_per_month REAL,
+    hot_water_per_month REAL,
+    hot_water_per_hour REAL,
+    price_gas REAL,
+    cost_of_gas REAL,
+    gas_forecast REAL,
+    projected_price REAL
+)
+"""
+create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
+
+
+
 # Создаём таблицу api_table
 fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER ,
     timestamp TEXT,    
     a_floor_humi REAL,
     dp_floor REAL,
@@ -211,7 +215,7 @@ create_table(db_path=database_file, table_name='heating_table', fields=fields_db
 
 # Таблица сырых данных с сайта (weather_site_table)
 fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER ,
     timestamp TEXT NOT NULL,
     site_temp REAL NOT NULL,
     site_humi REAL NOT NULL,
