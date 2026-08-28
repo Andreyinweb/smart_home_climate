@@ -86,25 +86,26 @@ async def get_dashboard(request: Request):
         db_data["msg_vent_status"] = "НЕТ"
         db_data["vent_reason"] = "Тяги нет."
 
-    db_data["vent_class"] = (
-        "badge-green" if db_data.get("vent_status") == "ДА" else "badge-red"
-    )
-    db_data["vent_display_class"] = ""
+    if db_data.get("vent_status"):
+        db_data["vent_class"] = "badge-green"
+        db_data["vent_display_class"] = ""
+    else:
+        db_data["vent_class"] = "badge-red"
+        db_data["vent_display_class"] = "d-none"
+    
 
     # --- Обработка статусов и описания отопления ---
+    heating_delta = db_data.get("heating_delta", 0.0)
     if db_data.get("heat_status"):
         db_data["msg_heat_status"] = "ДА"
+        db_data["heat_info"] = f"+{heating_delta} °C"
+        db_data["heat_class"] = "badge-amber"
+        db_data["heat_display_class"] = ""
     else:
         db_data["msg_heat_status"] = "НЕТ"
-
-    heating_delta = db_data.get("heating_delta", 0.0)
-    db_data["heat_info"] = (
-        f"+{heating_delta} °C" if db_data.get("heat_status") else ""
-    )
-    db_data["heat_class"] = (
-        "badge-amber" if db_data.get("heat_status") else "badge-gray"
-    )
-    db_data["heat_display_class"] = ""
+        db_data["heat_info"] = ""
+        db_data["heat_class"] = "badge-gray" 
+        db_data["heat_display_class"] = "d-none"  
 
     # --- Определение текущего активного режима ---
     active_modes = []
@@ -120,6 +121,10 @@ async def get_dashboard(request: Request):
         active_modes.append("Отопление")
 
     db_data["active_mode"] = ", ".join(active_modes) if active_modes else ""
+
+    # Принудительно показывает таблицы проветривания и отопления на главной странице, даже если они неактивны
+    # db_data["vent_display_class"] = "" # TODO Удали
+    # db_data["heat_display_class"] = ""# TODO Удали
 
     context = {
         "website_return_time": WEBSITE_RETURN_TIME,

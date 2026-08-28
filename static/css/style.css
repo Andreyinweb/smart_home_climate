@@ -232,3 +232,6 @@ html, body {
 .badge-red { background-color: #fee2e2; color: #7f1d1d; }
 .badge-amber { background-color: #fef3c7; color: #78350f; }
 .badge-gray { background-color: #f1f5f9; color: #334155; }
+
+/* Скрытие элементов */
+.d-none {display: none !important;}
