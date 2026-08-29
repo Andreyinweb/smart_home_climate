@@ -79,9 +79,12 @@ class XiaomiBLEReceiver:
     async def sensor_get_sensors_all(self):
         # Загрузка переменных из базы данных
         MAX_RETRIES = operations.settings_in_db()[4]
+        MODE = operations.settings_in_db()[1]
+        NAME_SENSOR_MAC = [f"{item}_MAC" for item in MODE.split("_")]
+        print(f"Опрос датчиков в режиме: {MODE}. Датчики: {NAME_SENSOR_MAC}") # TODO: Убрать после отладки
         data_sensors_all = {} 
         # 1. Сбор данных со всех датчиков
-        for name in config.NAME_SENSOR_MAC:
+        for name in NAME_SENSOR_MAC:
             if config.MAC_DICT.get(name):                
                 try:
                     data = {}

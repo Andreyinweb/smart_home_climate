@@ -9,9 +9,10 @@
     <div class="form-group" style="margin-bottom: 15px;">
         <label for="mode" style="display: block; font-weight: bold; margin-bottom: 5px;">Режим работы (mode):</label>
         <select id="mode" name="mode" class="input-field" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-            <option value="FLOOR" {% if mode == 'FLOOR' %}selected{% endif %}>FLOOR (3 датчика: улица, подвал, пол)</option>
-            <option value="TWO_SENSORS" {% if mode == 'TWO_SENSORS' %}selected{% endif %}>TWO_SENSORS (2 датчика: улица, подвал)</option>
-            <option value="SENSORS_ONE" {% if mode == 'SENSORS_ONE' %}selected{% endif %}>SENSORS_ONE (1 датчик: подвал)</option>
+            <option value="BASEMENT_STREET_FLOOR" {% if mode == 'BASEMENT_STREET_FLOOR' %}selected{% endif %}>BASEMENT_STREET_FLOOR </option>
+            <option value="BASEMENT_STREET" {% if mode == 'BASEMENT_STREET' %}selected{% endif %}>BASEMENT_STREET</option>
+            <option value="BASEMENT_FLOOR" {% if mode == 'BASEMENT_FLOOR' %}selected{% endif %}>BASEMENT_FLOOR</option>
+            <option value="BASEMENT" {% if mode == 'BASEMENT' %}selected{% endif %}>BASEMENT</option>
         </select>
     </div>
 

@@ -15,7 +15,8 @@ work_log = logging.getLogger("climat_app.main")
 
 receiver = XiaomiBLEReceiver()
 
-print(f"main запущена. MODE = {config.MODE}.")
+MODE = operations.settings_in_db()[1]
+print(f"main запущена. MODE = {MODE}.")
 
 async def polling_task():
     """Фоновый асинхронный опрос BLE датчиков, OpenWeatherMap и сохранение результатов в БД."""    
@@ -51,7 +52,8 @@ async def polling_task():
             data_sensors_all['timestamp'] = timestamp_str
             # Проверка наличия отклика от физического уличного датчика
             has_street_physical = (
-                config.STREET_SENSOR_ENABLED and 
+                MODE != 'BASEMENT_FLOOR' and 
+                MODE != 'BASEMENT' and
                 'street_temp' in data_sensors_all and 
                 data_sensors_all['street_temp'] is not None and
                 data_sensors_all['street_temp'] != 0.0
@@ -67,9 +69,9 @@ async def polling_task():
                 data_sensors_all['sensor_or_calc_street'] = False
 
             # Вычисление difference_temp в зависимости от режима работы
-            if MODE == 'TWO_SENSORS':
+            if MODE == 'BASEMENT_STREET':
                 data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
-            elif MODE == 'FLOOR':
+            elif MODE == 'BASEMENT_STREET_FLOOR' or MODE == 'BASEMENT_FLOOR':
                 if 'basement_temp' in data_sensors_all and 'floor_temp' in data_sensors_all:
                     data_sensors_all['difference_temp'] = round(
                         data_sensors_all['basement_temp'] - data_sensors_all['floor_temp'], 2
@@ -92,10 +94,15 @@ async def polling_task():
                 else:
                     data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
                     work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчика basement")
-            else: # MODE == 'SENSORS_ONE'
+            else: # MODE == 'BASEMENT'
                 if before_db and 'average_temp' in before_db:
                     if update_data_db('settings_table', {'t_floor_mac_diff': before_db['average_temp'], 'timestamp': data_sensors_all['timestamp']}, row_id=1):
                         T_FLOOR_MAC_DIFF = before_db['average_temp']
+
+                data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - T_FLOOR_MAC_DIFF           
+                abs_basement_humi = operations.calculate_absolute_humidity(data_sensors_all['basement_temp'], data_sensors_all['basement_humi'])
+                data_sensors_all['floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], abs_basement_humi)
+                data_sensors_all['floor_voltage'] = 0.0
                 data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
                 data_sensors_all['average_temp'] = T_FLOOR_MAC_DIFF
                 data_sensors_all['sensor_or_calc_basement'] = True

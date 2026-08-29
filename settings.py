@@ -14,9 +14,10 @@ class AppConfig:
    API_LOG: str = os.environ.get("API_LOG", f"{PROJECT_DIR}/logs/api_log.log")
    BACKUP: str = os.environ.get("BACKUP", f"{PROJECT_DIR}/backup")
    # APP start configuration
-   MODE = "FLOOR"  # Есть датчик температуры пола, всего 3 датчика: у улицы, в подвале и у пола
-   # MODE = "TWO_SENSORS"  # Расчёт температуры у пола, всего 2 датчика: у улицы и в подвале
-   # MODE = "SENSORS_ONE"  # Есть датчик температуры подвала, всего 1 датчик. Данные улицы берутся с сайта погоды. 
+   MODE = "BASEMENT_STREET_FLOOR"  # Есть датчик температуры пола, всего 3 датчика: у улицы, в подвале и у пола
+   # MODE = "BASEMENT_STREET"  # Расчёт температуры у пола, всего 2 датчика: у улицы и в подвале
+   # MODE = "BASEMENT_FLOOR"  # Расчёт температуры у пола, всего 2 датчика: в подвале и у пола
+   # MODE = "BASEMENT"  # Есть датчик температуры подвала, всего 1 датчик. Данные улицы берутся с сайта погоды. 
 
    # Интервалов опроса в секундах
    INTERVAL_SECONDS = 300
@@ -105,12 +106,11 @@ class APIConfig:
    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
 
    # Настройки OpenWeatherMap API
-   OPENWEATHER_API_KEY: str = os.environ.get("OPENWEATHER_API_KEY", "")
+   SITE_WEATHER_API_KEY: str = os.environ.get("SITE_WEATHER_API_KEY", "")
 
    LOCATION_LAT: float = float(os.environ.get("LOCATION_LAT", 50.4501))
    LOCATION_LON: float = float(os.environ.get("LOCATION_LON", 30.5234))
    # Флаг активности уличного физического датчика (True - включен, False - зимовка/расчет)
-   STREET_SENSOR_ENABLED = True # False
 
 class Config(
    AppConfig,
@@ -131,15 +131,15 @@ config = Config()
 work_log = logging.getLogger("climat_app.settings")
 
 for name in config.NAME_SENSOR_MAC:      
-   if not config.MAC_DICT[name] and config.MODE == "FLOOR":
+   if not config.MAC_DICT[name] and config.MODE == "BASEMENT_STREET_FLOOR":
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()
-   elif config.MODE == "TWO_SENSORS" and not config.MAC_DICT["STREET_MAC"] and not config.MAC_DICT["BASEMENT_MAC"]:
+   elif config.MODE == "BASEMENT_STREET" and not config.MAC_DICT["STREET_MAC"] and not config.MAC_DICT["BASEMENT_MAC"]:
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()
-   elif config.MODE == "SENSORS_ONE" and not config.MAC_DICT["BASEMENT_MAC"]:
+   elif config.MODE == "BASEMENT" and not config.MAC_DICT["BASEMENT_MAC"]:
       print(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env. Значение {config.MAC_DICT[name]}")
       work_log.error(f"Ошибка: Не указан MAC-адрес для датчика {name}. Проверьте файл .env.")          
       sys.exit()

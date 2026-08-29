@@ -120,7 +120,7 @@ sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\'$PWD\'|" ./run/run_data.py
 source ./run/run_data.py # Аналог import run_data
 
 for var in PROJECT_DIR VENV_DIR VENV_NAME DATA_DIR DATA_FILE \
-            desired_version BASEMENT_MAC OPENWEATHER_API_KEY \
+            desired_version BASEMENT_MAC SITE_WEATHER_API_KEY \
             LOCATION_LAT LOCATION_LON; do
     if [ -z "${!var}" ]; then
         echo "Ошибка: Переменная $var не определена в файле run_data.sh"
@@ -234,7 +234,7 @@ if [ "$env_dir" -eq 0 ]; then
     echo "BASEMENT_MAC = '$BASEMENT_MAC'" >> $ENV_FILE
     echo "FLOOR_MAC = '$FLOOR_MAC'" >> $ENV_FILE
     echo " " >> $ENV_FILE
-    echo "OPENWEATHER_API_KEY = '$OPENWEATHER_API_KEY'" >> $ENV_FILE
+    echo "SITE_WEATHER_API_KEY = '$SITE_WEATHER_API_KEY'" >> $ENV_FILE
     echo " " >> $ENV_FILE
     echo "LOCATION_LAT = '$LOCATION_LAT'" >> $ENV_FILE
     echo "LOCATION_LON = '$LOCATION_LON'" >> $ENV_FILE

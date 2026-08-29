@@ -12,14 +12,14 @@ work_log = logging.getLogger("climat_app.weather_service")
 
 # def fetch_openweathermap_data():
 #     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
-#     if not config.OPENWEATHER_API_KEY:
-#         work_log.warning("[WeatherAPI] OPENWEATHER_API_KEY не установлен в settings/env.")
+#     if not config.SITE_WEATHER_API_KEY:
+#         work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
 #         return None
 
 #     url = (
 #         f"https://api.openweathermap.org/data/2.5/weather?"
 #         f"lat={config.LOCATION_LAT}&lon={config.LOCATION_LON}"
-#         f"&appid={config.OPENWEATHER_API_KEY}&units=metric"
+#         f"&appid={config.SITE_WEATHER_API_KEY}&units=metric"
 #     )
 
 #     try:
@@ -41,14 +41,14 @@ work_log = logging.getLogger("climat_app.weather_service")
 
 def fetch_openweathermap_data():
     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
-    if not config.OPENWEATHER_API_KEY:
-        work_log.warning("[WeatherAPI] OPENWEATHER_API_KEY не установлен в settings/env.")
+    if not config.SITE_WEATHER_API_KEY:
+        work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
         return None
 
     url = (
         f"https://api.tomorrow.io/v4/weather/realtime?"
         f"location={config.LOCATION_LAT},{config.LOCATION_LON}"
-        f"&apikey={config.OPENWEATHER_API_KEY}"
+        f"&apikey={config.SITE_WEATHER_API_KEY}"
     )
 
     try:

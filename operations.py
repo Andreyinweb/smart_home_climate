@@ -12,18 +12,19 @@ work_log = logging.getLogger("climat_app.operations")
 def settings_in_db():    
     latest_settings = models.get_latest_climate_data('settings_table')
     if latest_settings:
-        settings_in_db = latest_settings[0]
-        DATE_SETINGS = settings_in_db['timestamp']
-        MODE = settings_in_db['mode']
-        INTERVAL_SECONDS = settings_in_db['interval_seconds']
-        WEBSITE_RETURN_TIME = settings_in_db['website_return_time']
-        MAX_RETRIES = settings_in_db['max_retries']
-        T_FLOOR_MAC_DIFF = settings_in_db['t_floor_mac_diff']
-        ABSOLUTE_HUMIDITY_TOLERANCE = settings_in_db['absolute_humidity_tolerance']
-        MINIMUM_HUMIDITY = settings_in_db['minimum_humidity']
-        TARGET_RH = settings_in_db['target_rh']
-        DANGEROUS_HUMIDITY = settings_in_db['dangerous_humidity']
-        PRICE_GAS = settings_in_db['price_gas']
+        settings_in_db = latest_settings[0]   
+        DATE_SETINGS = settings_in_db['timestamp'] # 0
+        MODE = settings_in_db['mode']              # 1
+        INTERVAL_SECONDS = settings_in_db['interval_seconds'] # 2
+        WEBSITE_RETURN_TIME = settings_in_db['website_return_time'] # 3
+        MAX_RETRIES = settings_in_db['max_retries'] # 4
+        T_FLOOR_MAC_DIFF = settings_in_db['t_floor_mac_diff'] # 5
+        ABSOLUTE_HUMIDITY_TOLERANCE = settings_in_db['absolute_humidity_tolerance'] # 6
+        MINIMUM_HUMIDITY = settings_in_db['minimum_humidity'] # 7
+        TARGET_RH = settings_in_db['target_rh']  # 8
+        DANGEROUS_HUMIDITY =settings_in_db['dangerous_humidity'] # 9
+        PRICE_GAS = settings_in_db['price_gas'] # 10
+
     else:
         work_log.error("Невозможно получить данные из базы settings_table.")
         exit(1)
