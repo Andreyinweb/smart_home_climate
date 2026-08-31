@@ -6,8 +6,10 @@ import calendar
 from datetime import datetime, timedelta
 import logging
 import models
+from settings import config
 
 work_log = logging.getLogger("climat_app.operations")
+api_log = logging.getLogger("api_app.api")
 
 def settings_in_db():    
     latest_settings = models.get_latest_climate_data('settings_table')
@@ -24,6 +26,7 @@ def settings_in_db():
         TARGET_RH = settings_in_db['target_rh']  # 8
         DANGEROUS_HUMIDITY =settings_in_db['dangerous_humidity'] # 9
         PRICE_GAS = settings_in_db['price_gas'] # 10
+        HOT_WATER_PER_HOUR = settings_in_db['hot_water_per_hour'] # 11
 
     else:
         work_log.error("Невозможно получить данные из базы settings_table.")
@@ -31,7 +34,7 @@ def settings_in_db():
 
     return (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
              MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
-             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS)
+             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS,HOT_WATER_PER_HOUR)
 
 def calculate_absolute_humidity(temp: float, humi: float) -> float:
     """
@@ -113,32 +116,7 @@ def calculating_temperature_from_humidity(temp: float, ah: float):
     
     return temp_heating, round(delta * 0.1, 1)
 
-def coefficient_gas(street_temp: float, basement_temp: float, gas_difference: float, timestamp: str) -> float:
-    """Расчет коэффициента расхода газа."""
-    if street_temp is None or basement_temp is None or gas_difference is None or timestamp is None:
-        return 0.0
 
-    temp_diff = abs(basement_temp - street_temp)
-    if temp_diff == 0:
-        return 0.0
-
-    try:
-        dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        return 0.0
-
-    hours_passed = (dt.day - 1) * 24 + dt.hour + dt.minute / 60 + dt.second / 3600
-
-    if hours_passed == 0:
-        return 0.0
-
-    days_in_month = calendar.monthrange(dt.year, dt.month)[1]
-
-    gas_per_hour = gas_difference / hours_passed
-    gas_per_month = gas_per_hour * 24 * days_in_month
-
-    coefficient = round(gas_per_month / temp_diff, 3)
-    return coefficient
 
 def get_time_difference_str(start_str: str, end_str: str, fmt: str = "%H:%M") -> str:
     t_start = datetime.strptime(start_str, fmt)
@@ -189,3 +167,116 @@ def create_backup(source_file, backup_dir, max_backups=100):
         work_log.error(f"Ошибка при создании резервной копии: {e}")
         print(f"Ошибка: {e}")
         return None
+
+################################################ ГАЗ  ###############################################
+def coefficient_gas(street_temp: float, basement_temp: float, gas_difference: float, timestamp: str) -> float:
+    """Расчет коэффициента расхода газа."""
+    if street_temp is None or basement_temp is None or gas_difference is None or timestamp is None:
+        return 0.0
+
+    temp_diff = abs(basement_temp - street_temp)
+    if temp_diff == 0:
+        return 0.0
+
+    try:
+        dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return 0.0
+
+    hours_passed = (dt.day - 1) * 24 + dt.hour + dt.minute / 60 + dt.second / 3600
+
+    if hours_passed == 0:
+        return 0.0
+
+    days_in_month = calendar.monthrange(dt.year, dt.month)[1]
+
+    gas_per_hour = gas_difference / hours_passed
+    gas_per_month = gas_per_hour * 24 * days_in_month
+
+    coefficient = round(gas_per_month / temp_diff, 3)
+    return coefficient
+
+
+def update_gas_meter(gas_meter, start_of_month_gas=None)-> bool:
+    """
+    Обновляет данные счетчика газа в базе данных.
+    
+    :param gas_meter: Текущее значение счетчика газа.
+    :param start_of_month_gas: Значение счетчика газа на начало месяца (опционально).
+    """
+    """ 
+    id INTEGER , +
+    timestamp TEXT NOT NULL,+
+    gas_meter REAL,+
+    start_of_month_gas_meter REAL,+
+    gas_difference REAL,+
+    average_street_temp REAL,+
+    average_basement_temp REAL,+
+    delta_T REAL,+
+    coefficient_gas REAL,+
+    gas_per_hour REAL,
+    gas_per_month REAL,
+    hot_water_per_month REAL,
+    hot_water_per_hour REAL,
+    price_gas REAL,
+    cost_of_gas REAL,
+    gas_forecast REAL,
+    projected_price REAL
+    """
+
+    gas_out_db = {}
+    latest_sensor = models.get_latest_climate_data("table_sensor_data")
+    if latest_sensor:
+        last_sensor_id = latest_sensor[0]["id"]
+        gas_out_db['timestamp'] = latest_sensor[0]["timestamp"]        
+        gas_out_db['gas_meter'] = gas_meter
+        latest_gas = models.get_latest_climate_data("gas_table")
+
+        # Определение значения начала месяца
+        if start_of_month_gas is not None:
+            gas_out_db['start_of_month_gas_meter'] = start_of_month_gas
+        elif latest_gas and latest_gas[0].get("start_of_month_gas_meter") is not None:
+            gas_out_db['start_of_month_gas_meter'] = latest_gas[0]["start_of_month_gas_meter"]
+        else:
+            gas_out_db['start_of_month_gas_meter'] = config.START_OF_MONTH_GAS_METER
+
+        # Расчет разницы, коэффициента и стоимости
+        gas_out_db['gas_difference'] = round(gas_meter - gas_out_db['start_of_month_gas_meter'], 3)
+
+        average_street_temp = models.get_interval_average('table_sensor_data', 'street_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
+        average_basement_temp = models.get_interval_average('table_sensor_data', 'basement_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
+
+        gas_out_db['average_street_temp'] = average_street_temp
+        gas_out_db['average_basement_temp'] = average_basement_temp
+        gas_out_db['delta_T'] = round(average_basement_temp - average_street_temp, 2)
+
+        gas_out_db['coefficient_gas'] = coefficient_gas(
+            average_street_temp, 
+            average_basement_temp, 
+            gas_out_db['gas_difference'], 
+            latest_sensor[0]["timestamp"]
+        )
+        gas_out_db['hot_water_per_hour'] = settings_in_db()[11]  # HOT_WATER_PER_HOUR
+        gas_out_db['price_gas'] = settings_in_db()[10]
+        gas_out_db['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
+
+        if latest_gas:            
+            prev_gas = latest_gas[0].get("gas_meter")
+            prev_start = latest_gas[0].get("start_of_month_gas_meter")
+            prev_id = latest_gas[0].get("id")
+
+            # Записываем в БД, если изменилось текущее значение, значение начала месяца или id записи
+            if (prev_gas != gas_meter) or (prev_start != gas_out_db['start_of_month_gas_meter']) or (prev_id != last_sensor_id):
+                models.write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
+                api_log.info(f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
+            else:
+                api_log.info(f"[БД] Значение счетчика газа в gas_table (id={last_sensor_id}) не изменилось: {gas_meter}")
+        else:
+            models.write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
+            api_log.info(f"[БД] Успешно создан и обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
+
+        return True
+
+    else:
+        api_log.warning("table_sensor_data пуста, не удалось обновить счетчик газа")
+        return False

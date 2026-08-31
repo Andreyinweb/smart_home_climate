@@ -10,8 +10,8 @@ import operations
 
 work_log = logging.getLogger("climat_app.weather_service")
 
-# def fetch_openweathermap_data():
-#     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
+# def fetch_site_weather_data():
+#     """Запрашивает данные о погоде с openweathermap.org API по координатам."""
 #     if not config.SITE_WEATHER_API_KEY:
 #         work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
 #         return None
@@ -39,8 +39,8 @@ work_log = logging.getLogger("climat_app.weather_service")
 
 #     return None
 
-def fetch_openweathermap_data():
-    """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
+def fetch_site_weather_data():
+    """Запрашивает данные о погоде с tomorrow.io API по координатам."""
     if not config.SITE_WEATHER_API_KEY:
         work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
         return None
@@ -71,7 +71,7 @@ def fetch_openweathermap_data():
 
 def record_site_weather(timestamp: str = None, id: int = None):
     """Получает текущую погоду с сайта, высчитывает AH и записывает в weather_site_table."""
-    weather_data = fetch_openweathermap_data()
+    weather_data = fetch_site_weather_data()
     if not weather_data:
         work_log.warning("[WeatherAPI] Не удалось получить данные с OpenWeatherMap.")
         return None

@@ -36,7 +36,7 @@ async def polling_task():
         # 1. Загрузка настроек из базы данных
         (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
              MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
-             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
+             MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS,HOT_WATER_PER_HOUR) = operations.settings_in_db()
                 
         if before_db:
             now_id = before_db['id'] + 1

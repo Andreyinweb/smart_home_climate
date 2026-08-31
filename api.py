@@ -63,7 +63,7 @@ async def get_dashboard(request: Request):
     # Загрузка переменных из базы данных
     (DATE_SETINGS, MODE, INTERVAL_SECONDS, WEBSITE_RETURN_TIME,
     MAX_RETRIES, T_FLOOR_MAC_DIFF, ABSOLUTE_HUMIDITY_TOLERANCE, 
-    MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS) = operations.settings_in_db()
+    MINIMUM_HUMIDITY, TARGET_RH, DANGEROUS_HUMIDITY, PRICE_GAS,HOT_WATER_PER_HOUR) = operations.settings_in_db()
 
     latest_records_api = get_latest_climate_data("api_table")
     latest_records_sensor = get_latest_climate_data("table_sensor_data")
@@ -621,57 +621,8 @@ async def update_gas_meter(request: Request):
             api_log.warning(
                 "Не удалось преобразовать значение start_of_month_gas_meter в число"
             )
-
-    gas_out_db = {}
-    latest_sensor = get_latest_climate_data("table_sensor_data")
-    if latest_sensor:
-        last_sensor_id = latest_sensor[0]["id"]
-        gas_out_db['timestamp'] = latest_sensor[0]["timestamp"]        
-        gas_out_db['gas_meter'] = gas_meter
-        latest_gas = get_latest_climate_data("gas_table")
-
-        # Определение значения начала месяца
-        if start_of_month_gas is not None:
-            gas_out_db['start_of_month_gas_meter'] = start_of_month_gas
-        elif latest_gas and latest_gas[0].get("start_of_month_gas_meter") is not None:
-            gas_out_db['start_of_month_gas_meter'] = latest_gas[0]["start_of_month_gas_meter"]
-        else:
-            gas_out_db['start_of_month_gas_meter'] = config.START_OF_MONTH_GAS_METER
-
-        # Расчет разницы, коэффициента и стоимости
-        gas_out_db['gas_difference'] = round(gas_meter - gas_out_db['start_of_month_gas_meter'], 3)
-
-        average_street_temp = get_interval_average('table_sensor_data', 'street_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
-        average_basement_temp = get_interval_average('table_sensor_data', 'basement_temp', interval_type='month', target_time=latest_sensor[0]["timestamp"][0:7])
-
-        gas_out_db['coefficient_gas'] = operations.coefficient_gas(
-            average_street_temp, 
-            average_basement_temp, 
-            gas_out_db['gas_difference'], 
-            latest_sensor[0]["timestamp"]
-        )
-        gas_out_db['price_gas'] = operations.settings_in_db()[10]
-        gas_out_db['cost_of_gas'] = round(gas_out_db['gas_difference'] * gas_out_db['price_gas'], 2)
-
-        if latest_gas:            
-            prev_gas = latest_gas[0].get("gas_meter")
-            prev_start = latest_gas[0].get("start_of_month_gas_meter")
-            prev_id = latest_gas[0].get("id")
-
-            # Записываем в БД, если изменилось текущее значение, значение начала месяца или id записи
-            if (prev_gas != gas_meter) or (prev_start != gas_out_db['start_of_month_gas_meter']) or (prev_id != last_sensor_id):
-                write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
-                api_log.info(f"[БД] Успешно обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
-            else:
-                api_log.info(f"[БД] Значение счетчика газа в gas_table (id={last_sensor_id}) не изменилось: {gas_meter}")
-        else:
-            write_climate_data("gas_table", gas_out_db, row_id=last_sensor_id)
-            api_log.info(f"[БД] Успешно создан и обновлен счетчик газа в gas_table (id={last_sensor_id}): {gas_meter}")
-
-    else:
-        api_log.warning(
-            "table_sensor_data пуста, не удалось обновить счетчик газа"
-        )
+    # Обновление показаний счетчика газа в таблице gas_table
+    operations.update_gas_meter(gas_meter, start_of_month_gas=start_of_month_gas)
 
     return RedirectResponse(url="/gas", status_code=303)
 
@@ -693,6 +644,7 @@ async def get_settings_page(request: Request):
             "target_rh": config.TARGET_RH,
             "dangerous_humidity": config.DANGEROUS_HUMIDITY,
             "price_gas": config.PRICE_GAS,
+            "hot_water_per_hour": config.HOT_WATER_PER_HOUR,
         }
     else:
         settings_dict = latest_settings[0]
@@ -760,6 +712,7 @@ async def update_settings(request: Request):
             "dangerous_humidity", config.DANGEROUS_HUMIDITY, float
         ),
         "price_gas": parse_field("price_gas", config.PRICE_GAS, float),
+        "hot_water_per_hour": parse_field("hot_water_per_hour", config.HOT_WATER_PER_HOUR, float),
     }
 
     success = write_climate_data("settings_table", settings_to_write, row_id=1)

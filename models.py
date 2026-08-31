@@ -215,40 +215,6 @@ def get_calibration_data(max_time_diff_seconds: int = 600) -> list:
         work_log.error(f"[БД] Ошибка запроса данных для калибровки: {e}")
         return []
 
-work_log.info("-" * 60)
-work_log.info(f"Программа запущена. MODE = {config.MODE}.")
-settings_out_db = {}
-
-latest_settings = get_latest_climate_data('settings_table')
-if not latest_settings:
-    settings_out_db['mode'] = config.MODE
-    settings_out_db['interval_seconds'] = config.INTERVAL_SECONDS
-    settings_out_db['max_retries'] = config.MAX_RETRIES
-    settings_out_db['website_return_time'] = config.WEBSITE_RETURN_TIME
-    settings_out_db['absolute_humidity_tolerance'] = config.ABSOLUTE_HUMIDITY_TOLERANCE
-    settings_out_db['minimum_humidity'] = config.MINIMUM_HUMIDITY
-    settings_out_db['target_rh'] = config.TARGET_RH
-    settings_out_db['dangerous_humidity'] = config.DANGEROUS_HUMIDITY
-    settings_out_db['price_gas'] = config.PRICE_GAS
-    settings_out_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-else:
-    settings_out_db = latest_settings[0]
-
-latest_records = get_latest_climate_data('table_sensor_data')
-if latest_records:
-    in_db_sensor_data = latest_records[0]
-    if in_db_sensor_data.get('average_temp'):
-        settings_out_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
-        settings_out_db['timestamp'] = in_db_sensor_data['timestamp']
-        config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
-    else:
-        settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
-else:
-    settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
-
-write_climate_data('settings_table', settings_out_db, row_id=1)
-
-######################################
 def get_interval_average(
     name_table: str,
     column_name: str,
@@ -319,3 +285,39 @@ def get_interval_average(
         work_log.error(f"[БД] Ошибка вычисления среднего значения {column_name} в {name_table}: {e}")
         print(f"[БД] Ошибка вычисления среднего значения {column_name} в {name_table}: {e}")
         return None
+    
+######################################
+
+work_log.info("-" * 60)
+work_log.info(f"Программа запущена. MODE = {config.MODE}.")
+settings_out_db = {}
+
+latest_settings = get_latest_climate_data('settings_table')
+if not latest_settings:
+    settings_out_db['mode'] = config.MODE
+    settings_out_db['interval_seconds'] = config.INTERVAL_SECONDS
+    settings_out_db['max_retries'] = config.MAX_RETRIES
+    settings_out_db['website_return_time'] = config.WEBSITE_RETURN_TIME
+    settings_out_db['absolute_humidity_tolerance'] = config.ABSOLUTE_HUMIDITY_TOLERANCE
+    settings_out_db['minimum_humidity'] = config.MINIMUM_HUMIDITY
+    settings_out_db['target_rh'] = config.TARGET_RH
+    settings_out_db['dangerous_humidity'] = config.DANGEROUS_HUMIDITY
+    settings_out_db['price_gas'] = config.PRICE_GAS
+    settings_out_db['hot_water_per_hour'] = config.HOT_WATER_PER_HOUR
+    settings_out_db['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+else:
+    settings_out_db = latest_settings[0]
+
+latest_records = get_latest_climate_data('table_sensor_data')
+if latest_records:
+    in_db_sensor_data = latest_records[0]
+    if in_db_sensor_data.get('average_temp'):
+        settings_out_db['t_floor_mac_diff'] = in_db_sensor_data['average_temp']
+        settings_out_db['timestamp'] = in_db_sensor_data['timestamp']
+        config.T_FLOOR_MAC_DIFF = in_db_sensor_data['average_temp']
+    else:
+        settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
+else:
+    settings_out_db['t_floor_mac_diff'] = config.T_FLOOR_MAC_DIFF
+
+write_climate_data('settings_table', settings_out_db, row_id=1)

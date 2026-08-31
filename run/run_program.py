@@ -109,7 +109,8 @@ fields_db = """ (
     minimum_humidity  REAL,
     target_rh REAL,
     dangerous_humidity REAL,
-    price_gas REAL   
+    price_gas REAL,
+    hot_water_per_hour REAL   
     )
     """
 create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
@@ -148,11 +149,11 @@ fields_db = """ (
     average_street_temp REAL,
     average_basement_temp REAL,
     delta_T REAL,
-    coefficient_gas REAL,
     gas_per_hour REAL,
     gas_per_month REAL,
     hot_water_per_month REAL,
     hot_water_per_hour REAL,
+    coefficient_gas REAL,
     price_gas REAL,
     cost_of_gas REAL,
     gas_forecast REAL,
