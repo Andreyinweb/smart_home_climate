@@ -11,7 +11,7 @@ import operations
 work_log = logging.getLogger("climat_app.weather_service")
 
 # def fetch_site_weather_data():
-#     """Запрашивает данные о погоде с openweathermap.org API по координатам."""
+#     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
 #     if not config.SITE_WEATHER_API_KEY:
 #         work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
 #         return None

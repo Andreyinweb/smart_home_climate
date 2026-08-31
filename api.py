@@ -611,6 +611,14 @@ async def update_gas_meter(request: Request):
             "Не удалось преобразовать значение gas_meter в число с плавающей точкой"
         )
         return RedirectResponse(url="/gas", status_code=303)
+    
+    # Обновление показаний счетчика газа в таблице gas_table
+    if gas_meter:
+        gas_out_db = operations.calc_gas_meter(gas_meter)
+        # Записываем в БД, если изменилось текущее значение, значение начала месяца или id записи
+        if gas_out_db:
+            write_climate_data("gas_table", gas_out_db, row_id=gas_out_db["id"])
+            api_log.info(f"Успешно обновлен счетчик газа в gas_table (id={gas_out_db["id"]}): {gas_meter}")
 
     # Обработка введенного показания на начало месяца (если указано)
     start_of_month_gas = None
@@ -621,8 +629,12 @@ async def update_gas_meter(request: Request):
             api_log.warning(
                 "Не удалось преобразовать значение start_of_month_gas_meter в число"
             )
-    # Обновление показаний счетчика газа в таблице gas_table
-    operations.update_gas_meter(gas_meter, start_of_month_gas=start_of_month_gas)
+        if start_of_month_gas:
+            db_month_gas = operations.calc_of_month_gas(start_of_month_gas)
+            if db_month_gas:
+                api_log.info(f"Успешно обновлен счетчик газа на начало месяца: {start_of_month_gas}")
+            else:
+                api_log.warning(f"Не удалось обновит счетчик газа на начало месяца: {start_of_month_gas}")
 
     return RedirectResponse(url="/gas", status_code=303)
 
