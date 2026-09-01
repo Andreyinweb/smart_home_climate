@@ -736,3 +736,21 @@ async def update_settings(request: Request):
         api_log.error("[БД] Ошибка при записи новых настроек в settings_table")
 
     return RedirectResponse(url="/settings", status_code=303)
+
+##################################################
+
+@app.get("/gas/table", response_class=HTMLResponse)
+async def get_gas_table_page(request: Request):
+    """Страница отображения таблицы с последней строкой данных из gas_table."""
+    WEBSITE_RETURN_TIME = operations.settings_in_db()[3]
+    latest_records = get_latest_climate_data("gas_table")
+    gas_data = latest_records[0] if latest_records else {}
+
+    context = {
+        "website_return_time": WEBSITE_RETURN_TIME,
+        "gas_data": gas_data,
+    }
+
+    return templates.TemplateResponse(
+        request=request, name="gas_table.html", context=context
+    )

@@ -47,9 +47,9 @@ class XiaomiBLEReceiver:
         def notification_handler(sender, data: bytes):
             temp, humi, voltage = self._parse_xiaomi_pack(data)
             if temp is not None:
-                result["temp"] = temp
-                result["humi"] = humi
-                result["voltage"] = voltage
+                result["temp"] = round(temp, 1)
+                result["humi"] = round(humi, 1)
+                result["voltage"] = round(voltage, 3)
                 data_received.set()
 
         try:
