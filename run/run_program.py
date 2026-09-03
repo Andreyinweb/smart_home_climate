@@ -187,7 +187,8 @@ fields_db = """ (
     basement_humi_heated REAL,
     a_basement_humi_heated REAL,
     floor_humi_heated REAL,
-    a_floor_humi_heated REAL
+    a_floor_humi_heated REAL,
+    last_graph_sensor_id INTEGER
     )
     """
 create_table(db_path=database_file, table_name='api_table', fields=fields_db)

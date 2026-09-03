@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import operations
-from models import get_db_connection, get_latest_climate_data, write_climate_data, get_interval_average
+from models import get_db_connection, get_latest_climate_data, write_climate_data, get_interval_average, get_db_connection, update_graphs_cache_if_needed
 from settings import config
 
 api_log = logging.getLogger("api_app.api")
@@ -737,8 +737,6 @@ async def update_settings(request: Request):
 
     return RedirectResponse(url="/settings", status_code=303)
 
-##################################################
-
 @app.get("/gas/table", response_class=HTMLResponse)
 async def get_gas_table_page(request: Request):
     """Страница отображения таблицы с последней строкой данных из gas_table."""
@@ -753,4 +751,35 @@ async def get_gas_table_page(request: Request):
 
     return templates.TemplateResponse(
         request=request, name="gas_table.html", context=context
+    )
+
+##################################################################################
+
+@app.get("/graphs/temperature")
+def get_temperature_page(request: Request):
+    conn = get_db_connection()
+    try:
+        update_graphs_cache_if_needed(conn)
+    finally:
+        conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="temperature.html",
+        context={"graph_url": "/static/graphs/temperature.png"}
+    )
+
+
+@app.get("/graphs/humidity")
+def get_humidity_page(request: Request):
+    conn = get_db_connection()
+    try:
+        update_graphs_cache_if_needed(conn)
+    finally:
+        conn.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="humidity.html",
+        context={"graph_url": "/static/graphs/humidity.png"}
     )

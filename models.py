@@ -287,6 +287,64 @@ def get_interval_average(
         return None
     
 ######################################
+def get_sensor_data_for_graphs(db_conn):
+    """
+    Выборка данных за последние ~48 часов относительно последней имеющейся записи в БД.
+    Без жесткой фильтрации по минутам, чтобы не пропадали данные при пропусках.
+    """
+    query = """
+        SELECT id, timestamp, street_temp, basement_temp, floor_temp, 
+               street_humi, basement_humi, floor_humi
+        FROM table_sensor_data
+        WHERE timestamp >= datetime((SELECT MAX(timestamp) FROM table_sensor_data), '-24 hours')
+        ORDER BY timestamp ASC;
+    """
+    cursor = db_conn.cursor()
+    cursor.execute(query)
+    return cursor.fetchall()
+
+
+def update_graphs_cache_if_needed(db_conn):
+    """
+    Проверяет, появились ли новые записи в table_sensor_data.
+    Если появились новые данные — перерисовывает картинки.
+    """
+    from graph_builder import render_sensor_graphs
+
+    cursor = db_conn.cursor()
+
+    # 0. Авто-создание столбца, если его нет в api_table
+    try:
+        cursor.execute("SELECT last_graph_sensor_id FROM api_table LIMIT 1;")
+    except Exception:
+        cursor.execute("ALTER TABLE api_table ADD COLUMN last_graph_sensor_id INTEGER DEFAULT 0;")
+        db_conn.commit()
+
+    # 1. Получаем MAX(id) из датчиков
+    cursor.execute("SELECT MAX(id) FROM table_sensor_data;")
+    max_sensor_id = cursor.fetchone()[0] or 0
+
+    # 2. Получаем last_graph_sensor_id из api_table
+    cursor.execute("SELECT last_graph_sensor_id FROM api_table LIMIT 1;")
+    row = cursor.fetchone()
+    last_processed_id = row[0] if row and row[0] is not None else 0
+
+    # 3. Перерисовываем при необходимости
+    if max_sensor_id > last_processed_id:
+        data = get_sensor_data_for_graphs(db_conn)
+        if data:
+            render_sensor_graphs(data)
+            
+            # Обновляем отметку обработанного ID
+            cursor.execute(
+                "UPDATE api_table SET last_graph_sensor_id = ?;", 
+                (max_sensor_id,)
+            )
+            db_conn.commit()
+
+
+
+############################################################################################
 
 work_log.info("-" * 60)
 work_log.info(f"Программа запущена. MODE = {config.MODE}.")
