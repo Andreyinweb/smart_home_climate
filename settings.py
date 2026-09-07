@@ -14,6 +14,7 @@ class AppConfig:
    API_LOG: str = os.environ.get("API_LOG", f"{PROJECT_DIR}/logs/api_log.log")
    BACKUP: str = os.environ.get("BACKUP", f"{PROJECT_DIR}/backup")
    # APP start configuration
+   SITE_WEATHER =  "tomorrow"      # "tomorrow"  # "openweathermap" 
    MODE = "BASEMENT_STREET_FLOOR"  # Есть датчик температуры пола, всего 3 датчика: у улицы, в подвале и у пола
    # MODE = "BASEMENT_STREET"  # Расчёт температуры у пола, всего 2 датчика: у улицы и в подвале
    # MODE = "BASEMENT_FLOOR"  # Расчёт температуры у пола, всего 2 датчика: в подвале и у пола

@@ -10,70 +10,77 @@ import operations
 
 work_log = logging.getLogger("climat_app.weather_service")
 
-# def fetch_site_weather_data():
-#     """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
-#     if not config.SITE_WEATHER_API_KEY:
-#         work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
-#         return None
-
-#     url = (
-#         f"https://api.openweathermap.org/data/2.5/weather?"
-#         f"lat={config.LOCATION_LAT}&lon={config.LOCATION_LON}"
-#         f"&appid={config.SITE_WEATHER_API_KEY}&units=metric"
-#     )
-
-#     try:
-#         req = urllib.request.Request(url, headers={'User-Agent': 'ClimatApp/1.0'})
-#         with urllib.request.urlopen(req, timeout=10) as response:
-#             if response.status == 200:
-#                 data = json.loads(response.read().decode('utf-8'))
-#                 temp = float(data['main']['temp'])
-#                 humi = float(data['main']['humidity'])
-#                 return {'temp': temp, 'humi': humi}
-#             else:
-#                 work_log.error(f"[WeatherAPI] Код ответа сервера: {response.status}")
-#     except urllib.error.URLError as e:
-#         work_log.error(f"[WeatherAPI] Ошибка подключения к OpenWeatherMap: {e}")
-#     except Exception as e:
-#         work_log.error(f"[WeatherAPI] Ошибка при запросе погоды: {e}")
-
-#     return None
-
 def fetch_site_weather_data():
-    """Запрашивает данные о погоде с tomorrow.io API по координатам."""
-    if not config.SITE_WEATHER_API_KEY:
-        work_log.warning("[WeatherAPI] SITE_WEATHER_API_KEY не установлен в settings/env.")
+
+    if config.SITE_WEATHER == "openweathermap":
+        
+        """Запрашивает данные о погоде с OpenWeatherMap API по координатам."""
+        if not config.SITE_WEATHER_API_KEY:
+            work_log.warning("[OpenWeatherMap] SITE_WEATHER_API_KEY не установлен в settings/env.")
+            return None
+
+        url = (
+            f"https://api.openweathermap.org/data/2.5/weather?"
+            f"lat={config.LOCATION_LAT}&lon={config.LOCATION_LON}"
+            f"&appid={config.SITE_WEATHER_API_KEY}&units=metric"
+        )
+
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'ClimatApp/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8'))
+                    temp = float(data['main']['temp'])
+                    humi = float(data['main']['humidity'])
+                    return {'temp': temp, 'humi': humi}
+                else:
+                    work_log.error(f"[OpenWeatherMap] Код ответа сервера: {response.status}")
+        except urllib.error.URLError as e:
+            work_log.error(f"[OpenWeatherMap] Ошибка подключения к OpenWeatherMap: {e}")
+        except Exception as e:
+            work_log.error(f"[OpenWeatherMap] Ошибка при запросе погоды: {e}")
+
         return None
-
-    url = (
-        f"https://api.tomorrow.io/v4/weather/realtime?"
-        f"location={config.LOCATION_LAT},{config.LOCATION_LON}"
-        f"&apikey={config.SITE_WEATHER_API_KEY}"
-    )
-
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'ClimatApp/1.0'})
-        with urllib.request.urlopen(req, timeout=10) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode('utf-8'))
-                values = data['data']['values']
-                temp = float(values['temperature'])
-                humi = float(values['humidity'])
-                return {'temp': temp, 'humi': humi}
-            else:
-                work_log.error(f"[WeatherAPI] Код ответа сервера: {response.status}")
-    except urllib.error.URLError as e:
-        work_log.error(f"[WeatherAPI] Ошибка подключения к Tomorrow.io: {e}")
-    except Exception as e:
-        work_log.error(f"[WeatherAPI] Ошибка при запросе погоды: {e}")
-
-    return None
+    
+    elif config.SITE_WEATHER == "tomorrow":
+        """Запрашивает данные о погоде с tomorrow.io API по координатам."""
+        if not config.SITE_WEATHER_API_KEY:
+            work_log.warning("[Tomorrow] SITE_WEATHER_API_KEY не установлен в settings/env.")
+            return None
+    
+        url = (
+            f"https://api.tomorrow.io/v4/weather/realtime?"
+            f"location={config.LOCATION_LAT},{config.LOCATION_LON}"
+            f"&apikey={config.SITE_WEATHER_API_KEY}"
+        )
+    
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'ClimatApp/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8'))
+                    values = data['data']['values']
+                    temp = float(values['temperature'])
+                    humi = float(values['humidity'])
+                    return {'temp': temp, 'humi': humi}
+                else:
+                    work_log.error(f"[WeatherAPI] Код ответа сервера: {response.status}")
+        except urllib.error.URLError as e:
+            work_log.error(f"[Tomorrow] Ошибка подключения к Tomorrow.io: {e}")
+        except Exception as e:
+            work_log.error(f"[Tomorrow] Ошибка при запросе погоды: {e}")
+    
+        return None
+    else:
+        work_log.warning(f"Неизвестный источник погоды: {config.SITE_WEATHER}")
+        return None
+    
 
 def record_site_weather(timestamp: str = None, id: int = None):
     """Получает текущую погоду с сайта, высчитывает AH и записывает в weather_site_table."""
     weather_data = fetch_site_weather_data()
     if not weather_data:
-        work_log.warning("[WeatherAPI] Не удалось получить данные с OpenWeatherMap.")
+        work_log.warning(f" Не удалось получить данные с {config.SITE_WEATHER}.")
         return None
 
     site_temp = weather_data['temp']
@@ -92,7 +99,7 @@ def record_site_weather(timestamp: str = None, id: int = None):
     }
 
     if models.write_climate_data('weather_site_table', data_to_write):
-        work_log.info(f"[WeatherAPI] Записаны данные с сайта ({timestamp}): T={site_temp}°C, RH={site_humi}%, AH={site_ah}г/м³")
+        work_log.info(f"[{config.SITE_WEATHER}] Записаны данные с сайта ({timestamp}): T={site_temp}°C, RH={site_humi}%, AH={site_ah}г/м³")
         return data_to_write
     return None
 
