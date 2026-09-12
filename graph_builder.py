@@ -107,48 +107,94 @@ def sample_points_to_target(data_rows: list, vent_events: list = None, heat_even
 
     return [data_rows[i] for i in final_indices]
 
-def get_event_spans(data_rows: list, status_key: str):
+##########################################################################################
+def get_event_spans(events: list, data_rows: list, start_key: str, stop_key: str) -> list:
     """
-    Возвращает список временных интервалов (dt_start, dt_end) активных режимов.
+    Возвращает список временных интервалов (dt_start, dt_end) для закрашивания фона (axvspan)
+    строго по фактическим событиям из ventilation_table и heating_table.
     """
+    if not data_rows:
+        return []
+
+    def parse_dt(ts):
+        if isinstance(ts, datetime):
+            return ts
+        if isinstance(ts, str):
+            try:
+                return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return datetime.strptime(ts, "%Y-%m-%d %H:%M")
+        return ts
+
+    # Карта id -> datetime из всех доступных точек датчиков
+    id_to_dt = {}
+    for r in data_rows:
+        r_id = r.get('id') if isinstance(r, dict) else r[0]
+        r_ts = r.get('timestamp') if isinstance(r, dict) else r[1]
+        if r_id is not None and r_ts is not None:
+            id_to_dt[r_id] = parse_dt(r_ts)
+
+    if not id_to_dt:
+        return []
+
+    sorted_ids = sorted(id_to_dt.keys())
+    min_id = sorted_ids[0]
+    max_id = sorted_ids[-1]
+    min_dt = id_to_dt[min_id]
+    max_dt = id_to_dt[max_id]
+
     spans = []
-    start_dt = None
-    
-    for row in data_rows:
-        ts = row['timestamp']
-        dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") if isinstance(ts, str) and len(ts) >= 19 else datetime.strptime(ts, "%Y-%m-%d %H:%M") if isinstance(ts, str) else ts
-        is_active = bool(row.get(status_key, 0))
-        
-        if is_active and start_dt is None:
-            start_dt = dt
-        elif not is_active and start_dt is not None:
-            spans.append((start_dt, dt))
-            start_dt = None
-            
-    if start_dt is not None and data_rows:
-        ts_last = data_rows[-1]['timestamp']
-        dt_last = datetime.strptime(ts_last, "%Y-%m-%d %H:%M:%S") if isinstance(ts_last, str) and len(ts_last) >= 19 else ts_last
-        spans.append((start_dt, dt_last))
-        
+    if events:
+        for ev in events:
+            start_id = ev.get(start_key)
+            stop_id = ev.get(stop_key, 0)
+
+            if not start_id:
+                continue
+
+            # Отсекаем события вне временного окна графика
+            if stop_id and stop_id != 0 and stop_id < min_id:
+                continue
+            if start_id > max_id:
+                continue
+
+            # Точка старта
+            if start_id in id_to_dt:
+                dt_start = id_to_dt[start_id]
+            elif start_id < min_id:
+                dt_start = min_dt
+            else:
+                continue
+
+            # Точка стопа (или текущий момент, если процесс еще идет)
+            if stop_id and stop_id in id_to_dt:
+                dt_end = id_to_dt[stop_id]
+            elif stop_id == 0 or stop_id > max_id or not stop_id:
+                dt_end = max_dt
+            else:
+                continue
+
+            if dt_start < dt_end:
+                spans.append((dt_start, dt_end))
+
     return spans
+
 
 def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", vent_events: list = None, heat_events: list = None) -> None:
     """
     Генерирует графики температуры и влажности с числом точек ~48-50,
-    подсвечивая последнюю точку, проветривание и отопление.
-    Оптимизировано под слабый/старый ПК.
+    подсвечивая последнюю точку, а также фактические циклы проветривания и отопления.
     """
     if not data_rows:
         return
 
-    # Отбор строго 48–50 точек с гарантированным включением последней точки и событий
+    # Отбор 48–50 точек с гарантированным включением крайних точек и границ событий
     sampled_rows = sample_points_to_target(data_rows, vent_events, heat_events, target_min=48, target_max=50)
     os.makedirs(output_dir, exist_ok=True)
 
     timestamps = []
     st_temps, bs_temps, fl_temps = [], [], []
     st_hums, bs_hums, fl_hums = [], [], []
-    vent_flags, heat_flags = [], []
 
     for row in sampled_rows:
         ts = row['timestamp'] if isinstance(row, dict) else row[1]
@@ -169,19 +215,17 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
         bs_hums.append(row['basement_humi'] if isinstance(row, dict) else row[6])
         fl_hums.append(row['floor_humi'] if isinstance(row, dict) else row[7])
 
-        vent_flags.append(row.get('vent_status', 0) if isinstance(row, dict) else 0)
-        heat_flags.append(row.get('heat_status', 0) if isinstance(row, dict) else 0)
-
-    # Интервалы проветривания и отопления
-    vent_spans = get_event_spans(sampled_rows, 'vent_status')
-    heat_spans = get_event_spans(sampled_rows, 'heat_status')
+    # Получение интервалов проветривания и отопления strictly из фактических событий таблиц
+    vent_spans = get_event_spans(vent_events, data_rows, 'ventilation_start', 'stop_ventilation')
+    heat_spans = get_event_spans(heat_events, data_rows, 'heating_start', 'stop_heating')
 
     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
     end_str = timestamps[-1].strftime("%d.%m.%Y %H:%M")
-    
+
     date_fmt = mdates.DateFormatter('%d.%m\n%H:%M')
     locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
 
+    # --- 1. График температуры ---
     fig_temp, (ax_st_t, ax_bs_t, ax_fl_t) = plt.subplots(
         3, 1, figsize=(11, 9), sharex=True, gridspec_kw={'hspace': 0.45}
     )
@@ -190,17 +234,14 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
         fontsize=12, fontweight='bold'
     )
 
-    # 1. Улица
     ax_st_t.plot(timestamps, st_temps, color='#2ecc71', linewidth=1.8, label='Улица', marker='o', markersize=3)
     ax_st_t.set_title('Датчик: Улица', fontsize=10, loc='left', color='#27ae60', fontweight='bold')
     ax_st_t.set_ylabel('°C')
 
-    # 2. Подвал
     ax_bs_t.plot(timestamps, bs_temps, color='#2980b9', linewidth=1.8, label='Подвал', marker='o', markersize=3)
     ax_bs_t.set_title('Датчик: Подвал', fontsize=10, loc='left', color='#1f618d', fontweight='bold')
     ax_bs_t.set_ylabel('°C')
 
-    # 3. Пол
     ax_fl_t.plot(timestamps, fl_temps, color='#e74c3c', linewidth=1.8, label='Пол', marker='o', markersize=3)
     ax_fl_t.set_title('Датчик: Пол', fontsize=10, loc='left', color='#c0392b', fontweight='bold')
     ax_fl_t.set_ylabel('°C')
@@ -209,15 +250,12 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
     temps_list = (st_temps, bs_temps, fl_temps)
 
     for ax, vals in zip(axes_temp, temps_list):
-        # Отображение интервалов проветривания (голубая заливка)
         for i, (v_start, v_end) in enumerate(vent_spans):
             ax.axvspan(v_start, v_end, color='#3498db', alpha=0.2, label='Проветривание' if i == 0 else "")
 
-        # Отображение интервалов отопления (оранжевая заливка)
         for i, (h_start, h_end) in enumerate(heat_spans):
             ax.axvspan(h_start, h_end, color='#e67e22', alpha=0.22, label='Отопление' if i == 0 else "")
 
-        # ПОСЛЕДНЯЯ ТОЧКА (Актуальный замер)
         if vals:
             latest_val = vals[-1]
             ax.plot(timestamps[-1], latest_val, marker='*', markersize=9, color='#c0392b', zorder=6)
@@ -240,6 +278,7 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
     fig_temp.savefig(os.path.join(output_dir, 'temperature.png'), dpi=110, bbox_inches='tight')
     plt.close(fig_temp)
 
+    # --- 2. График влажности ---
     fig_hum, (ax_st_h, ax_bs_h, ax_fl_h) = plt.subplots(
         3, 1, figsize=(11, 9), sharex=True, gridspec_kw={'hspace': 0.45}
     )
@@ -248,17 +287,14 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
         fontsize=12, fontweight='bold'
     )
 
-    # 1. Улица
     ax_st_h.plot(timestamps, st_hums, color='#27ae60', linewidth=1.8, label='Улица', marker='o', markersize=3)
     ax_st_h.set_title('Датчик: Улица', fontsize=10, loc='left', color='#27ae60', fontweight='bold')
     ax_st_h.set_ylabel('%')
 
-    # 2. Подвал
     ax_bs_h.plot(timestamps, bs_hums, color='#2980b9', linewidth=1.8, label='Подвал', marker='o', markersize=3)
     ax_bs_h.set_title('Датчик: Подвал', fontsize=10, loc='left', color='#1f618d', fontweight='bold')
     ax_bs_h.set_ylabel('%')
 
-    # 3. Пол
     ax_fl_h.plot(timestamps, fl_hums, color='#e74c3c', linewidth=1.8, label='Пол', marker='o', markersize=3)
     ax_fl_h.set_title('Датчик: Пол', fontsize=10, loc='left', color='#c0392b', fontweight='bold')
     ax_fl_h.set_ylabel('%')
@@ -273,7 +309,6 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
         for i, (h_start, h_end) in enumerate(heat_spans):
             ax.axvspan(h_start, h_end, color='#e67e22', alpha=0.22, label='Отопление' if i == 0 else "")
 
-        # ПОСЛЕДНЯЯ ТОЧКА (Актуальный замер)
         if vals:
             latest_val = vals[-1]
             ax.plot(timestamps[-1], latest_val, marker='*', markersize=9, color='#2980b9', zorder=6)
@@ -296,124 +331,3 @@ def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs", ven
     fig_hum.savefig(os.path.join(output_dir, 'humidity.png'), dpi=110, bbox_inches='tight')
     plt.close(fig_hum)
 
-
-
-
-
-# import os
-# import matplotlib
-# matplotlib.use('Agg')  # Фоновый режим без GUI
-# import matplotlib.pyplot as plt
-# import matplotlib.dates as mdates
-# from datetime import datetime
-
-# def render_sensor_graphs(data_rows: list, output_dir: str = "static/graphs") -> None:
-#     """
-#     Принимает список строк/словарей из БД и генерирует 2 файла графиков.
-#     data_rows содержит: timestamp, street_temp, basement_temp, floor_temp, street_humi, basement_humi, floor_humi
-#     """
-#     if not data_rows:
-#         return
-    
-#     data_rows = data_rows[::max(1, len(data_rows) // 25)] # Снижение количества точек до 25 для графиков
-#     os.makedirs(output_dir, exist_ok=True)
-
-#     timestamps = []
-#     st_temps, bs_temps, fl_temps = [], [], []
-#     st_hums, bs_hums, fl_hums = [], [], []
-
-#     for row in data_rows:
-#         ts = row['timestamp'] if isinstance(row, (dict, list)) else getattr(row, 'timestamp', row[1])
-#         if isinstance(ts, str):
-#             try:
-#                 dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-#             except ValueError:
-#                 dt = datetime.strptime(ts, "%Y-%m-%d %H:%M")
-#         else:
-#             dt = ts
-#         timestamps.append(dt)
-
-#         st_temps.append(row['street_temp'] if isinstance(row, dict) else row[2])
-#         bs_temps.append(row['basement_temp'] if isinstance(row, dict) else row[3])
-#         fl_temps.append(row['floor_temp'] if isinstance(row, dict) else row[4])
-
-#         st_hums.append(row['street_humi'] if isinstance(row, dict) else row[5])
-#         bs_hums.append(row['basement_humi'] if isinstance(row, dict) else row[6])
-#         fl_hums.append(row['floor_humi'] if isinstance(row, dict) else row[7])
-
-#     # Динамический заголовок с диапазоном дат
-#     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
-#     end_str = timestamps[-1].strftime("%d.%m.%Y %H:%M")
-
-#     # Форматирование оси X: дата сверху, часы снизу (напр. "02.09\n14:00")
-#     date_fmt = mdates.DateFormatter('%d.%m\n%H:%M')
-#     locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
-
-#     # -------------------------------------------------------------------------
-#     # 1. ГРАФИК ТЕМПЕРАТУРЫ (°C)
-#     # -------------------------------------------------------------------------
-#     fig_temp, (ax_st_t, ax_bs_t, ax_fl_t) = plt.subplots(
-#         3, 1, figsize=(12, 10), sharex=True, gridspec_kw={'hspace': 0.45}
-#     )
-#     fig_temp.suptitle(f'График температуры (°C)\nПериод: {start_str} — {end_str}', fontsize=13, fontweight='bold')
-
-#     # Улица
-#     ax_st_t.plot(timestamps, st_temps, color='#2ecc71', linewidth=2, label='Улица', marker='o', markersize=2)
-#     # ax_st_t.axhline(0, color='#e74c3c', linestyle='--', linewidth=0.8, alpha=0.7)
-#     ax_st_t.set_title('Датчик: Улица', fontsize=10, loc='left', color='#27ae60', fontweight='bold')
-#     ax_st_t.set_ylabel('°C')
-
-#     # Подвал
-#     ax_bs_t.plot(timestamps, bs_temps, color='#2980b9', linewidth=2, label='Подвал', marker='o', markersize=2)
-#     ax_bs_t.set_title('Датчик: Подвал', fontsize=10, loc='left', color='#1f618d', fontweight='bold')
-#     ax_bs_t.set_ylabel('°C')
-
-#     # Пол
-#     ax_fl_t.plot(timestamps, fl_temps, color='#e74c3c', linewidth=2, label='Пол', marker='o', markersize=2)
-#     ax_fl_t.set_title('Датчик: Пол', fontsize=10, loc='left', color='#c0392b', fontweight='bold')
-#     ax_fl_t.set_ylabel('°C')
-
-#     # Настройка X-оси для ВСЕХ трех графиков
-#     for ax in (ax_st_t, ax_bs_t, ax_fl_t):
-#         ax.tick_params(labelbottom=True)  # Показываем часы/даты под каждым графиком
-#         ax.xaxis.set_major_formatter(date_fmt)
-#         ax.xaxis.set_major_locator(locator)
-#         ax.grid(True, linestyle=':', alpha=0.6)
-#         ax.tick_params(axis='x', rotation=0, labelsize=9)
-
-#     fig_temp.savefig(os.path.join(output_dir, 'temperature.png'), dpi=120, bbox_inches='tight')
-#     plt.close(fig_temp)
-
-#     # -------------------------------------------------------------------------
-#     # 2. ГРАФИК ВЛАЖНОСТИ (%)
-#     # -------------------------------------------------------------------------
-#     fig_hum, (ax_st_h, ax_bs_h, ax_fl_h) = plt.subplots(
-#         3, 1, figsize=(12, 10), sharex=True, gridspec_kw={'hspace': 0.45}
-#     )
-#     fig_hum.suptitle(f'График влажности (%)\nПериод: {start_str} — {end_str}', fontsize=13, fontweight='bold')
-
-#     # Улица
-#     ax_st_h.plot(timestamps, st_hums, color='#27ae60', linewidth=2, label='Улица', marker='o', markersize=2)
-#     ax_st_h.set_title('Датчик: Улица', fontsize=10, loc='left', color='#27ae60', fontweight='bold')
-#     ax_st_h.set_ylabel('%')
-
-#     # Подвал
-#     ax_bs_h.plot(timestamps, bs_hums, color='#2980b9', linewidth=2, label='Подвал', marker='o', markersize=2)
-#     ax_bs_h.set_title('Датчик: Подвал', fontsize=10, loc='left', color='#1f618d', fontweight='bold')
-#     ax_bs_h.set_ylabel('%')
-
-#     # Пол
-#     ax_fl_h.plot(timestamps, fl_hums, color='#e74c3c', linewidth=2, label='Пол', marker='o', markersize=2)
-#     ax_fl_h.set_title('Датчик: Пол', fontsize=10, loc='left', color='#c0392b', fontweight='bold')
-#     ax_fl_h.set_ylabel('%')
-
-#     # Настройка X-оси для ВСЕХ трех графиков
-#     for ax in (ax_st_h, ax_bs_h, ax_fl_h):
-#         ax.tick_params(labelbottom=True)  # Показываем часы/даты под каждым графиком
-#         ax.xaxis.set_major_formatter(date_fmt)
-#         ax.xaxis.set_major_locator(locator)
-#         ax.grid(True, linestyle=':', alpha=0.6)
-#         ax.tick_params(axis='x', rotation=0, labelsize=9)
-
-#     fig_hum.savefig(os.path.join(output_dir, 'humidity.png'), dpi=120, bbox_inches='tight')
-#     plt.close(fig_hum)

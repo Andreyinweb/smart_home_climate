@@ -1,6 +1,9 @@
 logs/
 backup/
 *.sqlite3
+humidity.png
+temperature.png
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

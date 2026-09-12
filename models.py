@@ -286,84 +286,37 @@ def get_interval_average(
         print(f"[БД] Ошибка вычисления среднего значения {column_name} в {name_table}: {e}")
         return None
     
-######################################
-# def get_sensor_data_for_graphs(db_conn):
-#     """
-#     Выборка данных за последние ~48 часов относительно последней имеющейся записи в БД.
-#     Без жесткой фильтрации по минутам, чтобы не пропадали данные при пропусках.
-#     """
-#     query = """
-#         SELECT id, timestamp, street_temp, basement_temp, floor_temp, 
-#                street_humi, basement_humi, floor_humi
-#         FROM table_sensor_data
-#         WHERE timestamp >= datetime((SELECT MAX(timestamp) FROM table_sensor_data), '-24 hours')
-#         ORDER BY timestamp ASC;
-#     """
-#     cursor = db_conn.cursor()
-#     cursor.execute(query)
-#     return cursor.fetchall()
-
-
-# def update_graphs_cache_if_needed(db_conn):
-#     """
-#     Проверяет, появились ли новые записи в table_sensor_data.
-#     Если появились новые данные — перерисовывает картинки.
-#     """
-#     from graph_builder import render_sensor_graphs
-
-#     cursor = db_conn.cursor()
-
-#     # 0. Авто-создание столбца, если его нет в api_table
-#     try:
-#         cursor.execute("SELECT last_graph_sensor_id FROM api_table LIMIT 1;")
-#     except Exception:
-#         cursor.execute("ALTER TABLE api_table ADD COLUMN last_graph_sensor_id INTEGER DEFAULT 0;")
-#         db_conn.commit()
-
-#     # 1. Получаем MAX(id) из датчиков
-#     cursor.execute("SELECT MAX(id) FROM table_sensor_data;")
-#     max_sensor_id = cursor.fetchone()[0] or 0
-
-#     # 2. Получаем last_graph_sensor_id из api_table
-#     cursor.execute("SELECT last_graph_sensor_id FROM api_table LIMIT 1;")
-#     row = cursor.fetchone()
-#     last_processed_id = row[0] if row and row[0] is not None else 0
-
-#     # 3. Перерисовываем при необходимости
-#     if max_sensor_id > last_processed_id:
-#         data = get_sensor_data_for_graphs(db_conn)
-#         if data:
-#             render_sensor_graphs(data)
-            
-#             # Обновляем отметку обработанного ID
-#             cursor.execute(
-#                 "UPDATE api_table SET last_graph_sensor_id = ?;", 
-#                 (max_sensor_id,)
-#             )
-#             db_conn.commit()
-
-
 
 ############################################################################################
-
 def get_sensor_data_for_graphs(db_conn):
     """
-    Выборка данных датчиков с объединением флагов проветривания и отопления из api_table.
+    Выборка данных датчиков с формированием статусов активных интервалов
+    на основе ФАКТИЧЕСКИХ записей из ventilation_table и heating_table,
+    а не прогностических рекомендаций алгоритма из api_table.
     """
     query = """
-        SELECT 
-            s.id, 
-            s.timestamp, 
-            s.street_temp, 
-            s.basement_temp, 
-            s.floor_temp, 
-            s.street_humi, 
-            s.basement_humi, 
-            s.floor_humi,
-            COALESCE(a.vent_status, 0) AS vent_status,
-            COALESCE(a.heat_status, 0) AS heat_status
+        SELECT
+        s.id,
+        s.timestamp,
+        s.street_temp,
+        s.basement_temp,
+        s.floor_temp,
+        s.street_humi,
+        s.basement_humi,
+        s.floor_humi,
+        CASE WHEN EXISTS (
+        SELECT 1 FROM ventilation_table v
+        WHERE v.ventilation_start > 0
+        AND s.id >= v.ventilation_start
+        AND (v.stop_ventilation = 0 OR v.stop_ventilation IS NULL OR s.id <= v.stop_ventilation)
+        ) THEN 1 ELSE 0 END AS vent_status,
+        CASE WHEN EXISTS (
+        SELECT 1 FROM heating_table h
+        WHERE h.heating_start > 0
+        AND s.id >= h.heating_start
+        AND (h.stop_heating = 0 OR h.stop_heating IS NULL OR s.id <= h.stop_heating)
+        ) THEN 1 ELSE 0 END AS heat_status
         FROM table_sensor_data s
-        LEFT JOIN api_table a ON s.id = a.id
         WHERE s.timestamp >= datetime((SELECT MAX(timestamp) FROM table_sensor_data), '-24 hours')
         ORDER BY s.timestamp ASC;
     """
@@ -371,6 +324,7 @@ def get_sensor_data_for_graphs(db_conn):
     cursor.execute(query)
     rows = cursor.fetchall()
     return [dict(row) for row in rows]
+
 
 def get_ventilation_events_for_graphs(db_conn):
     """Возвращает сессии проветривания из ventilation_table."""
