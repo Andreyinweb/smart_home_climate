@@ -155,7 +155,7 @@ def get_average_difference_temp() -> float:
 
 def get_hourly_coefficient(hour: int) -> dict:
     """Возвращает калибровочные коэффициенты для указанного часа."""
-    query = "SELECT delta_temp, delta_ah FROM hourly_coefficients_table WHERE hour = ?"
+    query = "SELECT delta_temp, delta_ah, updated_at FROM hourly_coefficients_table WHERE hour = ?"
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()

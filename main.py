@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 from settings import config
-from models import write_climate_data, get_average_difference_temp, get_latest_climate_data, update_data_db
+from models import write_climate_data, get_average_difference_temp, get_latest_climate_data, update_data_db, get_hourly_coefficient
 import operations
 import weather_service
 from ble_receiver import XiaomiBLEReceiver
@@ -30,6 +30,9 @@ async def polling_task():
         # Получение последних данных из БД для сравнения
         before_db = {}
         latest = get_latest_climate_data('table_sensor_data')
+        latest_db_last_calibrated = get_hourly_coefficient(12)
+        if latest_db_last_calibrated:
+            last_calibrated_day = int(latest_db_last_calibrated['updated_at'][8:10])        
         if latest:
             before_db = latest[0]
 
@@ -70,7 +73,30 @@ async def polling_task():
 
             # Вычисление difference_temp в зависимости от режима работы
             if MODE == 'BASEMENT_STREET':
-                data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
+                if before_db and 'average_temp' in before_db:
+                    if update_data_db('settings_table', {'t_floor_mac_diff': before_db['average_temp'], 'timestamp': data_sensors_all['timestamp']}, row_id=1):
+                        T_FLOOR_MAC_DIFF = before_db['average_temp']
+
+                if 'basement_temp' in data_sensors_all and 'basement_humi' in data_sensors_all:
+                    data_sensors_all['floor_temp'] = data_sensors_all['basement_temp'] - T_FLOOR_MAC_DIFF           
+                    abs_basement_humi = operations.calculate_absolute_humidity(data_sensors_all['basement_temp'], data_sensors_all['basement_humi'])
+                    data_sensors_all['floor_humi'] = operations.calculate_relative_humidity(data_sensors_all['floor_temp'], abs_basement_humi)
+                    data_sensors_all['floor_voltage'] = 0.0
+                    data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
+                    data_sensors_all['sensor_or_calc_basement'] = True
+                    data_sensors_all['sensor_or_calc_floor'] = False
+                else:
+                    data_sensors_all['basement_temp'] = 0.0
+                    data_sensors_all['basement_humi'] = 0.0
+                    data_sensors_all['basement_voltage'] = 0.0
+                    data_sensors_all['floor_temp'] = 0.0
+                    data_sensors_all['floor_humi'] = 0.0
+                    data_sensors_all['floor_voltage'] = 0.0
+                    data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
+                    data_sensors_all['sensor_or_calc_basement'] = False
+                    data_sensors_all['sensor_or_calc_floor'] = False
+                    work_log.warning("Расчет параметров пола невозможен: отсутствуют данные с датчика basement")
+
             elif MODE == 'BASEMENT_STREET_FLOOR' or MODE == 'BASEMENT_FLOOR':
                 if 'basement_temp' in data_sensors_all and 'floor_temp' in data_sensors_all:
                     data_sensors_all['difference_temp'] = round(
@@ -92,7 +118,15 @@ async def polling_task():
                     data_sensors_all['sensor_or_calc_basement'] = True
                     data_sensors_all['sensor_or_calc_floor'] = False
                 else:
+                    data_sensors_all['basement_temp'] = 0.0
+                    data_sensors_all['basement_humi'] = 0.0
+                    data_sensors_all['basement_voltage'] = 0.0
+                    data_sensors_all['floor_temp'] = 0.0
+                    data_sensors_all['floor_humi'] = 0.0
+                    data_sensors_all['floor_voltage'] = 0.0
                     data_sensors_all['difference_temp'] = T_FLOOR_MAC_DIFF
+                    data_sensors_all['sensor_or_calc_basement'] = False
+                    data_sensors_all['sensor_or_calc_floor'] = False
                     work_log.warning("Расчет difference_temp невозможен: отсутствуют данные с датчика basement")
             else: # MODE == 'BASEMENT'
                 if before_db and 'average_temp' in before_db:
@@ -110,7 +144,7 @@ async def polling_task():
 
             data_sensors_all['average_temp'] = get_average_difference_temp()
             
-            print(f"Запись в БД: {data_sensors_all}") # TODO
+            print(f"Запись в БД: data_sensors_all") # TODO
             write_climate_data('table_sensor_data', data_sensors_all)          
 
             # 4. Расчёт показателей для api_table
@@ -175,7 +209,7 @@ async def polling_task():
             last_calibrated_day = current_now.day
         # 6. Ожидание до следующей итерации опроса
         work_log.info(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...")
-        print(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...")
+        print(f"Ожидание {INTERVAL_SECONDS} секунд до следующей итерации опроса...") # TODO
         await asyncio.sleep(INTERVAL_SECONDS)
 
 async def start_services():
