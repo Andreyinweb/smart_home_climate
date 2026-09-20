@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Таблица газа — Мониторинг климата{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">📊 Последняя запись таблицы газа</h2>
+                <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
+                    Полные параметры и расчетные показатели последнего замера
+                </div>
+            </div>
+        </div>
+
+        {% if gas_data %}
+        <div style="overflow-x: auto; margin-top: 15px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                <thead>
+                    <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+                        <th style="padding: 10px; border: 1px solid #e2e8f0;">Поле</th>
+                        <th style="padding: 10px; border: 1px solid #e2e8f0;">Значение</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">id</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.id if gas_data.id is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">timestamp</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.timestamp if gas_data.timestamp else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">gas_meter</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.gas_meter if gas_data.gas_meter is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">start_of_month_gas_meter</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.start_of_month_gas_meter if gas_data.start_of_month_gas_meter is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">gas_difference</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.gas_difference if gas_data.gas_difference is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">average_street_temp</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.average_street_temp if gas_data.average_street_temp is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">average_basement_temp</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.average_basement_temp if gas_data.average_basement_temp is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">delta_T</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.delta_T if gas_data.delta_T is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">gas_per_hour</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.gas_per_hour if gas_data.gas_per_hour is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">gas_per_month</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.gas_per_month if gas_data.gas_per_month is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">hot_water_per_month</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.hot_water_per_month if gas_data.hot_water_per_month is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">hot_water_per_hour</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.hot_water_per_hour if gas_data.hot_water_per_hour is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">coefficient_gas</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.coefficient_gas if gas_data.coefficient_gas is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">price_gas</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.price_gas if gas_data.price_gas is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">cost_of_gas</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.cost_of_gas if gas_data.cost_of_gas is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">gas_forecast</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.gas_forecast if gas_data.gas_forecast is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0; font-weight: 600;">projected_price</td>
+                        <td style="padding: 8px 10px; border: 1px solid #e2e8f0;">{{ gas_data.projected_price if gas_data.projected_price is not none else '—' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding: 20px; text-align: center; color: #64748b;">
+            Записи в таблице gas_table отсутствуют.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

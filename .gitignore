@@ -1,0 +1,49 @@
+logs/
+backup/
+graphs/
+
+# Database
+*.sqlite3
+*.sqlite
+*.db
+*.sqlite-journal
+
+# Folder for generated graphs (keep empty folder via .gitkeep)
+charts/*
+!charts/.gitkeep
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+*.env
+env/
+ENV/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE / Editor / OS settings (Ubuntu / Linux)
+.vscode/
+.idea/
+*~
+*.swp
+*.swo
