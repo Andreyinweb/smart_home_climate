@@ -72,7 +72,7 @@ def sample_points_to_target(
     # 2. Точки из таблиц событий
     if vent_events:
         for ve in vent_events:
-            v_start = ve.get("ventilation_start")
+            v_start = ve.get("id")
             v_stop = ve.get("stop_ventilation")
             if v_start in id_to_idx:
                 mandatory.add(id_to_idx[v_start])
@@ -81,7 +81,7 @@ def sample_points_to_target(
 
     if heat_events:
         for he in heat_events:
-            h_start = he.get("heating_start")
+            h_start = he.get("id")
             h_stop = he.get("stop_heating")
             if h_start in id_to_idx:
                 mandatory.add(id_to_idx[h_start])
@@ -290,10 +290,10 @@ def render_sensor_graphs(
         fl_hums.append(row.get("floor_humi", 0.0))
 
     vent_spans = get_event_spans(
-        vent_events or [], data_rows, "ventilation_start", "stop_ventilation"
+        vent_events or [], data_rows, "id", "stop_ventilation"
     )
     heat_spans = get_event_spans(
-        heat_events or [], data_rows, "heating_start", "stop_heating"
+        heat_events or [], data_rows, "id", "stop_heating"
     )
 
     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")

@@ -42,34 +42,7 @@ class BaseRepository:
             logger.debug(f"UPSERT в '{table_name}' выполнен.")
             return True
 
-    @staticmethod
-    def _update_sync(
-        table_name: str,
-        data: Dict[str, Any],
-        pk_col: str = "id",
-        log_to_api: bool = False
-    ) -> bool:
-        """
-        Выполняет точечное обновление полей записи по первичному ключу (UPDATE SET).
-        Сохраняет существующие значения остальных колонок неизменными.
-        """
-        logger = api_log if log_to_api else work_log
-        if not data or pk_col not in data:
-            return False
-
-        update_cols = [col for col in data.keys() if col != pk_col]
-        if not update_cols:
-            return False
-
-        set_clause = ", ".join([f"{col} = :{col}" for col in update_cols])
-        sql = f"UPDATE {table_name} SET {set_clause} WHERE {pk_col} = :{pk_col};"
-
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, data)
-            logger.debug(f"UPDATE в '{table_name}' выполнен.")
-            return cursor.rowcount > 0
-
+    
     @staticmethod
     def _get_by_id_sync(
         table_name: str,
@@ -192,6 +165,34 @@ class BaseRepository:
         with get_db_connection() as conn:
             return conn.cursor().execute(sql, (record_id,)).rowcount > 0
 
+    @staticmethod
+    def _fetch_by_date_sync(
+        table_name: str,
+        target_date: str,
+        interval_type: str = "month",
+        order_asc: bool = True,
+        log_to_api: bool = False,
+    ) -> List[Dict[str, Any]]:
+        logger = api_log if log_to_api else work_log
+        length_map = {"month": 7, "day": 10, "hour": 13}
+        str_len = length_map.get(interval_type, 7)
+        prefix = target_date[:str_len]
+
+        order = "ASC" if order_asc else "DESC"
+        sql = f"SELECT * FROM {table_name} WHERE substr(timestamp, 1, ?) = ? ORDER BY id {order};"
+
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, (str_len, prefix))
+                rows = cursor.fetchall()
+                results = [dict(row) for row in rows]
+                logger.debug(f"[fetch_by_date] Найдено {len(results)} записей в '{table_name}' за '{prefix}' ({interval_type}).")
+                return results
+        except Exception as e:
+            logger.error(f"[fetch_by_date] Ошибка выполнения запроса к '{table_name}': {e}")
+            return []
+
 
 # --- Работа с настройками (через BaseRepository) ---
 
@@ -301,15 +302,6 @@ async def upsert_record(
     return await asyncio.to_thread(BaseRepository._upsert_sync, table_name, data, pk_col, log_to_api)
 
 
-async def update_record(
-    table_name: str,
-    data: Dict[str, Any],
-    pk_col: str = "id",
-    log_to_api: bool = False
-) -> bool:
-    return await asyncio.to_thread(BaseRepository._update_sync, table_name, data, pk_col, log_to_api)
-
-
 async def get_record_by_id(
     table_name: str,
     record_id: Any,
@@ -370,3 +362,19 @@ async def get_sensor_graph_points(hours: int = 24, log_to_api: bool = False) -> 
 
 async def get_calibration_data(max_time_diff_seconds: int = 600, log_to_api: bool = False) -> List[Dict[str, Any]]:
     return await asyncio.to_thread(_get_calibration_data_sync, max_time_diff_seconds, log_to_api)
+
+async def fetch_by_date(
+    table_name: str,
+    target_date: str,
+    interval_type: str = "month",
+    order_asc: bool = True,
+    log_to_api: bool = False,
+) -> List[Dict[str, Any]]:
+    return await asyncio.to_thread(
+        BaseRepository._fetch_by_date_sync,
+        table_name,
+        target_date,
+        interval_type,
+        order_asc,
+        log_to_api,
+    )
