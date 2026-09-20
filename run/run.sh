@@ -261,8 +261,8 @@ check_or_create_dir "$LOG_DIR"
 check_or_create_file "$WORK_LOG" "run/log.txt"
 check_or_create_file "$API_LOG" "run/log.txt"
 
-check_or_create_dir "$BACKUP"
-check_or_create_dir '$PROJECT_DIR/static/graphs'
+check_or_create_dir "$PROJECT_DIR/backup"
+check_or_create_dir "$PROJECT_DIR/static/graphs"
 ####################################################### Проверка базы данных #######################################################
 # Проверка папки data
 check_or_create_dir "$DATA_DIR" 
