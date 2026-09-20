@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if website_return_time %}
+    <meta http-equiv="refresh" content="{{ website_return_time }}">
+    {% endif %}
+    <title>{% block title %}Новая программа{% endblock %}</title>
+    <!-- <link rel="stylesheet" href="../static/css/legacy.css"> -->
+     <link rel="stylesheet" href="/static/css/legacy.css?v=3">
+</head>
+<body>
+    <!-- Верхняя панель навигации -->
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">🌡️ Новая программа</a>
+            <nav class="nav-menu">
+                <a href="/" class="nav-link">🏠 Главная</a>
+                <a href="/ventilation" class="nav-link">💨 Проветривание</a>
+                <a href="/heating" class="nav-link">🔥 Отопление</a>
+                <a href="/graphs/temperature" class="nav-link">T, °C</a>
+                <a href="/graphs/humidity" class="nav-link">Влажность</a>
+                <a href="/gas/table" class="nav-link">📊 Таблица</a>
+                <a href="/gas" class="nav-link">📟 Учет</a>
+                <a href="/settings" class="nav-link">⚙️ Настройки</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="content-container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

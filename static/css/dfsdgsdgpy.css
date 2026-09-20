@@ -1,0 +1,237 @@
+/* ==========================================================================
+   Сброс базовых стилей и оптимизация под старые браузеры (2013+)
+   ========================================================================== */
+* {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background-color: #0f172a;
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.3;
+}
+
+/* Ограничение контейнера по высоте для размещения экрана без прокрутки */
+.content-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 10px;
+}
+
+/* ==========================================================================
+   Шапка и выпадающее меню (Pure CSS, без JavaScript)
+   ========================================================================== */
+.navbar {
+    background-color: #1e293b;
+    border-bottom: 2px solid #334155;
+    padding: 8px 16px;
+    margin-bottom: 10px;
+}
+
+.nav-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #f8fafc;
+    text-decoration: none;
+}
+
+/* Выпадающий список */
+.dropdown {
+    position: relative;
+    display: inline-block;
+    outline: none;
+}
+
+.dropdown-btn {
+    background-color: #3b82f6;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.dropdown-btn:hover, .dropdown-btn:focus {
+    background-color: #2563eb;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    background-color: #1e293b;
+    min-width: 180px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.dropdown-item {
+    display: block;
+    padding: 12px 16px;
+    color: #f1f5f9;
+    text-decoration: none;
+    font-weight: 600;
+    border-bottom: 1px solid #334155;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: #1e3a8a;
+    color: #60a5fa;
+}
+
+/* Логика открытия меню без JS */
+.dropdown:hover .dropdown-content,
+.dropdown:focus .dropdown-content,
+.dropdown:focus-within .dropdown-content {
+    display: block;
+}
+
+/* ==========================================================================
+   Компоновка карточек и компактных таблиц
+   ========================================================================== */
+.card {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.card-title {
+    font-size: 1.15rem;
+    font-weight: bold;
+    color: #f8fafc;
+}
+
+/* Сверхкомпактные контрастные таблицы */
+.table-compact {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.05rem;
+    text-align: left;
+}
+
+.table-compact th {
+    background-color: #0f172a;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    border-bottom: 2px solid #334155;
+}
+
+.table-compact td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #334155;
+    color: #f1f5f9;
+}
+
+.table-compact tr:nth-child(even) {
+    background-color: #0f172a;
+}
+
+/* ==========================================================================
+   Кнопки управления и формы
+   ========================================================================== */
+.actions-row {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn-start {
+    background-color: #22c55e;
+    color: #052e16;
+}
+
+.btn-start:hover {
+    background-color: #16a34a;
+}
+
+.btn-stop {
+    background-color: #ef4444;
+    color: #ffffff;
+}
+
+.btn-stop:hover {
+    background-color: #dc2626;
+}
+
+.btn-disabled {
+    background-color: #475569;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Индикаторы и цветные акценты (Высокий контраст для ТВ)
+   ========================================================================== */
+.val-bold { font-weight: bold; }
+.text-green { color: #4ade80; font-weight: bold; }
+.text-red { color: #f87171; font-weight: bold; }
+.text-blue { color: #60a5fa; font-weight: bold; }
+.text-amber { color: #fbbf24; font-weight: bold; }
+.text-gray { color: #94a3b8; }
+
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.badge-green { background-color: #052e16; color: #4ade80; }
+.badge-red { background-color: #450a0a; color: #f87171; }
+.badge-amber { background-color: #451a03; color: #fbbf24; }
+.badge-gray { background-color: #334155; color: #cbd5e1; }
+
+/* Скрытие элементов */
+.d-none {display: none !important;}

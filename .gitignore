@@ -1,16 +1,6 @@
 logs/
 backup/
-graphs/
-
-# Database
 *.sqlite3
-*.sqlite
-*.db
-*.sqlite-journal
-
-# Folder for generated graphs (keep empty folder via .gitkeep)
-charts/*
-!charts/.gitkeep
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -41,9 +31,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE / Editor / OS settings (Ubuntu / Linux)
+# IDE/Editor settings
 .vscode/
 .idea/
-*~
-*.swp
-*.swo
+.DS_Store

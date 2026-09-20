@@ -1,0 +1,22 @@
+{% extends "legacy/base.html" %}
+
+{% block content %}
+<div class="container my-4 text-center">
+    <h2 class="mb-4">График влажности</h2>
+    <div class="card shadow-sm p-3 bg-white rounded">
+        <img id="graph-image" src="{{ graph_url }}" class="img-fluid rounded mx-auto d-block" alt="График влажности">
+    </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      const img = document.getElementById('graph-image');
+      if (img) {
+        const baseUrl = img.src.split('?')[0];
+        img.src = baseUrl + '?t=' + new Date().getTime();
+      }
+    }, 6000);
+  });
+</script>
+{% endblock %}

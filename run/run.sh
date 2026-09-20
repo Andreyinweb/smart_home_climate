@@ -1,31 +1,39 @@
 #!/bin/bash
 
-# bash run/run.sh
+# bash run/run.sh /home/andrey/andrey_folder/New_Indoor_climate/In_server/.env
 
 # chmod +x run.sh
+################################################ Переменные #########################################################
+DIR_PATH="$PWD"
+# Обязательно указываем путь к файлу .env или настроек.
+if [ -n "$1" ]; then
+    ENV_FILE="$1"
+else
+    ENV_FILE="$DIR_PATH/.env"
+fi
 
 ######################################################### Функции #########################################################
 # Функция для запроса подтверждения
-ask_confirm() {
+function ask_confirm() {
     local prompt="$1"
     while true; do
-        read -p "$prompt y/n  д/н т/н так/ні: " answer
+        read -p "$prompt y/n: " answer
         case "$answer" in
-            ([yY]|[yY][eE][sS]|[дД]|[дД][аА]|[тТ]|[так])
+            ([yY]|[yY][eE][sS])
                 return 0
                 ;;
-            ([nN]|[nN][oO]|[нН]|[нН][іІ]|[нН]|[ні])
+            ([nN]|[nN][oO])
                 return 1
                 ;;
             (*)
-                echo "Пожалуйста, введите y/n  д/н т/н так/ні" >&2
+                echo "Пожалуйста, введите y/n" >&2
                 ;;
         esac
     done
 }
 
 # Универсальная функция установки пакетов
-install_package() {
+function install_package() {
     local package_name="$1"
     local test_command="$2"
     local install_command="sudo apt install -y $package_name"
@@ -85,28 +93,48 @@ function check_or_create_dir() {
         return 0
     fi
 }
-# Проверяет наличие файла и создает его, если он не существует
+
+# Проверяет наличие файла и создает его, если он не существует (если не включен режим "только проверка")
 function check_or_create_file() {
     local file_path="$1"
     local text_in_file="$2"
+    local mode="$3" # "check_only", файл создаваться не будет
     local log_dir=$(dirname "$file_path")
+    
+    # Коды возврата (Exit Status) функции check_or_create_file:
+    # 0 — Успех: файл уже существует
+    # 1 — Успех: файла не было, но он был успешно создан
+    # 2 — Файла нет и он не создан (режим check_only или отказ пользователя)
+    # 3 — Ошибка: отсутствует директория или нет прав на создание
     
     # Сначала проверяем существование директории
     if [ ! -d "$log_dir" ]; then
-        echo "✗ Директория '$log_dir' не существует - файл не может быть создан" >&2
-        return 2
+        echo "✗ Директория '$log_dir' не существует — файл не может быть создан" >&2
+        return 3
     fi
 
     # Проверяем существование файла
     if [ -f "$file_path" ]; then
         echo "✓ Файл '$file_path' существует" >&2
-        return 1
+        return 0
     else
         echo "✗ Файл '$file_path' не найден" >&2
+        
+        # ЕСЛИ включен режим "только проверка", сразу выходим без создания
+        if [ "$mode" = "check_only" ]; then
+            echo "  > Режим проверки: создание файла пропущено" >&2
+            return 2
+        fi
+
+        # Иначе — обычная логика создания
         if ask_confirm "Создать файл '$file_path'?"; then    
-            cp $text_in_file $file_path
+            if [ -n "$text_in_file" ] && [ -f "$text_in_file" ]; then
+                cp "$text_in_file" "$file_path"
+            else
+                touch "$file_path"
+            fi
             echo "  > Файл '$file_path' успешно создан" >&2
-            return 0
+            return 1
         else
             echo "  > Создание файла отменено" >&2
             return 2
@@ -114,25 +142,194 @@ function check_or_create_file() {
     fi
 }
 
-######################################################### Начальные условия #########################################################
-check_or_create_file "./run/run_data.py"
-sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\'$PWD\'|" ./run/run_data.py
-source ./run/run_data.py # Аналог import run_data
+function loading_variables() {
+    local config_file="$1"
+    local is_required=true
+    local missing=()
+    local line name val
 
-for var in PROJECT_DIR VENV_DIR VENV_NAME DATA_DIR DATA_FILE \
-            desired_version BASEMENT_MAC SITE_WEATHER_API_KEY \
-            LOCATION_LAT LOCATION_LON; do
-    if [ -z "${!var}" ]; then
-        echo "Ошибка: Переменная $var не определена в файле run_data.sh"
-        echo "Пожалуйста, проверьте файл run_data.sh и убедитесь, что все необходимые переменные определены."
-        exit 1
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ "$line" =~ ^[[:space:]]*#.*# ]] && is_required=false
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+
+        if [[ "$line" == *=* ]]; then
+            name="${line%%=*}"
+            val="${line#*=}"
+            
+            # Строго в кавычках и с обычным символом '|'
+            name=$(echo "$name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            val=$(echo "$val" | sed -E "s/#.*//; s/^[[:space:]]*//; s/[[:space:]]*$//; s/^['\"]|['\"]$//g")
+
+            if [ "$is_required" = true ] && [ -z "$val" ]; then
+                missing+=("$name")
+            fi
+            
+            # -g объявляет переменную в глобальном окружении скрипта
+            declare -g "$name=$val"
+        fi
+    done < "$config_file"
+
+    if [ ${#missing[@]} -ne 0 ]; then
+        echo "❌ Не заполнены обязательные переменные: ${missing[*]}. Пожалуйста, заполните их в $config_file и перезапустите скрипт." >&2
+        return 2
     fi
-done
+}
+
+
+######################################################### Начальные условия ##################################################
+
+
+# Коды возврата (Exit Status) функции check_or_create_file:
+# 0 — Успех: файл уже существует
+# 1 — Успех: файла не было, но он был успешно создан
+# 2 — Файла нет и он не создан (режим check_only или отказ пользователя)
+# 3 — Ошибка: отсутствует директория или нет прав на создание
+
+check_or_create_file "$ENV_FILE" #"./run/env.txt"
+if [ $? == 0 ]; then 
+    loading_variables "$ENV_FILE"
+    if [ $? == 2 ]; then
+        echo "Файл .env не заполнен основные переменные. Будет перезаписан" 
+        CONFIGURATION_FILE="./run/env.txt"
+
+    else
+        # Проверка соответствия PROJECT_DIR текущей директории
+        if [ "$PROJECT_DIR" == "$DIR_PATH" ]; then
+            # Если PROJECT_DIR совпадает с текущей директорией, используем файл .env
+            CONFIGURATION_FILE="$ENV_FILE" 
+
+        elif [ "$PROJECT_DIR" != "$DIR_PATH" ]; then
+            # Если PROJECT_DIR не совпадает с текущей директорией, выводим предупреждение и предлагаем варианты действий
+            echo "В .env указана переменная PROJECT_DIR = '$PROJECT_DIR', но текущая директория '$DIR_PATH'."
+            if ask_confirm "Есть основные данные, но пути можем переписать по умолчанию? !!!!! БЕЗ env.txt ФАЙЛА"; then
+                # Перезаписываем не основные переменные по умолчанию без env.txt файла
+                CONFIGURATION_FILE="$ENV_FILE"           
+            else
+                if ask_confirm "!!!!!!!!!!  Переписать файл .env? !! ОН БУДЕТ УДАЛЁН И ЗАПИСАН ЗАНОВО !!"; then
+                    # Удаляет файл .env и создает новый с настройками по умолчанию из env.txt
+                    rm "$ENV_FILE"
+                    CONFIGURATION_FILE="./run/env.txt"
+                    check_or_create_file "$ENV_FILE" "run/env.txt"
+                    if [ $? !=2 ]; then
+                        echo "НУЖЕН ФАЙЛ НАСТРОЕК .env. Завершение работы. ПЕРЕЗАПУСТИ ." 
+                        exit 2
+                    fi
+
+                else
+                    echo "НУЖЕН ФАЙЛ НАСТРОЕК .env. Завершение работы. ПЕРЕЗАПУСТИ ." 
+                    exit 2
+                fi
+            fi
+        fi
+    fi
+else
+    CONFIGURATION_FILE="./run/env.txt"
+fi
+
+
+check_or_create_file "$CONFIGURATION_FILE" "" "check_only"
+if [ $? != 0 ]; then
+    echo "Файл конфигурации $CONFIGURATION_FILE не найден. Перезапустите программу и и проверте наличие run/env.txt "
+    exit 1
+fi
+
+loading_variables "$CONFIGURATION_FILE"
+
+############################################### Проверка переменных окружения #######################################################
+if [ -z "$LOCATION_LAT" ]; then
+    LOCATION_LAT='50.4501'
+fi
+if [ -z "$LOCATION_LON" ]; then
+    LOCATION_LON='30.5234'
+fi
+if [ -z "$DB_DIR" ]; then
+    DB_DIR="$DIR_PATH"
+fi
+if [ -z "$DB_NAME" ]; then
+    DB_NAME='climate_data.sqlite3'
+fi
+if [ -z "$VENV_DIR" ]; then
+    VENV_DIR="$DIR_PATH/venv"
+fi
+if [ -z "$VENV_NAME" ]; then
+    VENV_NAME='venv_smart_home_climate'
+fi
+if [ -z "$LOG_DIR" ]; then
+    LOG_DIR="$DIR_PATH/logs"
+fi
+if [ -z "$WORK_LOG" ]; then
+    WORK_LOG="$LOG_DIR/work_log.log"
+fi
+if [ -z "$API_LOG" ]; then
+    API_LOG="$LOG_DIR/api_log.log"
+fi
+if [ -z "$BACKUP" ]; then
+    BACKUP="$DIR_PATH/backup"
+fi
+if [ -z "$SERVER_HOST" ]; then
+    SERVER_HOST='0.0.0.0'
+fi
+if [ -z "$SERVER_PORT" ]; then
+    SERVER_PORT='8000'
+fi
+if [ -z "$PYTHON_VERSION" ]; then
+    PYTHON_VERSION='3.12'
+fi
+
+PROJECT_DIR="$DIR_PATH"
+
+######################################################## Проверка .env #######################################################
+# Запись файла .env
+cat << EOF > "$ENV_FILE"
+# ОБЯЗАТЕЛЬНО дописать
+VERSION = '${VERSION}'
+
+# ОБЯЗАТЕЛЬНО дописать макадреса датчиков:  
+STREET_MAC = '${STREET_MAC}'  # Улица
+BASEMENT_MAC = '${BASEMENT_MAC}'  # Подвал
+FLOOR_MAC = '${FLOOR_MAC}'   # Пол
+
+# ОБЯЗАТЕЛЬНО хотя бы один ключ с сайта погоды:
+OPENWEATHERMAP_API_KEY = '${OPENWEATHERMAP_API_KEY}'
+TOMORROW_API_KEY = '${TOMORROW_API_KEY}' 
+
+########################## Не обязательные переменные  ########################################
+
+# Координаты города для сайта погоды:
+LOCATION_LAT = '${LOCATION_LAT}'
+LOCATION_LON = '${LOCATION_LON}'
+
+# База данных
+DB_DIR = '${DB_DIR}'
+DB_NAME = '${DB_NAME}'
+
+# Виртуальное окружение
+VENV_DIR = '${VENV_DIR}'
+VENV_NAME = '${VENV_NAME}'
+
+# Логи папка, файлы.
+LOG_DIR = '${LOG_DIR}'
+WORK_LOG = '${WORK_LOG}'
+API_LOG = '${API_LOG}'
+
+# Папка сохранения backup базы данных
+BACKUP = '${BACKUP}'
+
+# Параметры запуска веб-сервера
+SERVER_HOST = "${SERVER_HOST}"
+SERVER_PORT = ${SERVER_PORT}
+
+# Версия Python, которую нужно установить
+PYTHON_VERSION = '${PYTHON_VERSION}'
+
+# Местоположение проекта, для теста файла env
+PROJECT_DIR = '${PROJECT_DIR}'
+EOF
+
 #################################### Не изменяемые переменные. Используются во всём проекте ###################################################
 # Путь к целевой директории для виртуального окружения
 VENV_PATH="$VENV_DIR/$VENV_NAME"
-# Пути для проверки .env
-ENV_FILE="${PROJECT_DIR}/.env"
 # Пути для проверки log
 LOG_DIR="$PROJECT_DIR/logs"
 WORK_LOG="$LOG_DIR/work_log.log"
@@ -140,7 +337,7 @@ API_LOG="$LOG_DIR/api_log.log"
 #################################################################################### Проверка Python #########################################################
 
 # Проверяем текущую версию Python
-current_version=$(python3.12 --version 2>&1 | cut -d' ' -f2)
+current_version=$(python3 --version 2>&1 | cut -d' ' -f2)
 
 
 if [[ "$current_version" == *"$desired_version"* ]]; then
@@ -224,35 +421,7 @@ if [ -d "$VENV_DIR" ]; then
 else
     echo "Виртуальное окружениел не проверялось - папка '$VENV_DIR' отсутствует"
 fi
-######################################################## Проверка .env #######################################################
-# Проверка файла .env (только если папка существует или была создана)
-check_or_create_file "$ENV_FILE" "run/env.txt"
-env_dir=$?
-if [ "$env_dir" -eq 0 ]; then
-    echo " " >> $ENV_FILE
-    echo "STREET_MAC = '$STREET_MAC'" >> $ENV_FILE
-    echo "BASEMENT_MAC = '$BASEMENT_MAC'" >> $ENV_FILE
-    echo "FLOOR_MAC = '$FLOOR_MAC'" >> $ENV_FILE
-    echo " " >> $ENV_FILE
-    echo "SITE_WEATHER_API_KEY = '$SITE_WEATHER_API_KEY'" >> $ENV_FILE
-    echo " " >> $ENV_FILE
-    echo "LOCATION_LAT = '$LOCATION_LAT'" >> $ENV_FILE
-    echo "LOCATION_LON = '$LOCATION_LON'" >> $ENV_FILE
-    echo " " >> $ENV_FILE
-    echo "DB_DIR = '$DATA_DIR'" >> $ENV_FILE
-    echo "DB_NAME = '$DATA_FILE'" >> $ENV_FILE
-    echo "VENV_DIR = '$VENV_DIR'" >> $ENV_FILE
-    echo "VENV_NAME = '$VENV_NAME'" >> $ENV_FILE
-    echo " " >> $ENV_FILE
-    echo "LOG_DIR = '$LOG_DIR'" >> $ENV_FILE
-    echo "WORK_LOG = '$WORK_LOG'" >> $ENV_FILE
-    echo "API_LOG = '$API_LOG'" >> $ENV_FILE
-    echo " " >> $ENV_FILE
-    echo "BACKUP = '$PROJECT_DIR/backup'" >> $ENV_FILE
-elif [ "$env_dir" -eq 2 ]; then 
-    echo "Файл .env не был создан. Пожалуйста, создайте его вручную и добавьте необходимые переменные."
-    exit 1
-fi
+
 
 ####################################################### Проверка файлы логов #######################################################
 # Проверка папки logs
@@ -260,23 +429,13 @@ check_or_create_dir "$LOG_DIR"
 # Проверка файлов log (только если папка существует или была создана) 
 check_or_create_file "$WORK_LOG" "run/log.txt"
 check_or_create_file "$API_LOG" "run/log.txt"
-
-check_or_create_dir "$PROJECT_DIR/backup"
-check_or_create_dir "$PROJECT_DIR/static/graphs"
 ####################################################### Проверка базы данных #######################################################
 # Проверка папки data
-check_or_create_dir "$DATA_DIR" 
+check_or_create_dir "$DB_DIR" 
 ################################################ Делаем резервную копию run_data.py #######################################################
 
-# # Проверяем существование директории
-# if check_or_create_dir "$PROJECT_DIR/backup"; then    
-#     cp run/run_data.py $PROJECT_DIR/backup/run_data_$(date +'%Y%m%d_%H%M%S').py
-#     echo "Резервное копирование файла run_data.py в $PROJECT_DIR/backup/run_data_$(date +'%Y%m%d_%H%M%S').py"
-#     # Удаляем старые бэкапы (кроме 10 последних)
-#     ls -t $PROJECT_DIR/backup/run_data_*.py | tail -n +11 | xargs rm -f --
-# else
-#     echo "Не скопирован файла run_data.py нет папки $PROJECT_DIR/backup/"
-# fi
+# Проверяем существование директории backup
+check_or_create_dir "$PROJECT_DIR/backup"
 ################################################# Запуск run_program.py #######################################################
 
 echo "########################################### Запуск run_program.py #############################"
@@ -292,4 +451,5 @@ python3.12 run/migrator.py
 
 echo "######################## Пуск основной программы проекта main.py ######################"
 
-python3.12 main.py
+# python3.12 app/main.py
+python3.12 -m app.main

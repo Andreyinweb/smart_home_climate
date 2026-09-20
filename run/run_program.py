@@ -1,3 +1,5 @@
+# run/run_program.py
+
 import os
 import sqlite3
 from datetime import datetime
@@ -94,160 +96,163 @@ def create_backup(source_file, backup_dir, max_backups=100):
         print(f"Ошибка: {e}")
         return None
 
-check_or_create_database(database_file)
 
-# Создаём таблицу settings_table
-fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT,
-    mode TEXT, 
-    interval_seconds INTEGER, 
-    max_retries INTEGER, 
-    website_return_time INTEGER, 
-    t_floor_mac_diff REAL, 
-    absolute_humidity_tolerance REAL,
-    minimum_humidity  REAL,
-    target_rh REAL,
-    dangerous_humidity REAL,
-    price_gas REAL,
-    hot_water_per_hour REAL   
+if __name__ == "__main__":
+
+    check_or_create_database(database_file)
+
+    # Создаём таблицу settings_table
+    fields_db = """ (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        mode TEXT, 
+        interval_seconds INTEGER, 
+        max_retries INTEGER, 
+        website_return_time INTEGER, 
+        t_floor_mac_diff REAL, 
+        absolute_humidity_tolerance REAL,
+        minimum_humidity  REAL,
+        target_rh REAL,
+        dangerous_humidity REAL,
+        price_gas REAL,
+        hot_water_per_hour REAL   
+        )
+        """
+    create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
+
+
+    # Создаём таблицу table_sensor_data
+    fields_db = """ (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        street_temp REAL,
+        basement_temp REAL,
+        floor_temp REAL,
+        difference_temp REAL,
+        average_temp REAL,
+        street_humi REAL,
+        basement_humi REAL,
+        floor_humi REAL,
+        street_voltage REAL,
+        basement_voltage REAL,
+        floor_voltage REAL,
+        sensor_or_calc_street BOOLEAN,
+        sensor_or_calc_basement BOOLEAN,
+        sensor_or_calc_floor BOOLEAN
     )
     """
-create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
+    create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
 
 
-# Создаём таблицу table_sensor_data
-fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    street_temp REAL,
-    basement_temp REAL,
-    floor_temp REAL,
-    difference_temp REAL,
-    average_temp REAL,
-    street_humi REAL,
-    basement_humi REAL,
-    floor_humi REAL,
-    street_voltage REAL,
-    basement_voltage REAL,
-    floor_voltage REAL,
-    sensor_or_calc_street BOOLEAN,
-    sensor_or_calc_basement BOOLEAN,
-    sensor_or_calc_floor BOOLEAN
-)
-"""
-create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
-
-
-# Создаём таблицу gas_table
-fields_db = """ (
-    id INTEGER ,
-    timestamp TEXT NOT NULL,
-    gas_meter REAL,
-    start_of_month_gas_meter REAL,
-    gas_difference REAL,
-    average_street_temp REAL,
-    average_basement_temp REAL,
-    delta_T REAL,
-    gas_per_hour REAL,
-    gas_per_month REAL,
-    hot_water_per_month REAL,
-    hot_water_per_hour REAL,
-    coefficient_gas REAL,
-    price_gas REAL,
-    cost_of_gas REAL,
-    gas_forecast REAL,
-    projected_price REAL
-)
-"""
-create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
-
-
-
-# Создаём таблицу api_table
-fields_db = """ (
-    id INTEGER ,
-    timestamp TEXT,    
-    a_floor_humi REAL,
-    dp_floor REAL,
-    a_street_humi REAL,
-    dp_street REAL,
-    a_basement_humi REAL,
-    dp_basement REAL,
-    humidity_difference REAL,
-    vent_status BOOLEAN,
-    vent_time_val INTEGER,
-    sim_a_basement_humi REAL,
-    sim_basement_humi REAL,
-    sim_floor_humi REAL,
-    heating_delta REAL,
-    heat_status BOOLEAN,
-    floor_temp_heated REAL,
-    basement_temp_heated REAL,
-    basement_humi_heated REAL,
-    a_basement_humi_heated REAL,
-    floor_humi_heated REAL,
-    a_floor_humi_heated REAL,
-    last_graph_sensor_id INTEGER
+    # Создаём таблицу gas_table
+    fields_db = """ (
+        id INTEGER ,
+        timestamp TEXT NOT NULL,        
+        start_of_month_gas_meter REAL,
+        gas_meter REAL,
+        gas_difference REAL,
+        average_street_temp REAL,
+        average_basement_temp REAL,
+        delta_T REAL,
+        gas_per_hour REAL,
+        gas_per_month REAL,
+        hot_water_per_month REAL,
+        hot_water_per_hour REAL,
+        coefficient_gas REAL,
+        price_gas REAL,
+        cost_of_gas REAL,
+        gas_forecast REAL,
+        projected_price REAL
     )
     """
-create_table(db_path=database_file, table_name='api_table', fields=fields_db)
+    create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
 
-# Создаём таблицу ventilation_table
-fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT,
-    status_ventilation BOOLEAN,
-    ventilation_start INTEGER,
-    stop_ventilation INTEGER   
+
+
+    # Создаём таблицу api_table
+    fields_db = """ (
+        id INTEGER ,
+        timestamp TEXT,    
+        a_floor_humi REAL,
+        dp_floor REAL,
+        a_street_humi REAL,
+        dp_street REAL,
+        a_basement_humi REAL,
+        dp_basement REAL,
+        humidity_difference REAL,
+        vent_status BOOLEAN,
+        vent_time_val INTEGER,
+        sim_a_basement_humi REAL,
+        sim_basement_humi REAL,
+        sim_floor_humi REAL,
+        heating_delta REAL,
+        heat_status BOOLEAN,
+        floor_temp_heated REAL,
+        basement_temp_heated REAL,
+        basement_humi_heated REAL,
+        a_basement_humi_heated REAL,
+        floor_humi_heated REAL,
+        a_floor_humi_heated REAL,
+        last_graph_sensor_id INTEGER
+        )
+        """
+    create_table(db_path=database_file, table_name='api_table', fields=fields_db)
+
+    # Создаём таблицу ventilation_table
+    fields_db = """ (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        status_ventilation BOOLEAN,
+        ventilation_start INTEGER,
+        stop_ventilation INTEGER   
+        )
+        """
+    create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
+
+    # Создаём таблицу heating_table
+    fields_db = """ (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        status_heating BOOLEAN,
+        heating_start INTEGER,
+        stop_heating INTEGER   
+        )
+        """
+    create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
+
+    # Таблица сырых данных с сайта (weather_site_table)
+    fields_db = """ (
+        id INTEGER ,
+        timestamp TEXT NOT NULL,
+        site_temp REAL NOT NULL,
+        site_humi REAL NOT NULL,
+        site_ah REAL NOT NULL
     )
     """
-create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
+    create_table(db_path=database_file, table_name='weather_site_table', fields=fields_db)
 
-# Создаём таблицу heating_table
-fields_db = """ (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT,
-    status_heating BOOLEAN,
-    heating_start INTEGER,
-    stop_heating INTEGER   
+    # Таблица часовых калибровочных коэффициентов (hourly_coefficients_table)
+    fields_db = """ (
+        hour INTEGER PRIMARY KEY,
+        delta_temp REAL DEFAULT 0.0,
+        delta_ah REAL DEFAULT 0.0,
+        samples_count INTEGER DEFAULT 0,
+        updated_at TEXT
     )
     """
-create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
-
-# Таблица сырых данных с сайта (weather_site_table)
-fields_db = """ (
-    id INTEGER ,
-    timestamp TEXT NOT NULL,
-    site_temp REAL NOT NULL,
-    site_humi REAL NOT NULL,
-    site_ah REAL NOT NULL
-)
-"""
-create_table(db_path=database_file, table_name='weather_site_table', fields=fields_db)
-
-# Таблица часовых калибровочных коэффициентов (hourly_coefficients_table)
-fields_db = """ (
-    hour INTEGER PRIMARY KEY,
-    delta_temp REAL DEFAULT 0.0,
-    delta_ah REAL DEFAULT 0.0,
-    samples_count INTEGER DEFAULT 0,
-    updated_at TEXT
-)
-"""
-if create_table(db_path=database_file, table_name='hourly_coefficients_table', fields=fields_db):
-    try:
-        conn = sqlite3.connect(database_file)
-        cursor = conn.cursor()
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for h in range(24):
-            cursor.execute(
-                "INSERT OR IGNORE INTO hourly_coefficients_table (hour, delta_temp, delta_ah, samples_count, updated_at) VALUES (?, 0.0, 0.0, 0, ?)",
-                (h, now_str)
-            )
-        conn.commit()
-        conn.close()
-        print("Инициализирована таблица 'hourly_coefficients_table' 24 часовыми записями.")
-    except Exception as e:
-        print(f"Ошибка заполнения hourly_coefficients_table: {e}")
-        
+    if create_table(db_path=database_file, table_name='hourly_coefficients_table', fields=fields_db):
+        try:
+            conn = sqlite3.connect(database_file)
+            cursor = conn.cursor()
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            for h in range(24):
+                cursor.execute(
+                    "INSERT OR IGNORE INTO hourly_coefficients_table (hour, delta_temp, delta_ah, samples_count, updated_at) VALUES (?, 0.0, 0.0, 0, ?)",
+                    (h, now_str)
+                )
+            conn.commit()
+            conn.close()
+            print("Инициализирована таблица 'hourly_coefficients_table' 24 часовыми записями.")
+        except Exception as e:
+            print(f"Ошибка заполнения hourly_coefficients_table: {e}")
+            
