@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     # Создаём таблицу gas_table
     fields_db = """ (
-        id INTEGER ,
+        id INTEGER PRIMARY KEY,
         timestamp TEXT NOT NULL,        
         start_of_month_gas_meter REAL,
         gas_meter REAL,
@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
     # Создаём таблицу api_table
     fields_db = """ (
-        id INTEGER ,
+        id INTEGER PRIMARY KEY,
         timestamp TEXT,    
         a_floor_humi REAL,
         dp_floor REAL,
@@ -200,10 +200,9 @@ if __name__ == "__main__":
 
     # Создаём таблицу ventilation_table
     fields_db = """ (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         timestamp TEXT,
         status_ventilation BOOLEAN,
-        ventilation_start INTEGER,
         stop_ventilation INTEGER   
         )
         """
@@ -211,10 +210,9 @@ if __name__ == "__main__":
 
     # Создаём таблицу heating_table
     fields_db = """ (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         timestamp TEXT,
         status_heating BOOLEAN,
-        heating_start INTEGER,
         stop_heating INTEGER   
         )
         """
@@ -222,7 +220,7 @@ if __name__ == "__main__":
 
     # Таблица сырых данных с сайта (weather_site_table)
     fields_db = """ (
-        id INTEGER ,
+        id INTEGER PRIMARY KEY,
         timestamp TEXT NOT NULL,
         site_temp REAL NOT NULL,
         site_humi REAL NOT NULL,

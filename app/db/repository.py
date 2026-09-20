@@ -248,12 +248,12 @@ def _get_sensor_data_for_graphs_sync(hours: int = 24, log_to_api: bool = False) 
         s.street_humi, s.basement_humi, s.floor_humi,
         CASE WHEN EXISTS (
             SELECT 1 FROM ventilation_table v
-            WHERE v.ventilation_start > 0 AND s.id >= v.ventilation_start
+            WHERE v.id > 0 AND s.id >= v.id
             AND (v.stop_ventilation = 0 OR v.stop_ventilation IS NULL OR s.id <= v.stop_ventilation)
         ) THEN 1 ELSE 0 END AS vent_status,
         CASE WHEN EXISTS (
             SELECT 1 FROM heating_table h
-            WHERE h.heating_start > 0 AND s.id >= h.heating_start
+            WHERE h.id > 0 AND s.id >= h.id
             AND (h.stop_heating = 0 OR h.stop_heating IS NULL OR s.id <= h.stop_heating)
         ) THEN 1 ELSE 0 END AS heat_status
     FROM table_sensor_data s

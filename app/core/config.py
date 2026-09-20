@@ -75,7 +75,7 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
 
     # --- Интервалы и таймауты ---
     interval_seconds: int = Field(default=300, alias="INTERVAL_SECONDS", ge=1)
-    max_retries: int = Field(default=5, alias="MAX_RETRIES", ge=1)
+    max_retries: int = Field(default=3, alias="MAX_RETRIES", ge=1)
     website_return_time: int = Field(default=390, alias="WEBSITE_RETURN_TIME", ge=0)
 
     # --- BLE MAC-адреса (входные значения из env файлов) ---

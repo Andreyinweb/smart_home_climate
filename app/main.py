@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 import app.db.repository as db
-from app.routers import dashboard, gas, graphs, setting
+from app.routers import dashboard, gas, graphs, setting, heating
 
 from app.services.ble_service import fetch_all_ble_sensors
 from app.services.climate_engine import build_sensor_record, build_api_record
@@ -117,6 +117,7 @@ app.include_router(dashboard.router)
 app.include_router(gas.router)
 app.include_router(graphs.router)
 app.include_router(setting.router)
+app.include_router(heating.router)
 
 
 if __name__ == "__main__":

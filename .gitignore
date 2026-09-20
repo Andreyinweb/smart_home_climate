@@ -1,18 +1,48 @@
+# Database & Temporary DB files
+*.sqlite
+*.sqlite3
+*.db
+*.s3db
+*.dump
+*.sql
+*.ldf
+*.mdf
+*.dump.gz
+
+# FastAPI / Uvicorn / Runtime
+*.log
 logs/
 backup/
-*.sqlite3
+static/graphs/
+humidity.png
+temperature.png
+*.pid
+*.seed
+*.pid.child
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual Environments
+# Virtual Environments & Envs
 venv/
 .venv/
-*.env
 env/
 ENV/
+*.env
+.env.*
+!.env.example
+
+# Testing, Coverage & Linters (Pytest, Mypy, Ruff)
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
 
 # Distribution / packaging
 build/
@@ -31,7 +61,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE/Editor settings
+# IDE / Editors
 .vscode/
 .idea/
+
+# OS / Linux / Temporary files
 .DS_Store
+*~
+*.tmp
+*.temp
+*.bak
+*.swp
+.swo
+.directory
+
+# Containers / Services (if used)
+.docker/
