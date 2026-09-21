@@ -118,12 +118,6 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
     # --- Валидация путей, ключей и MAC-адресов ---
     @model_validator(mode="after")
     def validate_all_dependencies(self) -> "Settings":
-        if self.app_env == AppEnv.DEVELOPMENT:
-            self.site_weather = WeatherProvider.OPENWEATHERMAP
-
-    # # --- Валидация путей, ключей и MAC-адресов ---
-    # @model_validator(mode="after")
-    # def validate_all_dependencies(self) -> "Settings":
     
         # 1. Резолвинг абсолютных путей
         if not self.log_dir.is_absolute():

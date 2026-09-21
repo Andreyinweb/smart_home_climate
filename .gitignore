@@ -16,6 +16,7 @@
 *.log
 logs/
 backup/
+backup_1/
 static/graphs/
 humidity.png
 temperature.png

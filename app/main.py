@@ -17,15 +17,15 @@ from app.services import weather_service
 from app.services import backup_service
 
 
-async def check_and_run_calibration():
-    """Проверяет необходимость перерасчета коэффициентов в 00:00."""
-    now = datetime.now()
-    coeff_0 = await db.get_record_by_id("hourly_coefficients_table", 0, pk_col="hour", log_to_api=False)
-    updated_at_str = coeff_0.get("updated_at") if coeff_0 else None
-    today_str = now.strftime("%Y-%m-%d")
-    if not updated_at_str or not updated_at_str.startswith(today_str):
-        await weather_service.calibrate_hourly_coefficients()
-        await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
+# async def check_and_run_calibration():
+#     """Проверяет необходимость перерасчета коэффициентов в 00:00."""
+#     now = datetime.now()
+#     coeff_hour = await db.get_record_by_id("hourly_coefficients_table", now.hour, pk_col="hour", log_to_api=False)
+#     updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
+#     today_str = now.strftime("%Y-%m-%d")
+#     if not updated_at_str or not updated_at_str.startswith(today_str):
+#         await weather_service.calibrate_hourly_coefficients()
+#         await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,7 +81,13 @@ async def lifespan(app: FastAPI):
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
 
                 # Вызов проверки ежедневной калибровки
-                await check_and_run_calibration()
+                # await check_and_run_calibration()
+                coeff_hour = await db.get_record_by_id("hourly_coefficients_table", int(timestamp_str[11:13]), pk_col="hour", log_to_api=False)
+                updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
+                
+                if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
+                    await weather_service.calibrate_hourly_coefficients()
+                    await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
 
             except asyncio.TimeoutError:
                 work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
