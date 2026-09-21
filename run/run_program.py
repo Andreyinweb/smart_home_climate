@@ -242,11 +242,10 @@ if __name__ == "__main__":
         try:
             conn = sqlite3.connect(database_file)
             cursor = conn.cursor()
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for h in range(24):
                 cursor.execute(
-                    "INSERT OR IGNORE INTO hourly_coefficients_table (hour, delta_temp, delta_ah, samples_count, updated_at) VALUES (?, 0.0, 0.0, 0, ?)",
-                    (h, now_str)
+                    "INSERT OR IGNORE INTO hourly_coefficients_table (hour, delta_temp, delta_ah, samples_count) VALUES (?, 0.0, 0.0, 0)",
+                    (h)
                 )
             conn.commit()
             conn.close()

@@ -19,13 +19,11 @@ from app.services import weather_service
 async def check_and_run_calibration():
     """Проверяет необходимость перерасчета коэффициентов в 00:00."""
     now = datetime.now()
-    if now.hour == 0:
-        coeff_0 = await db.get_record_by_id("hourly_coefficients_table", 0, pk_col="hour", log_to_api=False)
-        updated_at_str = coeff_0.get("updated_at") if coeff_0 else None
-        today_str = now.strftime("%Y-%m-%d")
-
-        if not updated_at_str or not updated_at_str.startswith(today_str):
-            await weather_service.calibrate_hourly_coefficients()
+    coeff_0 = await db.get_record_by_id("hourly_coefficients_table", 0, pk_col="hour", log_to_api=False)
+    updated_at_str = coeff_0.get("updated_at") if coeff_0 else None
+    today_str = now.strftime("%Y-%m-%d")
+    if not updated_at_str or not updated_at_str.startswith(today_str):
+        await weather_service.calibrate_hourly_coefficients()
 
 
 @asynccontextmanager
@@ -47,9 +45,6 @@ async def lifespan(app: FastAPI):
             try:
                 sys_settings = await db.get_or_create_settings(log_to_api=False)
                 interval = getattr(sys_settings, "interval_seconds", settings.interval_seconds)
-
-                # Вызов проверки ежедневной калибровки
-                await check_and_run_calibration()
 
                 latest = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
                 now_id = (latest["id"] + 1) if latest and "id" in latest else 1
@@ -83,6 +78,9 @@ async def lifespan(app: FastAPI):
                     work_log.info(f"[Цикл] Данные ID={now_id} успешно записаны в table_sensor_data и api_table.")
                 else:
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
+
+                # Вызов проверки ежедневной калибровки
+                await check_and_run_calibration()
 
             except asyncio.TimeoutError:
                 work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
