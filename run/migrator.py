@@ -1,4 +1,5 @@
 # python3.12 run/migrator.py
+
 from pathlib import Path
 import sqlite3
 from typing import Any, Dict, List, Set
@@ -7,8 +8,9 @@ import run_program
 
 
 def get_db_connection(path_db: str | Path) -> sqlite3.Connection:
-    """Создает и возвращает подключение к базе данных SQLite."""
+    """Создает и возвращает подключение к базе данных SQLite с включенной поддержкой Foreign Keys."""
     conn = sqlite3.connect(path_db)
+    conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -51,10 +53,7 @@ def migrate_primary_table(
     backup_files: List[Path],
     table_name: str = "table_sensor_data",
 ) -> None:
-    """Мигрирует основную таблицу сенсоров (table_sensor_data) из бэкапов.
-
-    Генерирует уникальные автоинкрементные ID в целевой БД.
-    """
+    """Мигрирует основную таблицу сенсоров (table_sensor_data) из бэкапов."""
     print(f"\n--- [Главная таблица] Миграция: {table_name} ---")
     target_columns = get_table_columns(target_conn, table_name)
     if not target_columns:
@@ -79,7 +78,6 @@ def migrate_primary_table(
                 if not backup_columns or date_col not in backup_columns:
                     continue
 
-                # Исключаем 'id', чтобы целевая БД автоматически генерировала первичный ключ
                 common_columns = [
                     col for col in target_columns
                     if col in backup_columns and col.lower() != "id"
@@ -123,9 +121,9 @@ def migrate_dependent_table(
     table_name: str,
     ts_to_id: Dict[str, int],
 ) -> None:
-    """Мигрирует вторичные таблицы (gas_table, weather_site_table и т.д.),
+    """Мигрирует вторичные таблицы, связывая 'id' с ID из table_sensor_data по timestamp.
 
-    связывая 'id' с соответствующим ID из table_sensor_data по значению timestamp.
+    Если id для timestamp не найден в главной таблице, запись пропускается.
     """
     print(f"\n--- [Зависимая таблица] Миграция: {table_name} ---")
     target_columns = get_table_columns(target_conn, table_name)
@@ -152,7 +150,6 @@ def migrate_dependent_table(
                 if not backup_columns or date_col not in backup_columns:
                     continue
 
-                # Выбираем общие колонки без 'id'
                 common_non_id = [
                     col for col in target_columns
                     if col in backup_columns and col.lower() != "id"
@@ -180,6 +177,9 @@ def migrate_dependent_table(
                     else:
                         if has_id_col:
                             row_id = ts_to_id.get(row_date)
+                            if row_id is None:
+                                total_skipped += 1
+                                continue
                             row_tuple = (row_id,) + tuple(row_dict[col] for col in common_non_id)
                         else:
                             row_tuple = tuple(row_dict[col] for col in common_non_id)
@@ -198,7 +198,7 @@ def migrate_dependent_table(
         except sqlite3.Error as e:
             print(f"  [Ошибка] Чтение/запись файла {backup_path.name}: {e}")
 
-    print(f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов: {total_skipped}")
+    print(f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов/без ID: {total_skipped}")
 
 
 def main() -> None:
@@ -213,7 +213,6 @@ def main() -> None:
         print(f"[Ошибка] Директория с резервными копиями не найдена: {backup_dir}")
         return
 
-    # Получаем файлы бэкапов в хронологическом порядке
     backup_files = sorted(
         [
             f for f in backup_dir.iterdir()
@@ -233,7 +232,6 @@ def main() -> None:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
             target_tables = [row[0] for row in cursor.fetchall()]
 
-            # Таблицы, исключаемые из миграции зависимых данных
             exclude_tables = {
                 "table_sensor_data",
                 "settings_table",

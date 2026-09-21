@@ -11,8 +11,8 @@ def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
     """
     Контекстный менеджер для подключения к базе данных SQLite.
     
-    Автоматически активирует WAL-режим и приводит результаты выборки
-    к формату sqlite3.Row для удобного преобразования в Pydantic-модели.
+    Автоматически активирует WAL-режим, поддержку внешних ключей (Foreign Keys)
+    и приводит результаты выборки к формату sqlite3.Row.
     """
     conn = sqlite3.connect(
         settings.db_path,
@@ -22,7 +22,8 @@ def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
     conn.row_factory = sqlite3.Row
     
     try:
-        # Оптимизации работы SQLite
+        # Включение внешних ключей и оптимизаций SQLite
+        conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
         

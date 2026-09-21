@@ -14,6 +14,7 @@ from app.routers import dashboard, gas, graphs, setting, heating
 from app.services.ble_service import fetch_all_ble_sensors
 from app.services.climate_engine import build_sensor_record, build_api_record
 from app.services import weather_service
+from app.services import backup_service
 
 
 async def check_and_run_calibration():
@@ -24,7 +25,7 @@ async def check_and_run_calibration():
     today_str = now.strftime("%Y-%m-%d")
     if not updated_at_str or not updated_at_str.startswith(today_str):
         await weather_service.calibrate_hourly_coefficients()
-
+        await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

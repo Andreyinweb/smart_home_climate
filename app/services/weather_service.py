@@ -103,6 +103,7 @@ async def record_site_weather(timestamp: Optional[str] = None, row_id: Optional[
         "site_temp": site_temp,
         "site_humi": site_humi,
         "site_ah": site_ah,
+        "name_site": settings.site_weather
     }
 
     if await db.upsert_record("weather_site_table", data_to_write, pk_col="id", log_to_api=False):

@@ -35,6 +35,7 @@ def create_table(db_path, table_name, fields):
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
         
         cursor.execute(f"""
         SELECT count(*) FROM sqlite_master 
@@ -47,6 +48,7 @@ def create_table(db_path, table_name, fields):
             return False
         
         cursor.executescript(f"""
+            PRAGMA foreign_keys = ON;
             CREATE TABLE IF NOT EXISTS {table_name}
             {fields}
         """)
@@ -146,7 +148,7 @@ if __name__ == "__main__":
 
     # Создаём таблицу gas_table
     fields_db = """ (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT NOT NULL,        
         start_of_month_gas_meter REAL,
         gas_meter REAL,
@@ -168,10 +170,9 @@ if __name__ == "__main__":
     create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
 
 
-
     # Создаём таблицу api_table
     fields_db = """ (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,    
         a_floor_humi REAL,
         dp_floor REAL,
@@ -200,31 +201,33 @@ if __name__ == "__main__":
 
     # Создаём таблицу ventilation_table
     fields_db = """ (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,
         status_ventilation BOOLEAN,
-        stop_ventilation INTEGER   
+        stop_vent_plus INTEGER   
         )
         """
     create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
 
     # Создаём таблицу heating_table
     fields_db = """ (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,
         status_heating BOOLEAN,
-        stop_heating INTEGER   
+        stop_heat__plus INTEGER,
+        heating_automation BOOLEAN
         )
         """
     create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
 
     # Таблица сырых данных с сайта (weather_site_table)
     fields_db = """ (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT NOT NULL,
         site_temp REAL NOT NULL,
         site_humi REAL NOT NULL,
-        site_ah REAL NOT NULL
+        site_ah REAL NOT NULL,
+        name_site TEXT
     )
     """
     create_table(db_path=database_file, table_name='weather_site_table', fields=fields_db)
@@ -245,11 +248,10 @@ if __name__ == "__main__":
             for h in range(24):
                 cursor.execute(
                     "INSERT OR IGNORE INTO hourly_coefficients_table (hour, delta_temp, delta_ah, samples_count) VALUES (?, 0.0, 0.0, 0)",
-                    (h)
+                    (h,)
                 )
             conn.commit()
             conn.close()
             print("Инициализирована таблица 'hourly_coefficients_table' 24 часовыми записями.")
         except Exception as e:
             print(f"Ошибка заполнения hourly_coefficients_table: {e}")
-            

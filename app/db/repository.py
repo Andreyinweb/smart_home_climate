@@ -1,4 +1,5 @@
 # app/db/repository.py
+
 import asyncio
 from datetime import datetime
 import logging
@@ -24,8 +25,8 @@ class BaseRepository:
         log_to_api: bool = False
     ) -> bool:
         """
-        Выполняет вставку или полную замену записи (INSERT OR REPLACE).
-        Внимание: заменяет всю строку, сбрасывая непереданные поля в NULL.
+        Выполняет атомарное обновление/вставку без пересоздания строки.
+        Использование 'ON CONFLICT DO UPDATE' предотвращает срабатывание ON DELETE CASCADE.
         """
         logger = api_log if log_to_api else work_log
         if not data:
@@ -34,7 +35,19 @@ class BaseRepository:
         cols = list(data.keys())
         placeholders = ", ".join([f":{c}" for c in cols])
         cols_str = ", ".join(cols)
-        sql = f"INSERT OR REPLACE INTO {table_name} ({cols_str}) VALUES ({placeholders});"
+
+        update_cols = [c for c in cols if c != pk_col]
+        if update_cols:
+            update_str = ", ".join([f"{c} = excluded.{c}" for c in update_cols])
+            sql = (
+                f"INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) "
+                f"ON CONFLICT({pk_col}) DO UPDATE SET {update_str};"
+            )
+        else:
+            sql = (
+                f"INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) "
+                f"ON CONFLICT({pk_col}) DO NOTHING;"
+            )
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -42,7 +55,6 @@ class BaseRepository:
             logger.debug(f"UPSERT в '{table_name}' выполнен.")
             return True
 
-    
     @staticmethod
     def _get_by_id_sync(
         table_name: str,
@@ -250,12 +262,12 @@ def _get_sensor_data_for_graphs_sync(hours: int = 24, log_to_api: bool = False) 
         CASE WHEN EXISTS (
             SELECT 1 FROM ventilation_table v
             WHERE v.id > 0 AND s.id >= v.id
-            AND (v.stop_ventilation = 0 OR v.stop_ventilation IS NULL OR s.id <= v.stop_ventilation)
+            AND (v.stop_vent_plus = 0 OR v.stop_vent_plus IS NULL OR s.id <= v.id + v.stop_vent_plus)
         ) THEN 1 ELSE 0 END AS vent_status,
         CASE WHEN EXISTS (
             SELECT 1 FROM heating_table h
             WHERE h.id > 0 AND s.id >= h.id
-            AND (h.stop_heating = 0 OR h.stop_heating IS NULL OR s.id <= h.stop_heating)
+            AND (h.stop_heat__plus = 0 OR h.stop_heat__plus IS NULL OR s.id <= h.id + h.stop_heat__plus)
         ) THEN 1 ELSE 0 END AS heat_status
     FROM table_sensor_data s
     WHERE s.timestamp >= datetime((SELECT IFNULL(MAX(timestamp), datetime('now')) FROM table_sensor_data), ?)
@@ -362,6 +374,7 @@ async def get_sensor_graph_points(hours: int = 24, log_to_api: bool = False) -> 
 
 async def get_calibration_data(max_time_diff_seconds: int = 600, log_to_api: bool = False) -> List[Dict[str, Any]]:
     return await asyncio.to_thread(_get_calibration_data_sync, max_time_diff_seconds, log_to_api)
+
 
 async def fetch_by_date(
     table_name: str,

@@ -1,4 +1,4 @@
-# smart_home_climate/app/services/graph_service.py
+# app/services/graph_service.py
 
 import asyncio
 from datetime import datetime
@@ -73,19 +73,21 @@ def sample_points_to_target(
     if vent_events:
         for ve in vent_events:
             v_start = ve.get("id")
-            v_stop = ve.get("stop_ventilation")
-            if v_start in id_to_idx:
+            v_plus = ve.get("stop_vent_plus", 0) or 0
+            v_stop = (v_start + v_plus) if (v_start is not None and v_plus > 0) else None
+            if v_start is not None and v_start in id_to_idx:
                 mandatory.add(id_to_idx[v_start])
-            if v_stop in id_to_idx:
+            if v_stop is not None and v_stop in id_to_idx:
                 mandatory.add(id_to_idx[v_stop])
 
     if heat_events:
         for he in heat_events:
             h_start = he.get("id")
-            h_stop = he.get("stop_heating")
-            if h_start in id_to_idx:
+            h_plus = he.get("stop_heat__plus", 0) or 0
+            h_stop = (h_start + h_plus) if (h_start is not None and h_plus > 0) else None
+            if h_start is not None and h_start in id_to_idx:
                 mandatory.add(id_to_idx[h_start])
-            if h_stop in id_to_idx:
+            if h_stop is not None and h_stop in id_to_idx:
                 mandatory.add(id_to_idx[h_stop])
 
     # 3. Поиск пиков (min/max) внутри интервалов отопления и проветривания
@@ -174,15 +176,15 @@ def sample_points_to_target(
 def get_event_spans(
     events: List[Dict[str, Any]],
     data_rows: List[Dict[str, Any]],
-    start_key: str,
-    stop_key: str,
+    start_key: str = "id",
+    plus_key: str = "stop_vent_plus",
 ) -> List[tuple]:
     """Формирует список интервалов (dt_start, dt_end) для подсветки активностей."""
     if not data_rows:
         work_log.debug(f"[get_event_spans] [{start_key}] data_rows пуст.")
         return []
 
-    work_log.debug(f"[get_event_spans] Анализ событий ({start_key} -> {stop_key}). Событий: {len(events or [])}")
+    work_log.debug(f"[get_event_spans] Анализ событий ({start_key} -> {plus_key}). Событий: {len(events or [])}")
 
     def parse_dt(ts: Any) -> datetime:
         if isinstance(ts, datetime):
@@ -215,7 +217,8 @@ def get_event_spans(
     if events:
         for ev in events:
             start_id = ev.get(start_key)
-            stop_id = ev.get(stop_key, 0)
+            plus_val = ev.get(plus_key, 0) or 0
+            stop_id = (start_id + plus_val) if (start_id is not None and plus_val > 0) else 0
 
             if not start_id:
                 continue
@@ -290,10 +293,10 @@ def render_sensor_graphs(
         fl_hums.append(row.get("floor_humi", 0.0))
 
     vent_spans = get_event_spans(
-        vent_events or [], data_rows, "id", "stop_ventilation"
+        vent_events or [], data_rows, "id", "stop_vent_plus"
     )
     heat_spans = get_event_spans(
-        heat_events or [], data_rows, "id", "stop_heating"
+        heat_events or [], data_rows, "id", "stop_heat__plus"
     )
 
     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
