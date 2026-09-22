@@ -17,16 +17,6 @@ from app.services import weather_service
 from app.services import backup_service
 
 
-# async def check_and_run_calibration():
-#     """Проверяет необходимость перерасчета коэффициентов в 00:00."""
-#     now = datetime.now()
-#     coeff_hour = await db.get_record_by_id("hourly_coefficients_table", now.hour, pk_col="hour", log_to_api=False)
-#     updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
-#     today_str = now.strftime("%Y-%m-%d")
-#     if not updated_at_str or not updated_at_str.startswith(today_str):
-#         await weather_service.calibrate_hourly_coefficients()
-#         await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     work_log = logging.getLogger("climat_app.main")
@@ -64,24 +54,19 @@ async def lifespan(app: FastAPI):
                         ble_data["street_humi"] = c_rh
                         ble_data["sensor_or_calc_street"] = c_flag
 
-                    # 1. Запись в table_sensor_data
                     avg_diff_temp = await db.get_aggregate("table_sensor_data", "difference_temp", "AVG") or 0.0
                     sensor_record = build_sensor_record(ble_data, sys_settings, avg_diff_temp)
                     await db.upsert_record("table_sensor_data", sensor_record, pk_col="id", log_to_api=False)
 
-                    # 2. Запись в api_table
                     api_record = build_api_record(sensor_record, now_id, sys_settings)
                     await db.upsert_record("api_table", api_record, pk_col="id", log_to_api=False)
 
-                    # 3. Асинхронная запись погоды (ждет появления now_id в table_sensor_data)
                     asyncio.create_task(weather_service.record_site_weather(timestamp_str, now_id))
 
                     work_log.info(f"[Цикл] Данные ID={now_id} успешно записаны в table_sensor_data и api_table.")
                 else:
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
 
-                # Вызов проверки ежедневной калибровки
-                # await check_and_run_calibration()
                 coeff_hour = await db.get_record_by_id("hourly_coefficients_table", int(timestamp_str[11:13]), pk_col="hour", log_to_api=False)
                 updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
                 

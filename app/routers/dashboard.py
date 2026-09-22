@@ -2,33 +2,16 @@
 
 from datetime import datetime
 import logging
-import os
 from typing import Any
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-import app.db.repository as db
+from app.db.repository import BaseRepository
+from app.dependencies import get_repository, get_template_path, get_templates
 
 api_log = logging.getLogger("api_app.routers.dashboard")
-templates = Jinja2Templates(directory="templates")
-
-
-def get_template_path(template_name: str, request: Request) -> str:
-    """Определяет путь к шаблону в зависимости от типа устройства."""
-    user_agent = request.headers.get("user-agent", "").lower()
-    legacy_keywords = [
-        "smart-tv", "smarttv", "opera tv", "netcast",
-        "viera", "tizen/2", "tizen/3", "web0s/1", "web0s/2"
-    ]
-    is_legacy_device = any(keyword in user_agent for keyword in legacy_keywords)
-    web_template_file = os.path.join("templates", "web", template_name)
-
-    if not is_legacy_device and os.path.exists(web_template_file):
-        return f"web/{template_name}"
-
-    return f"legacy/{template_name}"
 
 
 def safe_diff(val1: Any, val2: Any) -> float:
@@ -62,18 +45,22 @@ router = APIRouter(
 
 
 @router.get("/", response_class=HTMLResponse, summary="Главная страница дашборда")
-async def get_index(request: Request) -> Any:
+async def get_index(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    repo: BaseRepository = Depends(get_repository),
+) -> Any:
     """Главная страница климат-контроля со сводкой показателей."""
     api_log.info("GET / -> открытие главной страницы дашборда")
 
     try:
-        sys_settings = await db.get_or_create_settings(log_to_api=True)
+        sys_settings = await repo.get_or_create_settings(log_to_api=True)
         website_return_time = getattr(sys_settings, "website_return_time", 60)
         target_rh = getattr(sys_settings, "target_rh", 60.0)
         abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)
 
-        latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=True)
-        latest_api = await db.get_latest_record("api_table", order_by_col="id", log_to_api=True)
+        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=True)
+        latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=True)
 
         if not latest_sensor or not latest_api:
             api_log.warning("На сервер не приходят значения из базы данных")
@@ -126,14 +113,14 @@ async def get_index(request: Request) -> Any:
 
         active_modes = []
         try:
-            latest_vent = await db.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+            latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
             if latest_vent and latest_vent.get("status_ventilation"):
                 active_modes.append("Проветривание")
         except Exception:
             pass
 
         try:
-            latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
             if latest_heat and latest_heat.get("status_heating"):
                 active_modes.append("Отопление")
         except Exception:
@@ -174,13 +161,17 @@ async def get_index(request: Request) -> Any:
 
 
 @router.get("/ventilation", response_class=HTMLResponse, summary="Страница проветривания")
-async def get_ventilation_page(request: Request) -> Any:
+async def get_ventilation_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    repo: BaseRepository = Depends(get_repository),
+) -> Any:
     """Страница ручного управления проветриванием и таблицы сравнения."""
-    sys_settings = await db.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_or_create_settings(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
-    latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-    latest_api = await db.get_latest_record("api_table", order_by_col="id", log_to_api=False)
+    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
 
     if not latest_sensor or not latest_api:
         return templates.TemplateResponse(
@@ -198,14 +189,14 @@ async def get_ventilation_page(request: Request) -> Any:
 
     latest_vent = None
     try:
-        latest_vent = await db.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+        latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
     except Exception:
         pass
 
     if latest_vent and latest_vent.get("status_ventilation"):
         vent_start_id = latest_vent.get("id")
-        sensor_before = await db.get_record_by_id("table_sensor_data", vent_start_id, log_to_api=False) if vent_start_id else None
-        api_before = await db.get_record_by_id("api_table", vent_start_id, log_to_api=False) if vent_start_id else None
+        sensor_before = await repo.get_record_by_id("table_sensor_data", vent_start_id, log_to_api=False) if vent_start_id else None
+        api_before = await repo.get_record_by_id("api_table", vent_start_id, log_to_api=False) if vent_start_id else None
 
         if sensor_before and api_before:
             vent_before = dict(sensor_before)
@@ -275,15 +266,15 @@ async def get_ventilation_page(request: Request) -> Any:
 
 
 @router.post("/api/ventilation/start")
-async def start_ventilation():
+async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
     """Запуск проветривания."""
-    latest_vent = await db.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+    latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
     can_start = True
     if latest_vent and latest_vent.get("status_ventilation"):
         can_start = False
 
     if can_start:
-        latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
         if latest_sensor:
             data_to_write = {
                 "id": latest_sensor["id"],
@@ -291,18 +282,18 @@ async def start_ventilation():
                 "status_ventilation": True,
                 "stop_vent_plus": 0,
             }
-            await db.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
+            await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
             api_log.info(f"Успешный старт проветривания: sensor_id={latest_sensor['id']}")
 
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/api/ventilation/stop")
-async def stop_ventilation():
+async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
     """Остановка проветривания."""
-    latest_vent = await db.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+    latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
     if latest_vent and latest_vent.get("status_ventilation"):
-        latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
         if latest_sensor:
             stop_vent_plus = latest_sensor["id"] - latest_vent["id"]
             data_to_write = {
@@ -311,7 +302,7 @@ async def stop_ventilation():
                 "status_ventilation": False,
                 "stop_vent_plus": stop_vent_plus,
             }
-            await db.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
+            await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
             api_log.info(f"Успешный стоп проветривания: start_id={latest_vent['id']}, stop_id={latest_sensor['id']}, diff={stop_vent_plus}")
 
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)

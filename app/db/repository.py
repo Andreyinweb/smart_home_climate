@@ -24,10 +24,6 @@ class BaseRepository:
         pk_col: str = "id",
         log_to_api: bool = False
     ) -> bool:
-        """
-        Выполняет атомарное обновление/вставку без пересоздания строки.
-        Использование 'ON CONFLICT DO UPDATE' предотвращает срабатывание ON DELETE CASCADE.
-        """
         logger = api_log if log_to_api else work_log
         if not data:
             return False
@@ -205,8 +201,133 @@ class BaseRepository:
             logger.error(f"[fetch_by_date] Ошибка выполнения запроса к '{table_name}': {e}")
             return []
 
+    # --- Публичные асинхронные методы класса BaseRepository ---
 
-# --- Работа с настройками (через BaseRepository) ---
+    async def get_or_create_settings(self, log_to_api: bool = False) -> SystemSettings:
+        return await get_or_create_settings(log_to_api=log_to_api)
+
+    async def update_settings(
+        self,
+        update_dto: SystemSettingsUpdate,
+        settings_id: int = 1,
+        log_to_api: bool = False
+    ) -> Optional[SystemSettings]:
+        return await update_settings(update_dto=update_dto, settings_id=settings_id, log_to_api=log_to_api)
+
+    async def upsert_record(
+        self,
+        table_name: str,
+        data: Dict[str, Any],
+        pk_col: str = "id",
+        log_to_api: bool = False
+    ) -> bool:
+        return await upsert_record(table_name=table_name, data=data, pk_col=pk_col, log_to_api=log_to_api)
+
+    async def get_record_by_id(
+        self,
+        table_name: str,
+        record_id: Any,
+        pk_col: str = "id",
+        log_to_api: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        return await get_record_by_id(table_name=table_name, record_id=record_id, pk_col=pk_col, log_to_api=log_to_api)
+
+    async def get_latest_record(
+        self,
+        table_name: str,
+        order_by_col: str = "id",
+        log_to_api: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        return await get_latest_record(table_name=table_name, order_by_col=order_by_col, log_to_api=log_to_api)
+
+    async def fetch_range(
+        self,
+        table_name: str,
+        filter_col: str = "id",
+        start_val: Any = None,
+        stop_val: Any = None,
+        limit: Optional[int] = None,
+        order_asc: bool = True,
+        log_to_api: bool = False
+    ) -> List[Dict[str, Any]]:
+        return await fetch_range(
+            table_name=table_name, filter_col=filter_col, start_val=start_val, stop_val=stop_val, limit=limit, order_asc=order_asc, log_to_api=log_to_api
+        )
+
+    async def get_aggregate(
+        self,
+        table_name: str,
+        column_name: str,
+        function: str = "AVG",
+        interval_type: Optional[str] = None,
+        target_time: Optional[str] = None,
+        log_to_api: bool = False
+    ) -> Optional[float]:
+        return await get_aggregate(
+            table_name=table_name, column_name=column_name, function=function, interval_type=interval_type, target_time=target_time, log_to_api=log_to_api
+        )
+
+    async def delete_record_by_id(
+        self,
+        table_name: str,
+        record_id: Any,
+        pk_col: str = "id",
+        log_to_api: bool = False
+    ) -> bool:
+        return await delete_record_by_id(table_name=table_name, record_id=record_id, pk_col=pk_col, log_to_api=log_to_api)
+
+    async def get_sensor_graph_points(self, hours: int = 24, log_to_api: bool = False) -> List[GraphSensorPoint]:
+        return await get_sensor_graph_points(hours=hours, log_to_api=log_to_api)
+
+    async def get_calibration_data(self, max_time_diff_seconds: int = 600, log_to_api: bool = False) -> List[Dict[str, Any]]:
+        return await get_calibration_data(max_time_diff_seconds=max_time_diff_seconds, log_to_api=log_to_api)
+
+    async def fetch_by_date(
+        self,
+        table_name: str,
+        target_date: str,
+        interval_type: str = "month",
+        order_asc: bool = True,
+        log_to_api: bool = False,
+    ) -> List[Dict[str, Any]]:
+        return await fetch_by_date(
+            table_name=table_name, target_date=target_date, interval_type=interval_type, order_asc=order_asc, log_to_api=log_to_api
+        )
+
+    # --- Методы работы с показаниями газа ---
+
+    async def get_latest_gas_record(self) -> Optional[Dict[str, Any]]:
+        return await get_latest_gas_record()
+
+    async def save_gas_record(
+        self,
+        timestamp: Any,
+        gas_meter: float,
+        gas_difference: Optional[float] = None,
+        price_gas: Optional[float] = None,
+        cost_of_gas: Optional[float] = None,
+        **extra_fields
+    ) -> Dict[str, Any]:
+        return await save_gas_record(
+            timestamp=timestamp,
+            gas_meter=gas_meter,
+            gas_difference=gas_difference,
+            price_gas=price_gas,
+            cost_of_gas=cost_of_gas,
+            **extra_fields
+        )
+
+    async def get_gas_records(
+        self,
+        start_date: Optional[Any] = None,
+        end_date: Optional[Any] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        return await get_gas_records(start_date=start_date, end_date=end_date, limit=limit, offset=offset)
+
+
+# --- Синхронные хелперы для инициализации и специализированных запросов ---
 
 def _get_or_create_settings_sync(log_to_api: bool = False) -> SystemSettings:
     raw = BaseRepository._get_by_id_sync("settings_table", 1, pk_col="id", log_to_api=log_to_api)
@@ -252,8 +373,6 @@ def _update_settings_sync(
     return SystemSettings.model_validate(current)
 
 
-# --- Сложные специфичные запросы (JOIN / CASE) ---
-
 def _get_sensor_data_for_graphs_sync(hours: int = 24, log_to_api: bool = False) -> List[Dict[str, Any]]:
     sql = """
     SELECT
@@ -291,7 +410,80 @@ def _get_calibration_data_sync(max_time_diff_seconds: int = 600, log_to_api: boo
         return [dict(row) for row in conn.cursor().execute(sql, (max_time_diff_seconds,)).fetchall()]
 
 
-# --- Публичный асинхронный API ---
+# --- Синхронные хелперы для gas_table ---
+
+def _get_latest_gas_record_sync() -> Optional[Dict[str, Any]]:
+    sql = "SELECT * FROM gas_table ORDER BY timestamp DESC, id DESC LIMIT 1;"
+    with get_db_connection() as conn:
+        row = conn.cursor().execute(sql).fetchone()
+        return dict(row) if row else None
+
+
+def _save_gas_record_sync(
+    timestamp: Any,
+    gas_meter: float,
+    gas_difference: Optional[float] = None,
+    price_gas: Optional[float] = None,
+    cost_of_gas: Optional[float] = None,
+    **extra_fields
+) -> Dict[str, Any]:
+    str_ts = str(timestamp)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
+        cursor.execute("INSERT INTO table_sensor_data (timestamp) VALUES (?);", (str_ts,))
+        sensor_id = cursor.lastrowid
+
+        data = {
+            "id": sensor_id,
+            "timestamp": str_ts,
+            "gas_meter": gas_meter,
+            "gas_difference": gas_difference,
+            "price_gas": price_gas,
+            "cost_of_gas": cost_of_gas,
+            **{k: v for k, v in extra_fields.items() if v is not None}
+        }
+
+        cols = list(data.keys())
+        placeholders = ", ".join([f":{c}" for c in cols])
+        cols_str = ", ".join(cols)
+        sql_insert = f"INSERT INTO gas_table ({cols_str}) VALUES ({placeholders});"
+        cursor.execute(sql_insert, data)
+        conn.commit()
+
+        row = cursor.execute("SELECT * FROM gas_table WHERE id = ?;", (sensor_id,)).fetchone()
+        return dict(row) if row else {}
+
+
+def _get_gas_records_sync(
+    start_date: Optional[Any] = None,
+    end_date: Optional[Any] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
+    query = "SELECT * FROM gas_table"
+    params: List[Any] = []
+    where: List[str] = []
+
+    if start_date:
+        where.append("timestamp >= ?")
+        params.append(str(start_date))
+    if end_date:
+        where.append("timestamp <= ?")
+        params.append(str(end_date))
+
+    if where:
+        query += " WHERE " + " AND ".join(where)
+
+    query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    with get_db_connection() as conn:
+        rows = conn.cursor().execute(query, tuple(params)).fetchall()
+        return [dict(r) for r in rows]
+
+
+# --- Модульные асинхронные функции ---
 
 async def get_or_create_settings(log_to_api: bool = False) -> SystemSettings:
     return await asyncio.to_thread(_get_or_create_settings_sync, log_to_api)
@@ -391,3 +583,39 @@ async def fetch_by_date(
         order_asc,
         log_to_api,
     )
+
+
+async def get_latest_gas_record() -> Optional[Dict[str, Any]]:
+    return await asyncio.to_thread(_get_latest_gas_record_sync)
+
+
+async def save_gas_record(
+    timestamp: Any,
+    gas_meter: float,
+    gas_difference: Optional[float] = None,
+    price_gas: Optional[float] = None,
+    cost_of_gas: Optional[float] = None,
+    **extra_fields
+) -> Dict[str, Any]:
+    return await asyncio.to_thread(
+        _save_gas_record_sync,
+        timestamp,
+        gas_meter,
+        gas_difference,
+        price_gas,
+        cost_of_gas,
+        **extra_fields
+    )
+
+
+async def get_gas_records(
+    start_date: Optional[Any] = None,
+    end_date: Optional[Any] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
+    return await asyncio.to_thread(_get_gas_records_sync, start_date, end_date, limit, offset)
+
+
+def get_repository() -> BaseRepository:
+    return BaseRepository()

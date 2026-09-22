@@ -1,17 +1,16 @@
-# app/routers/settings.py
+# app/routers/setting.py
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-import app.db.repository as db
-from app.routers.dashboard import get_template_path
+from app.db.repository import BaseRepository
+from app.dependencies import get_repository, get_template_path, get_templates
 
 api_log = logging.getLogger("api_app.routers.settings")
-templates = Jinja2Templates(directory="templates")
 
 router = APIRouter(
     tags=["Settings"],
@@ -19,12 +18,16 @@ router = APIRouter(
 
 
 @router.get("/settings", response_class=HTMLResponse, summary="Страница настроек")
-async def get_settings_page(request: Request) -> Any:
+async def get_settings_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    repo: BaseRepository = Depends(get_repository),
+) -> Any:
     """HTML-страница просмотра и редактирования настроек системы."""
     api_log.info("GET /settings -> открытие страницы настроек")
 
-    sys_settings = await db.get_or_create_settings(log_to_api=False)
-    latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 
     average_temp = "—"
     if latest_sensor and latest_sensor.get("average_temp") is not None:
@@ -46,7 +49,10 @@ async def get_settings_page(request: Request) -> Any:
 
 
 @router.post("/api/settings/update")
-async def update_settings(request: Request):
+async def update_settings(
+    request: Request,
+    repo: BaseRepository = Depends(get_repository),
+):
     """Обработка формы обновления настроек с последующим редиректом на /settings."""
     form_data = await request.form()
 
@@ -59,8 +65,8 @@ async def update_settings(request: Request):
                 pass
         return default
 
-    current_settings = await db.get_or_create_settings(log_to_api=False)
-    latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    current_settings = await repo.get_or_create_settings(log_to_api=False)
+    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 
     last_sensor_timestamp = latest_sensor.get("timestamp", "—") if latest_sensor else "—"
 
@@ -80,10 +86,10 @@ async def update_settings(request: Request):
         "hot_water_per_hour": parse_field("hot_water_per_hour", getattr(current_settings, "hot_water_per_hour", 0.0), float),
     }
 
-    success = await db.upsert_record("settings_table", settings_to_write, pk_col="id", log_to_api=False)
+    success = await repo.upsert_record("settings_table", settings_to_write, pk_col="id", log_to_api=False)
     if success:
-        api_log.info(f" Настройки успешно обновлены в settings_table: {settings_to_write}")
+        api_log.info(f"Настройки успешно обновлены в settings_table: {settings_to_write}")
     else:
-        api_log.error(" Ошибка при записи новых настроек в settings_table")
+        api_log.error("Ошибка при записи новых настроек в settings_table")
 
     return RedirectResponse(url="/settings", status_code=status.HTTP_303_SEE_OTHER)

@@ -3,19 +3,18 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-import app.db.repository as db
+from app.db.repository import BaseRepository
+from app.dependencies import get_repository, get_template_path, get_templates
 from app.routers.dashboard import (
-    get_template_path,
     get_time_difference_str,
     safe_diff,
 )
 
 api_log = logging.getLogger("api_app.routers.heating")
-templates = Jinja2Templates(directory="templates")
 
 router = APIRouter(
     tags=["Heating"],
@@ -23,13 +22,17 @@ router = APIRouter(
 
 
 @router.get("/heating", response_class=HTMLResponse, summary="Страница отопления")
-async def get_heating_page(request: Request) -> Any:
+async def get_heating_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    repo: BaseRepository = Depends(get_repository),
+) -> Any:
     """Страница ручного управления отоплением и сравнительного анализа."""
-    sys_settings = await db.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_or_create_settings(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
-    latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-    latest_api = await db.get_latest_record("api_table", order_by_col="id", log_to_api=False)
+    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
 
     if not latest_sensor or not latest_api:
         return templates.TemplateResponse(
@@ -47,14 +50,14 @@ async def get_heating_page(request: Request) -> Any:
 
     latest_heat = None
     try:
-        latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
     except Exception:
         pass
 
     if latest_heat and latest_heat.get("status_heating"):
         heat_start_id = latest_heat.get("id")
-        sensor_before = await db.get_record_by_id("table_sensor_data", heat_start_id, log_to_api=False) if heat_start_id else None
-        api_before = await db.get_record_by_id("api_table", heat_start_id, log_to_api=False) if heat_start_id else None
+        sensor_before = await repo.get_record_by_id("table_sensor_data", heat_start_id, log_to_api=False) if heat_start_id else None
+        api_before = await repo.get_record_by_id("api_table", heat_start_id, log_to_api=False) if heat_start_id else None
 
         if sensor_before and api_before:
             heat_before = dict(sensor_before)
@@ -120,15 +123,15 @@ async def get_heating_page(request: Request) -> Any:
 
 
 @router.post("/api/heating/start")
-async def start_heating():
+async def start_heating(repo: BaseRepository = Depends(get_repository)):
     """Запуск отопления."""
-    latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+    latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
     can_start = True
     if latest_heat and latest_heat.get("status_heating"):
         can_start = False
 
     if can_start:
-        latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
         if latest_sensor:
             data_to_write = {
                 "id": latest_sensor["id"],
@@ -137,18 +140,18 @@ async def start_heating():
                 "stop_heat__plus": 0,
                 "heating_automation": False,
             }
-            await db.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+            await repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
             api_log.info(f"Успешный старт отопления: sensor_id={latest_sensor['id']}")
 
     return RedirectResponse(url="/heating", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/api/heating/stop")
-async def stop_heating():
+async def stop_heating(repo: BaseRepository = Depends(get_repository)):
     """Остановка отопления."""
-    latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+    latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
     if latest_heat and latest_heat.get("status_heating"):
-        latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
         if latest_sensor:
             stop_heat_plus = latest_sensor["id"] - latest_heat["id"]
             data_to_write = {
@@ -158,7 +161,7 @@ async def stop_heating():
                 "stop_heat__plus": stop_heat_plus,
                 "heating_automation": latest_heat.get("heating_automation", False),
             }
-            await db.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+            await repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
             api_log.info(f"Успешный стоп отопления: start_id={latest_heat['id']}, stop_id={latest_sensor['id']}, diff={stop_heat_plus}")
 
     return RedirectResponse(url="/heating", status_code=status.HTTP_303_SEE_OTHER)
