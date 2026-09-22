@@ -75,12 +75,16 @@ async def lifespan(app: FastAPI):
                     await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
 
             except asyncio.TimeoutError:
+                await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
                 work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
             except asyncio.CancelledError:
+                await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
                 work_log.info("[Цикл] Остановлена фоновая задача опроса BLE-датчиков.")
                 break
             except Exception as e:
+                await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
                 work_log.error(f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True)
+                
             work_log.info(f"[Цикл] Ожидание {interval} секунд до следующего опроса BLE-датчиков...")
             await asyncio.sleep(interval)
 
