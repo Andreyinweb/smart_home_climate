@@ -277,7 +277,10 @@ if [ -z "$PYTHON_VERSION" ]; then
     PYTHON_VERSION='3.12'
 fi
 
-SITE_WEATHER='OPENWEATHERMAP'
+if [ -z "$SITE_WEATHER" ]; then
+    SITE_WEATHER='OPENWEATHERMAP'
+fi
+
 
 PROJECT_DIR="$DIR_PATH"
 
@@ -298,7 +301,7 @@ TOMORROW_API_KEY = '${TOMORROW_API_KEY}'
 
 ########################## Не обязательные переменные  ########################################
 # Сайт погоды
-SITE_WEATHER = 'OPENWEATHERMAP'
+SITE_WEATHER = '${SITE_WEATHER}'
 
 # Координаты города для сайта погоды:
 LOCATION_LAT = '${LOCATION_LAT}'

@@ -340,6 +340,7 @@ def _get_or_create_settings_sync(log_to_api: bool = False) -> SystemSettings:
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "mode": config_settings.sensor_mode.value,
         "interval_seconds": config_settings.interval_seconds,
+        "previous_interval_in_seconds": config_settings.previous_interval_in_seconds,
         "max_retries": config_settings.max_retries,
         "website_return_time": config_settings.website_return_time,
         "t_floor_mac_diff": config_settings.t_floor_mac_diff,

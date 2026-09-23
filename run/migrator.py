@@ -7,6 +7,15 @@ from typing import Any, Dict, List, Set
 import run_program
 
 
+not_magrate_tables = {"table_sensor_data",
+    "settings_table",
+    "sqlite_sequence",
+    "api_table",
+    "ventilation_table",
+    "heating_table",
+    "hourly_coefficients_table",
+}
+
 def get_db_connection(path_db: str | Path) -> sqlite3.Connection:
     """Создает и возвращает подключение к базе данных SQLite с включенной поддержкой Foreign Keys."""
     conn = sqlite3.connect(path_db)
@@ -201,7 +210,7 @@ def migrate_dependent_table(
     print(f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов/без ID: {total_skipped}")
 
 
-def main() -> None:
+def main(not_magrate_tables) -> None:
     print("=" * 80)
     print(" ЗАПУСК ПРОЦЕССА МИГРАЦИИ И ОБЪЕДИНЕНИЯ ДАННЫХ")
     print("=" * 80)
@@ -232,16 +241,7 @@ def main() -> None:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
             target_tables = [row[0] for row in cursor.fetchall()]
 
-            exclude_tables = {
-                "table_sensor_data",
-                "settings_table",
-                "sqlite_sequence",
-                "api_table",
-                "ventilation_table",
-                "heating_table",
-                "hourly_coefficients_table",
-            }
-            now_db_tables = [t for t in target_tables if t not in exclude_tables]
+            now_db_tables = [t for t in target_tables if t not in not_magrate_tables]
             print(f"[Инфо] Таблицы для миграции ({len(now_db_tables)}): {now_db_tables}")
 
             # 1. Сначала мигрируем главную таблицу датчиков (table_sensor_data)
@@ -264,4 +264,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(not_magrate_tables)

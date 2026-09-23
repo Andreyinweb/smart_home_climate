@@ -13,6 +13,7 @@ class SystemSettings(BaseModel):
     timestamp: str = Field(description="Время последнего обновления записи (YYYY-MM-DD HH:MM:SS)")
     mode: str = Field(description="Текущий режим работы датчиков (SENSOR_MODE)")
     interval_seconds: int = Field(ge=1, description="Интервал опроса в секундах")
+    previous_interval_in_seconds: int = Field(ge=1, description="Предидущий интервал опроса в секундах")
     max_retries: int = Field(ge=1, description="Максимальное количество повторных попыток")
     website_return_time: int = Field(ge=0, description="Время возврата на главный экран (сек)")
     
@@ -33,6 +34,7 @@ class SystemSettingsUpdate(BaseModel):
 
     mode: Optional[str] = None
     interval_seconds: Optional[int] = Field(default=None, ge=1)
+    previous_interval_in_seconds: Optional[int] = Field(default=None, ge=1)
     max_retries: Optional[int] = Field(default=None, ge=1)
     website_return_time: Optional[int] = Field(default=None, ge=0)
     
