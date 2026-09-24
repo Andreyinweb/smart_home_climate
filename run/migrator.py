@@ -10,9 +10,9 @@ import run_program
 not_magrate_tables = {"table_sensor_data",
     "settings_table",
     "sqlite_sequence",
-    "api_table",
-    "ventilation_table",
-    "heating_table",
+    # "api_table",
+    # "ventilation_table",
+    # "heating_table",
     "hourly_coefficients_table",
 }
 

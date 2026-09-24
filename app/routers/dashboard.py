@@ -299,34 +299,10 @@ async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
 
 
-# @router.post("/api/ventilation/stop")
-# async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
-#     """Остановка проветривания."""
-#     sys_settings = await repo.get_or_create_settings(log_to_api=False)
-#     latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
-#     if latest_vent and latest_vent.get("status_ventilation"):
-#         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-#         if latest_sensor:
-#             stop_vent_plus = latest_sensor["id"] - latest_vent["id"]
-#             data_to_write = {
-#                 "id": latest_vent["id"],
-#                 "timestamp": latest_vent["timestamp"],
-#                 "status_ventilation": False,
-#                 "stop_vent_plus": stop_vent_plus,
-#             }
-#             await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
-#             api_log.info(f"Успешный стоп проветривания: start_id={latest_vent['id']}, stop_id={latest_sensor['id']}, diff={stop_vent_plus}")
-
-#         latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
-#         if latest_api:
-#             dto = SystemSettingsUpdate(interval_seconds=sys_settings.previous_interval_in_seconds)
-#             await repo.update_settings(update_dto=dto)
-
-#     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
-
 @router.post("/api/ventilation/stop")
 async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
     """Остановка проветривания."""
+    sys_settings = await repo.get_or_create_settings(log_to_api=False)
     latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
     if latest_vent and latest_vent.get("status_ventilation"):
         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
@@ -345,5 +321,10 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
                 }
                 await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
                 api_log.info(f"Успешный стоп проветривания: start_id={latest_vent['id']}, stop_id={latest_sensor['id']}, diff={stop_vent_plus}")
+
+            latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
+            if latest_api:
+                dto = SystemSettingsUpdate(interval_seconds=sys_settings.previous_interval_in_seconds)
+                await repo.update_settings(update_dto=dto)
 
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
