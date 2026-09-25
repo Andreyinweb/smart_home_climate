@@ -154,14 +154,19 @@ async def stop_heating(repo: BaseRepository = Depends(get_repository)):
         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
         if latest_sensor:
             stop_heat_plus = latest_sensor["id"] - latest_heat["id"]
-            data_to_write = {
-                "id": latest_heat["id"],
-                "timestamp": latest_heat["timestamp"],
-                "status_heating": False,
-                "stop_heat__plus": stop_heat_plus,
-                "heating_automation": latest_heat.get("heating_automation", False),
-            }
-            await repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
-            api_log.info(f"Успешный стоп отопления: start_id={latest_heat['id']}, stop_id={latest_sensor['id']}, diff={stop_heat_plus}")
 
+            if stop_heat_plus == 0:
+                await repo.delete_record_by_id("heating_table", latest_heat["id"], pk_col="id", log_to_api=False)
+                api_log.info(f"Удаление записи отопления (stop_heat_plus=0): id={latest_heat['id']}")
+            else:
+                data_to_write = {
+                    "id": latest_heat["id"],
+                    "timestamp": latest_heat["timestamp"],
+                    "status_heating": False,
+                    "stop_heat__plus": stop_heat_plus,
+                    "heating_automation": latest_heat.get("heating_automation", False),
+                }
+                await repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+                api_log.info(f"Успешный стоп отопления: start_id={latest_heat['id']}, stop_id={latest_sensor['id']}, diff={stop_heat_plus}")
+    
     return RedirectResponse(url="/heating", status_code=status.HTTP_303_SEE_OTHER)
