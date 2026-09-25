@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
 from app.dependencies import get_repository, get_template_path, get_templates
-from app.schemas.settings import SystemSettingsUpdate
+from app.schemas.schema_settings import SystemSettingsUpdate
 
 api_log = logging.getLogger("api_app.routers.dashboard")
 

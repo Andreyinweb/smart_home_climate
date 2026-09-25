@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from app.db.connection import get_db_connection
 from app.core.config import settings as config_settings
-from app.schemas.settings import SystemSettings, SystemSettingsUpdate
+from app.schemas.schema_settings import SystemSettings, SystemSettingsUpdate
 from app.schemas.climate import GraphSensorPoint
 
 work_log = logging.getLogger("climat_app.repository")
