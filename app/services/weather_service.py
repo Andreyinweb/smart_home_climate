@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from app.core.config import WeatherProvider, settings
 import app.db.repository as db
-from app.services.climate_engine import (
+from app.services.climate_service import (
     calculate_absolute_humidity,
     calculate_relative_humidity,
 )

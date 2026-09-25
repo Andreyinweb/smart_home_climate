@@ -1,4 +1,4 @@
-# app/routers/graphs.py
+# app/routers/graphs_router.py
 
 import logging
 from typing import Any
@@ -11,7 +11,7 @@ from app.db.repository import BaseRepository
 from app.dependencies import get_repository, get_template_path, get_templates
 from app.services.graph_service import update_graphs_cache_if_needed
 
-api_log = logging.getLogger("api_app.routers.graphs")
+api_log = logging.getLogger("api_app.routers.graphs_router")
 
 router = APIRouter(
     tags=["Graphs"],

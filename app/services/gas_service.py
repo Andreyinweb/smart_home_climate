@@ -1,4 +1,4 @@
-# app/services/gas_engine.py
+# app/services/gas_service.py
 import calendar
 import logging
 from datetime import datetime
@@ -7,7 +7,7 @@ from fastapi import Depends
 
 from app.core.config import settings
 from app.db.repository import BaseRepository, get_repository
-from app.schemas.gas_schem import GasUpdateInputSchema
+from app.schemas.gas_schema import GasUpdateInputSchema
 
 logger = logging.getLogger("api_app.services.gas")
 

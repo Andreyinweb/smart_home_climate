@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 from bleak import BleakClient
 
 from app.core.config import settings as config_settings
-from app.schemas.schema_settings import SystemSettings
+from app.schemas.settings_schema import SystemSettings
 
 work_log = logging.getLogger("climat_app.ble_service")
 

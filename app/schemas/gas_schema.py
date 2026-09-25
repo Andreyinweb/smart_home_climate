@@ -1,4 +1,4 @@
-# app/schemas/gas_schem.py
+# app/schemas/gas_schema.py
 from datetime import datetime
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, field_validator

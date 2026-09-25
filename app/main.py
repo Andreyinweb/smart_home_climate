@@ -10,10 +10,10 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 import app.db.repository as db
 from app.db.connection import get_db_connection
-from app.routers import dashboard, gas, graphs, settings_router, heating
+from app.routers import dashboard_router, gas_router, graphs_router, settings_router, heating_router
 
 from app.services.ble_service import fetch_all_ble_sensors
-from app.services.climate_engine import build_sensor_record, build_api_record
+from app.services.climate_service import build_sensor_record, build_api_record
 from app.services import weather_service
 from app.services import backup_service
 
@@ -121,11 +121,11 @@ app = FastAPI(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.include_router(dashboard.router)
-app.include_router(gas.router)
-app.include_router(graphs.router)
+app.include_router(dashboard_router.router)
+app.include_router(gas_router.router)
+app.include_router(graphs_router.router)
 app.include_router(settings_router.router)
-app.include_router(heating.router)
+app.include_router(heating_router.router)
 
 
 if __name__ == "__main__":

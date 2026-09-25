@@ -263,7 +263,7 @@ def render_sensor_graphs(
     work_log.debug(f"[render_sensor_graphs] Старт отрисовки. Строк: {len(data_rows)}, Директория: {output_dir}")
 
     sampled_rows = sample_points_to_target(
-        data_rows, vent_events, heat_events, target_min=48, target_max=50
+        data_rows, vent_events, heat_events, target_min=200, target_max=210
     )
     os.makedirs(output_dir, exist_ok=True)
 

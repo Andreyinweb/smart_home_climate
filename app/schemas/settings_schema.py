@@ -1,4 +1,4 @@
-# app/schemas/settings.py
+# app/schemas/settings_schema.py
 
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field

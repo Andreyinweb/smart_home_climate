@@ -1,4 +1,4 @@
-# app/routers/dashboard.py
+# app/routers/dashboard_router.py
 
 from datetime import datetime
 import logging
@@ -10,9 +10,9 @@ from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
 from app.dependencies import get_repository, get_template_path, get_templates
-from app.schemas.schema_settings import SystemSettingsUpdate
+from app.schemas.settings_schema import SystemSettingsUpdate
 
-api_log = logging.getLogger("api_app.routers.dashboard")
+api_log = logging.getLogger("api_app.routers.dashboard_router")
 
 
 def safe_diff(val1: Any, val2: Any) -> float:

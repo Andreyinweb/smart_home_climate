@@ -1,4 +1,4 @@
-# app/routers/heating.py
+# app/routers/heating_router.py
 
 import logging
 from typing import Any
@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
 from app.dependencies import get_repository, get_template_path, get_templates
-from app.routers.dashboard import (
+from app.routers.dashboard_router import (
     get_time_difference_str,
     safe_diff,
 )

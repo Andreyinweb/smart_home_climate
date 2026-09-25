@@ -1,14 +1,14 @@
-# app/routers/gas.py
+# app/routers/gas_router.py
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.dependencies import get_templates, get_template_path
-from app.schemas.gas_schem import GasUpdateInputSchema
-from app.services.gas_engine import GasEngineService
+from app.schemas.gas_schema import GasUpdateInputSchema
+from app.services.gas_service import GasEngineService
 
-logger = logging.getLogger("api_app.routers.gas")
+logger = logging.getLogger("api_app.routers.gas_router")
 templates = get_templates()
 
 router = APIRouter(tags=["Gas"])
