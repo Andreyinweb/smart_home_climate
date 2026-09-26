@@ -77,7 +77,8 @@ async def lifespan(app: FastAPI):
                 updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
 
                 if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
-                    await weather_service.calibrate_hourly_coefficients()
+                    asyncio.create_task(weather_service.calibrate_hourly_coefficients())
+                    # await weather_service.calibrate_hourly_coefficients()
                     await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
 
             except asyncio.TimeoutError:
