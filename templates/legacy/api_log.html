@@ -1,0 +1,24 @@
+<!-- templates/legacy/api_log.html -->
+{% extends "legacy/base.html" %}
+
+{% block title %}API Log — Отладка{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">🌐 {{ log_title }}</h2>
+            <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
+                Файл: <span class="text-blue val-bold">{{ log_file_name }}</span> | Записей в окне: <span class="text-blue val-bold">{{ lines_count }}</span>
+            </div>
+        </div>
+        <div class="actions-row">
+            <a href="/debug/api-log" class="btn btn-start" style="padding: 4px 10px; font-size: 0.85rem;">🔄 Обновить</a>
+        </div>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <pre style="background-color: #0f172a; color: #f8fafc; padding: 12px; border-radius: 6px; font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; line-height: 1.4; overflow-x: auto; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"><code>{{ log_content if log_content else 'Файл лога пуст.' }}</code></pre>
+    </div>
+</div>
+{% endblock %}

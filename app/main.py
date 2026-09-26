@@ -7,10 +7,17 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import settings
+from app.core.config import AppEnv, settings
 import app.db.repository as db
 from app.db.connection import get_db_connection
-from app.routers import dashboard_router, gas_router, graphs_router, settings_router, heating_router
+from app.routers import (
+    dashboard_router,
+    debug_router,
+    gas_router,
+    graphs_router,
+    heating_router,
+    settings_router,
+)
 
 from app.services.ble_service import fetch_all_ble_sensors
 from app.services.climate_service import build_sensor_record, build_api_record
@@ -68,10 +75,10 @@ async def lifespan(app: FastAPI):
 
                 coeff_hour = await db.get_record_by_id("hourly_coefficients_table", int(timestamp_str[11:13]), pk_col="hour", log_to_api=False)
                 updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
-                
+
                 if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
-                    await weather_service.calibrate_hourly_coefficients()
-                    await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
+                    asyncio.create_task(weather_service.calibrate_hourly_coefficients())
+                    asyncio.create_task(backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100))
 
             except asyncio.TimeoutError:
                 work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
@@ -127,12 +134,11 @@ app.include_router(graphs_router.router)
 app.include_router(settings_router.router)
 app.include_router(heating_router.router)
 
+if settings.app_env == AppEnv.DEVELOPMENT:
+    app.include_router(debug_router.router)
+
 
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("app.main:app", host=settings.server_host, port=settings.server_port, reload=True)
-
-
-
-

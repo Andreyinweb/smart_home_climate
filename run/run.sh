@@ -281,6 +281,9 @@ if [ -z "$SITE_WEATHER" ]; then
     SITE_WEATHER='OPENWEATHERMAP'
 fi
 
+if [ -z "$APP_ENV" ]; then
+    APP_ENV='DEVELOPMENT'
+fi
 
 PROJECT_DIR="$DIR_PATH"
 
@@ -329,6 +332,9 @@ SERVER_PORT = ${SERVER_PORT}
 
 # Версия Python, которую нужно установить
 PYTHON_VERSION = '${PYTHON_VERSION}'
+
+# Режимы приложения и железа
+APP_ENV = '${APP_ENV}'
 
 # Местоположение проекта, для теста файла env
 PROJECT_DIR = '${PROJECT_DIR}'

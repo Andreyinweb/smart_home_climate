@@ -1,3 +1,4 @@
+<!-- templates/legacy/base.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7,8 +8,7 @@
     <meta http-equiv="refresh" content="{{ website_return_time }}">
     {% endif %}
     <title>{% block title %}Новая программа{% endblock %}</title>
-    <!-- <link rel="stylesheet" href="../static/css/legacy.css"> -->
-     <link rel="stylesheet" href="/static/css/legacy.css?v=3">
+    <link rel="stylesheet" href="/static/css/legacy.css?v=3">
 </head>
 <body>
     <!-- Верхняя панель навигации -->
@@ -24,6 +24,8 @@
                 <a href="/gas/table" class="nav-link">📊 Таблица</a>
                 <a href="/gas" class="nav-link">📟 Учет</a>
                 <a href="/settings" class="nav-link">⚙️ Настройки</a>
+                <a href="/debug/work-log" class="nav-link">📝 Work Log</a>
+                <a href="/debug/api-log" class="nav-link">🌐 API Log</a>
             </nav>
         </div>
     </header>
