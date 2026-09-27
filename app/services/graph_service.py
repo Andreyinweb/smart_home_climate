@@ -254,6 +254,7 @@ def render_sensor_graphs(
     output_dir: str = "static/graphs",
     vent_events: Optional[List[Dict[str, Any]]] = None,
     heat_events: Optional[List[Dict[str, Any]]] = None,
+    target_floor_humi: Optional[float] = None,
 ) -> None:
     """Отрисовка и сохранение PNG-графиков температуры и влажности."""
     if not data_rows:
@@ -385,6 +386,16 @@ def render_sensor_graphs(
     ax_fl_h.set_title("Датчик: Пол", fontsize=10, loc="left", color="#c0392b", fontweight="bold")
     ax_fl_h.set_ylabel("%")
 
+    # Линия целевой влажности без подписей и легенды
+    if target_floor_humi is not None and target_floor_humi > 0:
+        ax_fl_h.axhline(
+            y=target_floor_humi,
+            color="#8e44ad",
+            linestyle="--",
+            linewidth=1.8,
+            zorder=5,
+        )
+
     for ax, vals in zip((ax_st_h, ax_bs_h, ax_fl_h), (st_hums, bs_hums, fl_hums)):
         for i, (v_start, v_end) in enumerate(vent_spans):
             ax.axvspan(v_start, v_end, color="#3498db", alpha=0.2, label="Проветривание" if i == 0 else "")
@@ -423,7 +434,7 @@ def render_sensor_graphs(
 async def update_graphs_cache_if_needed() -> Optional[bool]:
     """Асинхронная проверка появления новых данных или отсутствия файлов и перерисовка графиков."""
     if _graph_lock.locked():
-        work_log.warning("[update_graphs_cache_if_needed] Расчет графиков уже выполняется. Запрос отклонен.")
+        work_log.debug("[update_graphs_cache_if_needed] Расчет графиков уже выполняется. Запрос отклонен.")
         return None
 
     async with _graph_lock:
@@ -470,14 +481,34 @@ async def update_graphs_cache_if_needed() -> Optional[bool]:
             heat_events = await db.fetch_range("heating_table", order_asc=True, log_to_api=False)
             work_log.debug(f"[update_graphs_cache_if_needed] Загружено событий: проветривания={len(vent_events)}, отопления={len(heat_events)}")
 
+            sys_settings = await db.get_or_create_settings(log_to_api=False)
+            target_floor_humi = None
+
+            if sys_settings:
+                if hasattr(sys_settings, "target_rh"):
+                    val = getattr(sys_settings, "target_rh")
+                    if val is not None:
+                        try:
+                            target_floor_humi = float(val)
+                        except (ValueError, TypeError):
+                            pass
+                elif isinstance(sys_settings, dict) and "target_rh" in sys_settings:
+                    val = sys_settings["target_rh"]
+                    if val is not None:
+                        try:
+                            target_floor_humi = float(val)
+                        except (ValueError, TypeError):
+                            pass
+
             if sensor_data:
-                work_log.debug("[update_graphs_cache_if_needed] Запуск render_sensor_graphs во внешнем потоке...")
+                work_log.debug(f"[update_graphs_cache_if_needed] Запуск render_sensor_graphs во внешнем потоке (target_rh={target_floor_humi})...")
                 await asyncio.to_thread(
                     render_sensor_graphs,
                     sensor_data,
                     "static/graphs",
                     vent_events,
                     heat_events,
+                    target_floor_humi,
                 )
 
                 if latest_api and "id" in latest_api:
@@ -506,7 +537,6 @@ async def update_graphs_cache_if_needed() -> Optional[bool]:
             work_log.debug("[update_graphs_cache_if_needed] Актуальные графики уже сформированы. Изменений нет.")
 
         return False
-
 
 # # app/services/graph_service.py
 
