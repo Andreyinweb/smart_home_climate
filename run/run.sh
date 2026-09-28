@@ -1,44 +1,72 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# bash run/run.sh /home/andrey/andrey_folder/New_Indoor_climate/In_server/.env
+# /run/run.sh
 
-# chmod +x run.sh
-################################################ Переменные #########################################################
+set -eo pipefail
+
 DIR_PATH="$PWD"
-# Обязательно указываем путь к файлу .env или настроек.
-if [ -n "$1" ]; then
-    ENV_FILE="$1"
+SERVER_MODE=false
+CONFIG_FILE=""
+
+echo "СТАРТ run sh"
+
+# Разбор аргументов командной строки
+for arg in "$@"; do
+    if [ "$arg" = "-server" ]; then
+        SERVER_MODE=true
+    elif [ -z "$CONFIG_FILE" ] && [ "$arg" != "-server" ]; then
+        CONFIG_FILE="$arg"
+    fi
+done
+
+if [ "$SERVER_MODE" = true ]; then
+    ENV_FILE="/etc/smart_home_climate/config.env"
 else
-    ENV_FILE="$DIR_PATH/.env"
+    if [ -n "$CONFIG_FILE" ]; then
+        ENV_FILE="$CONFIG_FILE"
+    else
+        ENV_FILE="$DIR_PATH/.env"
+    fi
 fi
 
-######################################################### Функции #########################################################
-# Функция для запроса подтверждения
-function ask_confirm() {
-    local prompt="$1"
+# Определение интерактивности режима
+if [ ! -t 0 ] || [ "${NON_INTERACTIVE:-false}" = "true" ] || [ "$SERVER_MODE" = true ]; then
+    IS_INTERACTIVE=false
+else
+    IS_INTERACTIVE=true
+fi
+
+# Функция подтверждения операций
+ask_confirm() {
+    local prompt_msg="$1"
+
+    if [ "$IS_INTERACTIVE" = false ]; then
+        return 0
+    fi
+
+    local response
     while true; do
-        read -p "$prompt y/n: " answer
-        case "$answer" in
-            ([yY]|[yY][eE][sS])
+        read -p "$prompt_msg [y/N]: " response
+        case "$response" in
+            [yY][eE][sS]|[yY])
                 return 0
                 ;;
-            ([nN]|[nN][oO])
+            [nN][oO]|[nN])
                 return 1
                 ;;
-            (*)
+            *)
                 echo "Пожалуйста, введите y/n" >&2
                 ;;
         esac
     done
 }
 
-# Универсальная функция установки пакетов
-function install_package() {
+# Функция установки системных пакетов
+install_package() {
     local package_name="$1"
     local test_command="$2"
     local install_command="sudo apt install -y $package_name"
     
-    # Проверка, установлен ли уже пакет
     if eval "$test_command" &>/dev/null; then
         echo "✅ Пакет '$package_name' уже установлен"
         return 0
@@ -51,7 +79,6 @@ function install_package() {
         
         echo "⚙️ Устанавливаю $package_name..."
         if eval "$install_command"; then
-            # Повторная проверка после установки
             if eval "$test_command" &>/dev/null; then
                 echo "✅ Пакет '$package_name' успешно установлен"
                 return 0
@@ -67,17 +94,12 @@ function install_package() {
         echo "❌ Установка '$package_name' отменена пользователем"
         return 1
     fi
-
-                # Пример использования для других пакетов:
-                # install_package "curl" "curl --version"
-                # install_package "git" "git --version"
 }
 
-# Проверяет наличие папаки и создает ее, если она не существует
-function check_or_create_dir() {
+# Проверка и создание директории
+check_or_create_dir() {
     local dir_path="$1"
     
-    # Проверяем существование директории
     if [ ! -d "$dir_path" ]; then
         echo "Директория $dir_path не существует."
         if ask_confirm "Создать папку $dir_path ?"; then
@@ -94,39 +116,30 @@ function check_or_create_dir() {
     fi
 }
 
-# Проверяет наличие файла и создает его, если он не существует (если не включен режим "только проверка")
-function check_or_create_file() {
+# Проверка и создание файла
+check_or_create_file() {
     local file_path="$1"
     local text_in_file="$2"
-    local mode="$3" # "check_only", файл создаваться не будет
-    local log_dir=$(dirname "$file_path")
+    local mode="$3" # "check_only"
+    local log_dir
+    log_dir=$(dirname "$file_path")
     
-    # Коды возврата (Exit Status) функции check_or_create_file:
-    # 0 — Успех: файл уже существует
-    # 1 — Успех: файла не было, но он был успешно создан
-    # 2 — Файла нет и он не создан (режим check_only или отказ пользователя)
-    # 3 — Ошибка: отсутствует директория или нет прав на создание
-    
-    # Сначала проверяем существование директории
     if [ ! -d "$log_dir" ]; then
         echo "✗ Директория '$log_dir' не существует — файл не может быть создан" >&2
-        return 3
+        return 1
     fi
 
-    # Проверяем существование файла
     if [ -f "$file_path" ]; then
         echo "✓ Файл '$file_path' существует" >&2
         return 0
     else
         echo "✗ Файл '$file_path' не найден" >&2
         
-        # ЕСЛИ включен режим "только проверка", сразу выходим без создания
         if [ "$mode" = "check_only" ]; then
             echo "  > Режим проверки: создание файла пропущено" >&2
-            return 2
+            return 1
         fi
 
-        # Иначе — обычная логика создания
         if ask_confirm "Создать файл '$file_path'?"; then    
             if [ -n "$text_in_file" ] && [ -f "$text_in_file" ]; then
                 cp "$text_in_file" "$file_path"
@@ -134,19 +147,25 @@ function check_or_create_file() {
                 touch "$file_path"
             fi
             echo "  > Файл '$file_path' успешно создан" >&2
-            return 1
+            return 0
         else
             echo "  > Создание файла отменено" >&2
-            return 2
+            return 1
         fi
     fi
 }
 
-function loading_variables() {
+# Загрузка и экспорт переменных окружения из конфига
+loading_variables() {
     local config_file="$1"
     local is_required=true
     local missing=()
     local line name val
+
+    if [ ! -f "$config_file" ]; then
+        echo "❌ Конфигурационный файл $config_file не найден!" >&2
+        return 1
+    fi
 
     while IFS= read -r line || [ -n "$line" ]; do
         [[ "$line" =~ ^[[:space:]]*#.*# ]] && is_required=false
@@ -157,7 +176,6 @@ function loading_variables() {
             name="${line%%=*}"
             val="${line#*=}"
             
-            # Строго в кавычках и с обычным символом '|'
             name=$(echo "$name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
             val=$(echo "$val" | sed -E "s/#.*//; s/^[[:space:]]*//; s/[[:space:]]*$//; s/^['\"]|['\"]$//g")
 
@@ -165,142 +183,96 @@ function loading_variables() {
                 missing+=("$name")
             fi
             
-            # -g объявляет переменную в глобальном окружении скрипта
             declare -g "$name=$val"
+            export "$name=$val"
         fi
     done < "$config_file"
 
     if [ ${#missing[@]} -ne 0 ]; then
         echo "❌ Не заполнены обязательные переменные: ${missing[*]}. Пожалуйста, заполните их в $config_file и перезапустите скрипт." >&2
-        return 2
+        return 1
     fi
 }
 
+######################################################### Загрузка конфигурации ##################################################
 
-######################################################### Начальные условия ##################################################
-
-
-# Коды возврата (Exit Status) функции check_or_create_file:
-# 0 — Успех: файл уже существует
-# 1 — Успех: файла не было, но он был успешно создан
-# 2 — Файла нет и он не создан (режим check_only или отказ пользователя)
-# 3 — Ошибка: отсутствует директория или нет прав на создание
-
-check_or_create_file "$ENV_FILE" #"./run/env.txt"
-if [ $? == 0 ]; then 
-    loading_variables "$ENV_FILE"
-    if [ $? == 2 ]; then
-        echo "Файл .env не заполнен основные переменные. Будет перезаписан" 
-        CONFIGURATION_FILE="./run/env.txt"
-
+if [ "$SERVER_MODE" = true ]; then
+    if [ -f "$ENV_FILE" ]; then
+        loading_variables "$ENV_FILE"
     else
-        # Проверка соответствия PROJECT_DIR текущей директории
-        if [ "$PROJECT_DIR" == "$DIR_PATH" ]; then
-            # Если PROJECT_DIR совпадает с текущей директорией, используем файл .env
-            CONFIGURATION_FILE="$ENV_FILE" 
-
-        elif [ "$PROJECT_DIR" != "$DIR_PATH" ]; then
-            # Если PROJECT_DIR не совпадает с текущей директорией, выводим предупреждение и предлагаем варианты действий
-            echo "В .env указана переменная PROJECT_DIR = '$PROJECT_DIR', но текущая директория '$DIR_PATH'."
-            if ask_confirm "Есть основные данные, но пути можем переписать по умолчанию? !!!!! БЕЗ env.txt ФАЙЛА"; then
-                # Перезаписываем не основные переменные по умолчанию без env.txt файла
-                CONFIGURATION_FILE="$ENV_FILE"           
+        echo "❌ Ошибка: Серверный конфигурационный файл $ENV_FILE не найден!" >&2
+        exit 1
+    fi
+else
+    if check_or_create_file "$ENV_FILE"; then 
+        if ! loading_variables "$ENV_FILE"; then
+            echo "Файл .env не содержит основные переменные. Будет перезаписан из run/env.txt" 
+            CONFIGURATION_FILE="./run/env.txt"
+        else
+            if [ "${PROJECT_DIR:-}" = "$DIR_PATH" ]; then
+                CONFIGURATION_FILE="$ENV_FILE" 
             else
-                if ask_confirm "!!!!!!!!!!  Переписать файл .env? !! ОН БУДЕТ УДАЛЁН И ЗАПИСАН ЗАНОВО !!"; then
-                    # Удаляет файл .env и создает новый с настройками по умолчанию из env.txt
-                    rm "$ENV_FILE"
-                    CONFIGURATION_FILE="./run/env.txt"
-                    check_or_create_file "$ENV_FILE" "run/env.txt"
-                    if [ $? !=2 ]; then
-                        echo "НУЖЕН ФАЙЛ НАСТРОЕК .env. Завершение работы. ПЕРЕЗАПУСТИ ." 
+                echo "В .env указана переменная PROJECT_DIR = '${PROJECT_DIR:-}', но текущая директория '$DIR_PATH'."
+                if ask_confirm "Есть основные данные, но пути можем переписать по умолчанию?"; then
+                    CONFIGURATION_FILE="$ENV_FILE"           
+                else
+                    if ask_confirm "Переписать файл .env? ОН БУДЕТ УДАЛЁН И ЗАПИСАН ЗАНОВО!"; then
+                        rm -f "$ENV_FILE"
+                        CONFIGURATION_FILE="./run/env.txt"
+                        check_or_create_file "$ENV_FILE" "run/env.txt" || true
+                    else
+                        echo "НУЖЕН ФАЙЛ НАСТРОЕК .env. Завершение работы." 
                         exit 2
                     fi
-
-                else
-                    echo "НУЖЕН ФАЙЛ НАСТРОЕК .env. Завершение работы. ПЕРЕЗАПУСТИ ." 
-                    exit 2
                 fi
             fi
         fi
+    else
+        CONFIGURATION_FILE="./run/env.txt"
     fi
-else
-    CONFIGURATION_FILE="./run/env.txt"
+
+    if ! check_or_create_file "$CONFIGURATION_FILE" "" "check_only"; then
+        echo "Файл конфигурации $CONFIGURATION_FILE не найден. Проверьте наличие run/env.txt"
+        exit 1
+    fi
+
+    loading_variables "$CONFIGURATION_FILE"
 fi
 
-
-check_or_create_file "$CONFIGURATION_FILE" "" "check_only"
-if [ $? != 0 ]; then
-    echo "Файл конфигурации $CONFIGURATION_FILE не найден. Перезапустите программу и и проверте наличие run/env.txt "
-    exit 1
-fi
-
-loading_variables "$CONFIGURATION_FILE"
-
-############################################### Проверка переменных окружения #######################################################
-if [ -z "$LOCATION_LAT" ]; then
-    LOCATION_LAT='50.4501'
-fi
-if [ -z "$LOCATION_LON" ]; then
-    LOCATION_LON='30.5234'
-fi
-if [ -z "$DB_DIR" ]; then
-    DB_DIR="$DIR_PATH"
-fi
-if [ -z "$DB_NAME" ]; then
-    DB_NAME='climate_data.sqlite3'
-fi
-if [ -z "$VENV_DIR" ]; then
-    VENV_DIR="$DIR_PATH/venv"
-fi
-if [ -z "$VENV_NAME" ]; then
-    VENV_NAME='venv_smart_home_climate'
-fi
-if [ -z "$LOG_DIR" ]; then
-    LOG_DIR="$DIR_PATH/logs"
-fi
-if [ -z "$WORK_LOG" ]; then
-    WORK_LOG="$LOG_DIR/work_log.log"
-fi
-if [ -z "$API_LOG" ]; then
-    API_LOG="$LOG_DIR/api_log.log"
-fi
-if [ -z "$BACKUP" ]; then
-    BACKUP="$DIR_PATH/backup"
-fi
-if [ -z "$SERVER_HOST" ]; then
-    SERVER_HOST='0.0.0.0'
-fi
-if [ -z "$SERVER_PORT" ]; then
-    SERVER_PORT='8000'
-fi
-if [ -z "$PYTHON_VERSION" ]; then
-    PYTHON_VERSION='3.12'
-fi
-
-if [ -z "$SITE_WEATHER" ]; then
-    SITE_WEATHER='OPENWEATHERMAP'
-fi
-
-if [ -z "$APP_ENV" ]; then
-    APP_ENV='DEVELOPMENT'
-fi
-
+############################################### Значения по умолчанию #######################################################
+LOCATION_LAT="${LOCATION_LAT:-50.4501}"
+LOCATION_LON="${LOCATION_LON:-30.5234}"
+DB_DIR="${DB_DIR:-$DIR_PATH}"
+DB_NAME="${DB_NAME:-climate_data.sqlite3}"
+VENV_DIR="${VENV_DIR:-$DIR_PATH/venv}"
+VENV_NAME="${VENV_NAME:-venv_smart_home_climate}"
+LOG_DIR="${LOG_DIR:-$DIR_PATH/logs}"
+WORK_LOG="${WORK_LOG:-$LOG_DIR/work_log.log}"
+API_LOG="${API_LOG:-$LOG_DIR/api_log.log}"
+BACKUP="${BACKUP:-$DIR_PATH/backup}"
+SERVER_HOST="${SERVER_HOST:-0.0.0.0}"
+SERVER_PORT="${SERVER_PORT:-8000}"
+PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
+SITE_WEATHER="${SITE_WEATHER:-OPENWEATHERMAP}"
+APP_ENV="${APP_ENV:-DEVELOPMENT}"
 PROJECT_DIR="$DIR_PATH"
 
-######################################################## Проверка .env #######################################################
-# Запись файла .env
+export DB_DIR DB_NAME BACKUP LOG_DIR WORK_LOG API_LOG SERVER_HOST SERVER_PORT PROJECT_DIR APP_ENV LOCATION_LAT LOCATION_LON SITE_WEATHER APP_ENV VENV_DIR VENV_NAME PYTHON_VERSION
+
+######################################################## Перезапись .env (только Dev) #######################################################
+if [ "$SERVER_MODE" = false ]; then
 cat << EOF > "$ENV_FILE"
 # ОБЯЗАТЕЛЬНО дописать
-VERSION = '${VERSION}'
+VERSION = '${VERSION:-2.0.0}'
 
 # ОБЯЗАТЕЛЬНО дописать макадреса датчиков:  
-STREET_MAC = '${STREET_MAC}'  # Улица
-BASEMENT_MAC = '${BASEMENT_MAC}'  # Подвал
-FLOOR_MAC = '${FLOOR_MAC}'   # Пол
+STREET_MAC = '${STREET_MAC:-}'  # Улица
+BASEMENT_MAC = '${BASEMENT_MAC:-}'  # Подвал
+FLOOR_MAC = '${FLOOR_MAC:-}'   # Пол
 
 # ОБЯЗАТЕЛЬНО хотя бы один ключ с сайта погоды:
-OPENWEATHERMAP_API_KEY = '${OPENWEATHERMAP_API_KEY}'
-TOMORROW_API_KEY = '${TOMORROW_API_KEY}' 
+OPENWEATHERMAP_API_KEY = '${OPENWEATHERMAP_API_KEY:-}'
+TOMORROW_API_KEY = '${TOMORROW_API_KEY:-}' 
 
 ########################## Не обязательные переменные  ########################################
 # Сайт погоды
@@ -339,130 +311,69 @@ APP_ENV = '${APP_ENV}'
 # Местоположение проекта, для теста файла env
 PROJECT_DIR = '${PROJECT_DIR}'
 EOF
+fi
 
-#################################### Не изменяемые переменные. Используются во всём проекте ###################################################
-# Путь к целевой директории для виртуального окружения
+#################################### Путь к venv ###################################################
 VENV_PATH="$VENV_DIR/$VENV_NAME"
-# Пути для проверки log
-LOG_DIR="$PROJECT_DIR/logs"
-WORK_LOG="$LOG_DIR/work_log.log"
-API_LOG="$LOG_DIR/api_log.log"
-#################################################################################### Проверка Python #########################################################
 
-# Проверяем текущую версию Python
-current_version=$(python3 --version 2>&1 | cut -d' ' -f2)
-
-
-if [[ "$current_version" == *"$desired_version"* ]]; then
-    echo "Python $desired_version уже установлен (текущая версия: $current_version)"
+#################################################################################### Проверка Python 3.12 #########################################################
+if command -v python3.12 &>/dev/null; then
+    echo "✅ Python 3.12 уже установлен."
 else
-    echo "Обнаружена версия Python: $current_version"
-    echo "Хотите установить Python $desired_version?"
-
-    if ! ask_confirm "Продолжить установку?"; then
-        echo "Установка Python $desired_version отменена пользователем."
+    echo "❌ Python 3.12 не найден."
+    if ask_confirm "Установить Python 3.12?"; then
+        sudo apt-get update
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get update
+        sudo apt-get install -y python3.12 python3.12-venv python3.12-dev
     else
-
-        # Этап 1: Обновление пакетов
-        echo "Для установки потребуется обновить список пакетов."
-        if ask_confirm "Выполнить apt-get update?"; then
-            sudo apt-get update
-        else
-            echo "Пропуск обновления пакетов (может повлиять на установку)."
-        fi
-
-        # Этап 2: Установка зависимостей
-        echo "Необходимо установить вспомогательные пакеты."
-        if ask_confirm "Установить software-properties-common?"; then
-            sudo apt-get install -y software-properties-common
-        else
-            echo "Пропуск установки зависимостей (может вызвать ошибки)."
-        fi
-
-        # Этап 3: Добавление PPA
-        echo "Для установки Python $desired_version нужно добавить репозиторий deadsnakes."
-        if ask_confirm "Добавить ppa:deadsnakes/ppa?"; then
-            sudo add-apt-repository -y ppa:deadsnakes/ppa
-            sudo apt-get update
-        else
-            echo "Пропуск добавления PPA. Установка невозможна."
-            exit 1
-        fi
-
-        # Этап 4: Основная установка
-        echo "Готов к установке Python $desired_version."
-        if ask_confirm "Установить python3.12?"; then
-            sudo apt-get install -y python3.12
-        else
-            echo "Установка отменена."
-            exit 0
-        fi
-
-
-        # Проверка результата
-        new_version=$(python3.12 --version 2>&1 | cut -d' ' -f2)
-        echo "Установка завершена. Текущая версия Python: $new_version"
+        echo "Отмена установки Python 3.12."
+        exit 1
     fi
 fi
-####################################################### Проверка и установка пакетов #######################################################
-# Проверка и установка pip3
+
+####################################################### Проверка пакетов #######################################################
 install_package "python3-pip" "pip3 --version"
-# Проверка и установка python3-venv
-install_package "python3-venv python3-dev" "python3 -m venv --help"
-####################################################### Создание виртуального окружения #######################################################
-# Проверяем существование директории
+install_package "python3-venv python3-dev" "python3.12 -m venv --help"
+
+####################################################### Виртуальное окружение #######################################################
 check_or_create_dir "$VENV_DIR" 
-# Проверяем существование виртуального окружения
 if [ -d "$VENV_DIR" ]; then
     if [ ! -d "$VENV_PATH" ]; then
         echo "Виртуальное окружение $VENV_NAME не существует."
-        if ask_confirm "Создать виртуальное окружение  $VENV_NAME ?"; then
+        if ask_confirm "Создать виртуальное окружение $VENV_NAME ?"; then
             python3.12 -m venv "$VENV_PATH"
             echo "Виртуальное окружение успешно создано в $VENV_PATH"
-            
-            # Активируем и устанавливаем базовые пакеты (опционально)
-            echo "Активируем окружение и устанавливаем базовые пакеты..."
             source "$VENV_PATH/bin/activate"
-            pip3 install -r requirements.txt
-            # deactivate
+            if [ -f "requirements.txt" ]; then
+                pip install -r requirements.txt
+            fi
         else
-            echo "Виртуальное окружение не создано пользователем: $VENV_PATH"
+            echo "Виртуальное окружение не создано."
         fi
     else
         echo "Виртуальное окружение $VENV_NAME уже существует в $VENV_DIR"
     fi
-else
-    echo "Виртуальное окружениел не проверялось - папка '$VENV_DIR' отсутствует"
 fi
 
-
-####################################################### Проверка файлы логов #######################################################
-# Проверка папки logs
+####################################################### Папки и файлы логов/БД #######################################################
 check_or_create_dir "$LOG_DIR" 
-# Проверка файлов log (только если папка существует или была создана) 
 check_or_create_file "$WORK_LOG" "run/log.txt"
 check_or_create_file "$API_LOG" "run/log.txt"
-####################################################### Проверка базы данных #######################################################
-# Проверка папки data
 check_or_create_dir "$DB_DIR" 
-################################################ Делаем резервную копию run_data.py #######################################################
+check_or_create_dir "$BACKUP"
 
-# Проверяем существование директории backup
-check_or_create_dir "$PROJECT_DIR/backup"
-################################################# Запуск run_program.py #######################################################
+################################################# Запуск приложения #######################################################
+if [ -f "$VENV_PATH/bin/activate" ]; then
+    source "$VENV_PATH/bin/activate"
+fi
 
 echo "########################################### Запуск run_program.py #############################"
-source "$VENV_PATH/bin/activate"
 python3.12 run/run_program.py
 
-echo "Проверка завершена."
-# TODO удали
-# exit
 echo "########################################### Запуск run_migrator.py #############################"
-
 python3.12 run/migrator.py
 
 echo "######################## Пуск основной программы проекта main.py ######################"
-
-# python3.12 app/main.py
 python3.12 -m app.main
