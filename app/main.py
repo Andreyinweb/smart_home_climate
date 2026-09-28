@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
                 if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
                     asyncio.create_task(weather_service.calibrate_hourly_coefficients())
                     # await weather_service.calibrate_hourly_coefficients()
-                    await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
+                    await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100, max_daily_backups=1)
 
             except asyncio.TimeoutError:
                 work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
