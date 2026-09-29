@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
-from app.dependencies import get_repository, get_template_path, get_templates
+from app.dependencies import get_repository, get_template_path, get_templates, get_relay_controller
+from app.services.relay_service import RelayController, RelayError
 from app.routers.dashboard_router import (
     get_time_difference_str,
     safe_diff,
@@ -123,8 +124,11 @@ async def get_heating_page(
 
 
 @router.post("/api/heating/start")
-async def start_heating(repo: BaseRepository = Depends(get_repository)):
-    """Запуск отопления."""
+async def start_heating(
+    repo: BaseRepository = Depends(get_repository),
+    relay: RelayController = Depends(get_relay_controller),
+):
+    """Запуск отопления и физическое включение реле котла."""
     latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
     can_start = True
     if latest_heat and latest_heat.get("status_heating"):
@@ -141,14 +145,23 @@ async def start_heating(repo: BaseRepository = Depends(get_repository)):
                 "heating_automation": False,
             }
             await repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
-            api_log.info(f"Успешный старт отопления: sensor_id={latest_sensor['id']}")
+            api_log.info(f"Успешная запись старта отопления в БД: sensor_id={latest_sensor['id']}")
+
+            try:
+                await relay.turn_on()
+                api_log.info("Реле котла успешно включено.")
+            except RelayError as e:
+                api_log.error(f"Сбой при физическом включении реле котла: {e}")
 
     return RedirectResponse(url="/heating", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/api/heating/stop")
-async def stop_heating(repo: BaseRepository = Depends(get_repository)):
-    """Остановка отопления."""
+async def stop_heating(
+    repo: BaseRepository = Depends(get_repository),
+    relay: RelayController = Depends(get_relay_controller),
+):
+    """Остановка отопления и физическое выключение реле котла."""
     latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
     if latest_heat and latest_heat.get("status_heating"):
         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
@@ -167,6 +180,12 @@ async def stop_heating(repo: BaseRepository = Depends(get_repository)):
                     "heating_automation": latest_heat.get("heating_automation", False),
                 }
                 await repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
-                api_log.info(f"Успешный стоп отопления: start_id={latest_heat['id']}, stop_id={latest_sensor['id']}, diff={stop_heat_plus}")
-    
+                api_log.info(f"Успешная запись стопа отопления в БД: start_id={latest_heat['id']}, stop_id={latest_sensor['id']}, diff={stop_heat_plus}")
+
+            try:
+                await relay.turn_off()
+                api_log.info("Реле котла успешно выключено.")
+            except RelayError as e:
+                api_log.error(f"Сбой при физическом выключении реле котла: {e}")
+
     return RedirectResponse(url="/heating", status_code=status.HTTP_303_SEE_OTHER)

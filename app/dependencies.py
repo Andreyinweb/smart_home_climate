@@ -1,12 +1,15 @@
 # app/dependencies.py
 
 import os
+from typing import Optional
 from fastapi import Depends, Request
 from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
+from app.services.relay_service import RelayController
 
 _templates = Jinja2Templates(directory="templates")
+_relay_controller: Optional[RelayController] = None
 
 
 def get_templates() -> Jinja2Templates:
@@ -33,3 +36,12 @@ def get_template_path(template_name: str, request: Request) -> str:
 def get_repository() -> BaseRepository:
     """Провайдер экземпляра репозитория для работы с БД."""
     return BaseRepository()
+
+
+def get_relay_controller() -> RelayController:
+    """Провайдер синглтона контроллера USB-реле."""
+    global _relay_controller
+    if _relay_controller is None:
+        _relay_controller = RelayController()
+    return _relay_controller
+

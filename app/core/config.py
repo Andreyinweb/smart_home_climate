@@ -55,7 +55,7 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
     )
 
     # --- Режимы приложения и железа ---
-    app_env: AppEnv = Field(default=AppEnv.DEVELOPMENT, alias="APP_ENV")  #   PRODUCTION  STAGING    DEVELOPMENT
+    app_env: AppEnv = Field(default=AppEnv.DEVELOPMENT, alias="APP_ENV")
     sensor_mode: SensorMode = Field(default=SensorMode.BASEMENT_STREET_FLOOR, alias="SENSOR_MODE")
 
     # --- Пути (AppConfig & DatabaseConfig) ---
@@ -83,6 +83,12 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
     street_mac: Optional[str] = Field(default=None, alias="STREET_MAC")
     basement_mac: Optional[str] = Field(default=None, alias="BASEMENT_MAC")
     floor_mac: Optional[str] = Field(default=None, alias="FLOOR_MAC")
+
+    # --- Настройки USB-реле котла ---
+    relay_id: Optional[str] = Field(default=None, alias="RELAY_ID")
+    relay_inverted: bool = Field(default=False, alias="RELAY_INVERTED")
+    relay_timeout: float = Field(default=2.0, alias="RELAY_TIMEOUT")
+    relay_max_retries: int = Field(default=3, alias="RELAY_MAX_RETRIES")
 
     # --- Настройки сервера и геолокации ---
     server_host: str = Field(default="0.0.0.0", alias="SERVER_HOST")
@@ -119,8 +125,6 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
     # --- Валидация путей, ключей и MAC-адресов ---
     @model_validator(mode="after")
     def validate_all_dependencies(self) -> "Settings":
-    
-        # 1. Резолвинг абсолютных путей
         if not self.log_dir.is_absolute():
             self.log_dir = self.project_dir / self.log_dir
 
@@ -140,7 +144,6 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
         elif not self.api_log.is_absolute():
             self.api_log = self.project_dir / self.api_log
 
-        # 2. Проверка активного API-ключа выбранного провайдера
         active_key = self.active_weather_api_key
         if not active_key or not active_key.get_secret_value().strip():
             raise ValueError(
@@ -148,7 +151,6 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
                 f"не задан валидный API-ключ."
             )
 
-        # 3. Валидация MAC-адресов под текущий SENSOR_MODE
         required_sensors = [s.lower() for s in self.sensor_mode.value.split("_")]
         for sensor_name in required_sensors:
             attr_name = f"{sensor_name}_mac"
@@ -161,17 +163,14 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
         
         return self
 
-    # --- Автоматическое создание всех базовых директорий ---
     def create_required_directories(self) -> None:
         """Гарантирует существование папок перед первыми операциями записи"""
         for folder in [self.log_dir, self.backup, self.db_dir]:
             folder.mkdir(parents=True, exist_ok=True)
 
 
-# Инициализация конфигурации
 try:
     settings = Settings()
-    # Создаем директории сразу при успешной загрузке настроек
     settings.create_required_directories()
 except Exception as e:
     print(f"Ошибка загрузки конфигурации: {e}")
@@ -191,29 +190,24 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    # 1. Файловый обработчик для основной логики
     work_handler = logging.FileHandler(config.work_log, mode="a")
     work_handler.setFormatter(formatter)
     work_handler.addFilter(clean_logger_name)
 
-    # Корневой логгер приложения climat_app
     work_logger = logging.getLogger("climat_app")
     work_logger.setLevel(log_level)
     work_logger.addHandler(work_handler)
     work_logger.propagate = False
 
-    # 2. Файловый обработчик для веб-сервера / API
     api_handler = logging.FileHandler(config.api_log, mode="a")
     api_handler.setFormatter(formatter)
     api_handler.addFilter(clean_logger_name)
 
-    # Корневой логгер веб-сервера api_app
     api_logger = logging.getLogger("api_app")
     api_logger.setLevel(log_level)
     api_logger.addHandler(api_handler)
     api_logger.propagate = False
 
-    # 3. Перенаправление логов Uvicorn в api_log.log
     try:
         import uvicorn.config
         uvicorn_config_dict = uvicorn.config.LOGGING_CONFIG
@@ -221,7 +215,6 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
         fmt_str = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
         date_fmt = "%Y-%m-%d %H:%M:%S"
 
-        # Отключаем ANSI-цвета и устанавливаем единый формат сообщений и даты
         if "default" in uvicorn_config_dict.get("formatters", {}):
             uvicorn_config_dict["formatters"]["default"]["use_colors"] = False
             uvicorn_config_dict["formatters"]["default"]["fmt"] = fmt_str
@@ -231,7 +224,6 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
             uvicorn_config_dict["formatters"]["access"]["fmt"] = "%(asctime)s:%(levelname)s:%(name)s:%(client_addr)s - \"%(request_line)s\" %(status_code)s"
             uvicorn_config_dict["formatters"]["access"]["datefmt"] = date_fmt
 
-        # Регистрируем файловые обработчики в конфигураторе Uvicorn
         uvicorn_config_dict["handlers"]["api_file"] = {
             "class": "logging.FileHandler",
             "filename": str(config.api_log),
@@ -245,7 +237,6 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
             "formatter": "access",
         }
         
-        # Перенаправляем потоки логов Uvicorn в файл api_log.log
         uvicorn_config_dict["loggers"]["uvicorn"]["handlers"] = ["api_file"]
         uvicorn_config_dict["loggers"]["uvicorn.error"]["handlers"] = ["api_file"]
         uvicorn_config_dict["loggers"]["uvicorn.access"]["handlers"] = ["api_access_file"]
@@ -261,102 +252,5 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
     return work_logger, api_logger
 
 
-    # # 2. Файловый обработчик для веб-сервера / API
-    # api_handler = logging.FileHandler(config.api_log, mode="a")
-    # api_handler.setFormatter(formatter)
-    # api_handler.addFilter(clean_logger_name)
-
-    # # Корневой логгер веб-сервера api_app
-    # api_logger = logging.getLogger("api_app")
-    # api_logger.setLevel(log_level)
-    # api_logger.addHandler(api_handler)
-    # api_logger.propagate = False
-
-    # # 3. Перенаправление логов Uvicorn в api_log.log
-    # for uvicorn_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
-    #     u_logger = logging.getLogger(uvicorn_name)
-    #     u_logger.handlers = [api_handler]
-    #     u_logger.propagate = False
-    #     u_logger.setLevel(logging.INFO)
-
-    return work_logger, api_logger
-
-
-# Автоматическая настройка логгеров при импорте модуля
 setup_loggers(settings)
 
-
-"""
-===============================================================================
-МОДУЛЬ КОНФИГУРАЦИИ И ЛОГИРОВАНИЯ (app/core/config.py)
-===============================================================================
-
-ОБЩАЯ АРХИТЕКТУРА И НАЗНАЧЕНИЕ:
-Модуль является единой точкой конфигурации приложения. Отвечает за:
-1. Загрузку и валидацию системных переменных и путей.
-2. Управление физико-финансовыми константами.
-3. Валидацию BLE MAC-адресов под текущий режим работы датчиков.
-4. Централизованную инициализацию и форматирование логов приложения и API.
-
--------------------------------------------------------------------------------
-КЛЮЧЕВЫЕ АРХИТЕКТУРНЫЕ РЕШЕНИЯ И НЮАНСЫ:
-
-1. Разделение констант и настроек окружения (ClimatePhysicsDefaults + Settings):
-   - ClimatePhysicsDefaults: класс базовой Pydantic-модели, где задаются 
-     дефолтные физические и финансовые параметры (тарифы на газ/воду, пороги 
-     влажности и дельты температур). Значения можно править прямо в коде. 
-     Используется как источник полей по умолчанию для первичного заполнения 
-     (сидирования) таблицы 'settings' в базе данных SQLite.
-   - Settings: наследуется от BaseSettings и ClimatePhysicsDefaults. Все 
-     параметры доступны через единый объект `settings`.
-
-2. Порядок поиска конфигурационных файлов (Стандарт Linux / XDG):
-   Параметр `env_file` настраивает последовательный поиск переменных:
-   1) "/etc/climat_app/config.env" — системный конфигурационный файл ОС.
-   2) "~/.config/climat_app/config.env" — пользовательский конфигурационный файл.
-   3) ".env" — локальный файл в корне проекта для разработки.
-   Приоритет возрастает слева направо (каждый следующий файл переопределяет 
-   предыдущий). Переменные окружения ОС имеют высший приоритет над всеми файлами.
-
-3. Динамическая логика датчиков (SENSOR_MODE и mac_dict):
-   - Переменные `street_mac`, `basement_mac`, `floor_mac` считываются из env-файлов 
-     как сырые входные данные.
-   - Значение `sensor_mode` (например, BASEMENT_STREET_FLOOR) определяет, какие 
-     датчики обязательны для запуска.
-   - Валидатор `validate_all_dependencies` проверяет, заданы ли MAC-адреса для 
-     всех затребованных в SENSOR_MODE датчиков. Если адрес отсутствует, запуск 
-     прерывается с ошибкой ValueError.
-   - Вычисляемое свойство `@computed_field mac_dict` динамически формирует словарь 
-     активных датчиков вида: {'basement': '...', 'street': '...'}. Ключи словаря 
-     выполняют роль списка имен датчиков, отменяя необходимость в отдельных 
-     переменных name_sensor_mac и sensor_name.
-
-4. Резолвинг путей:
-   Все относительные пути (`log_dir`, `backup`, `db_dir`, `work_log`, `api_log`) 
-   в `validate_all_dependencies` автоматически приводятся к абсолютным 
-   относительно `project_dir`.
-
--------------------------------------------------------------------------------
-СИСТЕМА ЛОГИРОВАНИЯ (setup_loggers):
-
-В модуле настроена автоматическая система файлового логирования, разделенная 
-на два изолированных потока:
-- climat_app: логгер основной бизнес-логики (пишет в work_log.log).
-- api_app: логгер веб-сервера FastAPI/Uvicorn (пишет в api_log.log).
-
-Механизм работы и именования логов:
-1. Функция `clean_logger_name` фильтрует имена логгеров. При создании 
-   дочернего логгера через точку, префиксы "climat_app." и "api_app." удаляются 
-   из имени записи.
-2. Для использования логирования в любом модуле проекта достаточно вызвать:
-      import logging
-      work_log = logging.getLogger("climat_app.main")
-      api_log = logging.getLogger("api_app.main")
-3. В итоговом файле имя логгера сократится до названия модуля (например, 'main'), 
-   сформировав строгий формат записи:
-      2026-09-16 18:39:41:INFO:main:Тестовая запись: work_logger успешно инициализирован.
-
-Формат времени: YYYY-MM-DD HH:MM:SS.
-Уровень логирования: DEBUG при APP_ENV=DEVELOPMENT, иначе INFO.
-===============================================================================
-"""

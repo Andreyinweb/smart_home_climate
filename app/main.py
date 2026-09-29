@@ -2,7 +2,7 @@
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import AppEnv, settings
 import app.db.repository as db
 from app.db.connection import get_db_connection
+from app.dependencies import get_relay_controller
 from app.routers import (
     dashboard_router,
     debug_router,
@@ -73,12 +74,29 @@ async def lifespan(app: FastAPI):
                 else:
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
 
+                # Сверка и синхронизация фактического состояния USB-реле с heating_table
+                try:
+                    latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+                    target_heat_status = bool(latest_heat.get("status_heating")) if latest_heat else False
+
+                    relay_ctrl = get_relay_controller()
+                    actual_relay_state = await relay_ctrl.get_state()
+
+                    if actual_relay_state != target_heat_status:
+                        work_log.warning(
+                            f"[Цикл] Обнаружено расхождение состояния реле! В БД status_heating={target_heat_status}, "
+                            f"а фактически реле={actual_relay_state}. Выполняется принудительное выравнивание..."
+                        )
+                        await relay_ctrl.set_state(target_heat_status)
+                        work_log.info(f"[Цикл] Состояние реле успешно приведено к status_heating={target_heat_status}.")
+                except Exception as e:
+                    work_log.error(f"[Цикл] Ошибка при сверке состояния реле котла: {e}")
+
                 coeff_hour = await db.get_record_by_id("hourly_coefficients_table", int(timestamp_str[11:13]), pk_col="hour", log_to_api=False)
                 updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
 
                 if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
                     asyncio.create_task(weather_service.calibrate_hourly_coefficients())
-                    # await weather_service.calibrate_hourly_coefficients()
                     await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100, max_daily_backups=1)
 
             except asyncio.TimeoutError:
@@ -89,12 +107,11 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 work_log.error(f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True)
 
-            # Пауза между записями в бд
             sys_settings = await db.get_or_create_settings(log_to_api=False)
             interval_settings = getattr(sys_settings, "interval_seconds", settings.interval_seconds)
             delta_time = round((datetime.now() - datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")).total_seconds())
             interval = 60 if (interval_settings - delta_time) < 60 else interval_settings - delta_time
-            work_log.info(f"[Цикл] Ожидание {interval} секунд до следующего опроса BLE-датчиков. Пауза в базе данных {interval_settings}")
+            work_log.info(f"[Цикл] Ожидание до {datetime.now() + timedelta(seconds=interval):%H:%M:%S} (следующий опрос BLE-датчиков). Пауза в базе данных {interval_settings}")
             await asyncio.sleep(interval)
 
     polling_task = asyncio.create_task(ble_polling_loop())
@@ -108,10 +125,8 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-    # Создание финальной резервной копии перед выходом
     await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
 
-    # Принудительный сброс и очистка WAL-журнала при закрытии
     def _truncate_wal():
         try:
             with get_db_connection() as conn:
