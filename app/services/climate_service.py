@@ -219,6 +219,5 @@ def build_api_record(
         "basement_humi_heated": basement_humi_heated,
         "a_basement_humi_heated": a_basement_humi_heated,
         "floor_humi_heated": floor_humi_heated,
-        "a_floor_humi_heated": a_floor_humi_heated,
-        "last_graph_sensor_id": 0
+        "a_floor_humi_heated": a_floor_humi_heated
     }

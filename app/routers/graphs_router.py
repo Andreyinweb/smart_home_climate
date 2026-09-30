@@ -1,4 +1,3 @@
-
 # app/routers/graphs_router.py
 
 import logging
@@ -10,7 +9,10 @@ from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
 from app.dependencies import get_repository, get_template_path, get_templates
-from app.services.graph_service import update_graphs_cache_if_needed
+from app.services.graph_service import (
+    update_humidity_graph_cache_if_needed,
+    update_temperature_graph_cache_if_needed,
+)
 
 api_log = logging.getLogger("api_app.routers.graphs_router")
 
@@ -28,7 +30,7 @@ async def get_temperature_page(
 ) -> Any:
     """Страница с графиком температуры."""
     api_log.debug("GET /graphs/temperature -> открытие страницы графика температуры")
-    background_tasks.add_task(update_graphs_cache_if_needed)
+    background_tasks.add_task(update_temperature_graph_cache_if_needed)
     return templates.TemplateResponse(
         request=request,
         name=get_template_path("temperature.html", request),
@@ -45,11 +47,73 @@ async def get_humidity_page(
 ) -> Any:
     """Страница с графиком влажности."""
     api_log.debug("GET /graphs/humidity -> открытие страницы графика влажности")
-    background_tasks.add_task(update_graphs_cache_if_needed)
+    background_tasks.add_task(update_humidity_graph_cache_if_needed)
     return templates.TemplateResponse(
         request=request,
         name=get_template_path("humidity.html", request),
         context={"graph_url": "/static/graphs/humidity.png"},
     )
+
+
+
+
+
+
+
+
+
+
+# # app/routers/graphs_router.py
+
+# import logging
+# from typing import Any
+
+# from fastapi import APIRouter, BackgroundTasks, Depends, Request
+# from fastapi.responses import HTMLResponse
+# from fastapi.templating import Jinja2Templates
+
+# from app.db.repository import BaseRepository
+# from app.dependencies import get_repository, get_template_path, get_templates
+# from app.services.graph_service import update_graphs_cache_if_needed
+
+# api_log = logging.getLogger("api_app.routers.graphs_router")
+
+# router = APIRouter(
+#     tags=["Graphs"],
+# )
+
+
+# @router.get("/graphs/temperature", response_class=HTMLResponse, summary="График температуры")
+# async def get_temperature_page(
+#     request: Request,
+#     background_tasks: BackgroundTasks,
+#     templates: Jinja2Templates = Depends(get_templates),
+#     repo: BaseRepository = Depends(get_repository),
+# ) -> Any:
+#     """Страница с графиком температуры."""
+#     api_log.debug("GET /graphs/temperature -> открытие страницы графика температуры")
+#     background_tasks.add_task(update_graphs_cache_if_needed)
+#     return templates.TemplateResponse(
+#         request=request,
+#         name=get_template_path("temperature.html", request),
+#         context={"graph_url": "/static/graphs/temperature.png"},
+#     )
+
+
+# @router.get("/graphs/humidity", response_class=HTMLResponse, summary="График влажности")
+# async def get_humidity_page(
+#     request: Request,
+#     background_tasks: BackgroundTasks,
+#     templates: Jinja2Templates = Depends(get_templates),
+#     repo: BaseRepository = Depends(get_repository),
+# ) -> Any:
+#     """Страница с графиком влажности."""
+#     api_log.debug("GET /graphs/humidity -> открытие страницы графика влажности")
+#     background_tasks.add_task(update_graphs_cache_if_needed)
+#     return templates.TemplateResponse(
+#         request=request,
+#         name=get_template_path("humidity.html", request),
+#         context={"graph_url": "/static/graphs/humidity.png"},
+#     )
 
 
