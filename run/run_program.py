@@ -118,7 +118,10 @@ if __name__ == "__main__":
         target_rh REAL,
         dangerous_humidity REAL,
         price_gas REAL,
-        hot_water_per_hour REAL   
+        hot_water_per_hour REAL,
+        minimum_temperature  REAL,
+        target_temperature REAL,
+        maximum_temperature REAL
         )
         """
     create_table(db_path=database_file, table_name='settings_table', fields=fields_db)

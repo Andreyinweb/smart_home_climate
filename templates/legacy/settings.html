@@ -1,3 +1,4 @@
+<!-- templates/legacy/settings.html -->
 {% extends "legacy/base.html" %}
 
 {% block title %}Счетчик газа — Мониторинг климата{% endblock %}
@@ -61,6 +62,21 @@
     <div class="form-group" style="margin-bottom: 15px;">
         <label for="dangerous_humidity" style="display: block; font-weight: bold; margin-bottom: 5px;">Опасная отн. влажность (%):</label>
         <input type="number" step="0.1" id="dangerous_humidity" name="dangerous_humidity" value="{{ dangerous_humidity }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label for="minimum_temperature" style="display: block; font-weight: bold; margin-bottom: 5px;">Минимальная температура (°C):</label>
+        <input type="number" step="0.1" id="minimum_temperature" name="minimum_temperature" value="{{ minimum_temperature }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label for="target_temperature" style="display: block; font-weight: bold; margin-bottom: 5px;">Целевая температура (°C):</label>
+        <input type="number" step="0.1" id="target_temperature" name="target_temperature" value="{{ target_temperature }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label for="maximum_temperature" style="display: block; font-weight: bold; margin-bottom: 5px;">Максимальная температура (°C):</label>
+        <input type="number" step="0.1" id="maximum_temperature" name="maximum_temperature" value="{{ maximum_temperature }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
     </div>
 
     <div class="form-group" style="margin-bottom: 20px;">

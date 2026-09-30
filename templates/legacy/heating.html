@@ -1,4 +1,4 @@
-<!-- app/templates/heating.html -->
+<!-- templates/legacy/heating.html -->
 {% extends "legacy/base.html" %}
 
 {% block title %}Отопление — Мониторинг климата{% endblock %}
@@ -25,6 +25,24 @@
                     ⏹ Остановить отопление
                 </button>
             </form>
+        </div>
+
+        <!-- Уставки температуры -->
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+            <div>
+                <strong>Мин. Т:</strong> <span class="text-blue val-bold">{{ "%.1f"|format(minimum_temperature) if minimum_temperature is defined and minimum_temperature is not none else '—' }} °C</span>
+            </div>
+            <div>
+                <strong>Целевая Т:</strong> <span class="text-green val-bold">{{ "%.1f"|format(target_temperature) if target_temperature is defined and target_temperature is not none else '—' }} °C</span>
+            </div>
+            <div>
+                <strong>Макс. Т:</strong> <span class="text-red val-bold">{{ "%.1f"|format(maximum_temperature) if maximum_temperature is defined and maximum_temperature is not none else '—' }} °C</span>
+            </div>
+            {% if target_heat_limit is defined and target_heat_limit is not none %}
+            <div>
+                <strong>Цель догрева:</strong> <span class="text-amber val-bold" style="font-size: 1.2em; background-color: #880e4f; color: #ccff00; padding: 2px 6px; border-radius: 4px;">{{ "%.1f"|format(target_heat_limit) }} °C</span>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -94,8 +112,10 @@
             </tbody>
         </table>
     </div>
-<!-- Таблица начальных показателей -->
-    <div class="card-header">
+
+    <!-- Таблица начальных показателей -->
+    <div class="card">
+        <div class="card-header">
             <div>
                 <h2 class="card-title">📊 Начальные показатели</h2>
                 <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
@@ -151,8 +171,8 @@
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
             <div>
                 <strong>Проветривание:</strong> {{ "%.2f"|format(before_humidity_difference) if before_humidity_difference is defined and before_humidity_difference is not none else '0.00' }} г/м³
-                
             </div>
+        </div>
     </div>
 
 </div>
