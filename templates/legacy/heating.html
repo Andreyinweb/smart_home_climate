@@ -1,3 +1,4 @@
+<!-- app/templates/heating.html -->
 {% extends "legacy/base.html" %}
 
 {% block title %}Отопление — Мониторинг климата{% endblock %}
@@ -59,6 +60,14 @@
                     </td>
                 </tr>
                 <tr>
+                    <td class="val-bold">Подвал АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(before_a_basement_humi) if before_a_basement_humi is defined and before_a_basement_humi is not none else '—' }}</td>
+                    <td>{{ "%.2f"|format(a_basement_humi) if a_basement_humi is defined and a_basement_humi is not none else '—' }}</td>
+                    <td class="{{ diff_a_basement_humi_class if diff_a_basement_humi_class else 'text-gray' }}">
+                        {{ "%+.2f"|format(diff_a_basement_humi) if diff_a_basement_humi is defined and diff_a_basement_humi is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
                     <td class="val-bold">Пол Т (°C)</td>
                     <td>{{ "%.1f"|format(before_floor_temp) if before_floor_temp is defined and before_floor_temp is not none else '—' }}</td>
                     <td>{{ "%.1f"|format(floor_temp) if floor_temp is defined and floor_temp is not none else '—' }}</td>
@@ -72,6 +81,14 @@
                     <td>{{ "%.1f"|format(floor_humi) if floor_humi is defined and floor_humi is not none else '—' }}</td>
                     <td class="{{ diff_floor_humi_class if diff_floor_humi_class else 'text-gray' }}">
                         {{ "%+.1f"|format(diff_floor_humi) if diff_floor_humi is defined and diff_floor_humi is not none else '—' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="val-bold">Пол АВ (г/м³)</td>
+                    <td>{{ "%.2f"|format(before_a_floor_humi) if before_a_floor_humi is defined and before_a_floor_humi is not none else '—' }}</td>
+                    <td>{{ "%.2f"|format(a_floor_humi) if a_floor_humi is defined and a_floor_humi is not none else '—' }}</td>
+                    <td class="{{ diff_a_floor_humi_class if diff_a_floor_humi_class else 'text-gray' }}">
+                        {{ "%+.2f"|format(diff_a_floor_humi) if diff_a_floor_humi is defined and diff_a_floor_humi is not none else '—' }}
                     </td>
                 </tr>
             </tbody>

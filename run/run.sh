@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-# /run/run.sh
+# run/run.sh
 
 set -eo pipefail
+
+# Сохранение исходных потоков вывода и ошибок (для возврата перед запуском main.py)
+exec 3>&1 4>&2
 
 DIR_PATH="$PWD"
 SERVER_MODE=false
 CONFIG_FILE=""
-
-echo "СТАРТ run sh"
 
 # Разбор аргументов командной строки
 for arg in "$@"; do
@@ -36,7 +37,18 @@ else
     IS_INTERACTIVE=true
 fi
 
-# Функция подтверждения операций
+################################ Ранняя инициализация run_log.log и перенаправление вывода ################################
+LOG_DIR="${LOG_DIR:-$DIR_PATH/logs}"
+RUN_LOG="${RUN_LOG:-$LOG_DIR/run_log.log}"
+
+mkdir -p "$LOG_DIR"
+touch "$RUN_LOG"
+
+# Запись времени запуска и перенаправление stdout и stderr в run_log.log в режиме дозаписи
+echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ RUN" >> "$RUN_LOG"
+exec 1>> "$RUN_LOG" 2>&1
+
+# Функция подтверждения операций (вывод вопросов напрямую в терминал /dev/tty или fd 3)
 ask_confirm() {
     local prompt_msg="$1"
 
@@ -46,7 +58,13 @@ ask_confirm() {
 
     local response
     while true; do
-        read -p "$prompt_msg [y/N]: " response
+        if [ -e /dev/tty ]; then
+            printf "%s [y/N]: " "$prompt_msg" > /dev/tty
+            read -r response < /dev/tty
+        else
+            printf "%s [y/N]: " "$prompt_msg" >&3
+            read -r response <&4
+        fi
         case "$response" in
             [yY][eE][sS]|[yY])
                 return 0
@@ -55,7 +73,11 @@ ask_confirm() {
                 return 1
                 ;;
             *)
-                echo "Пожалуйста, введите y/n" >&2
+                if [ -e /dev/tty ]; then
+                    echo "Пожалуйста, введите y/n" > /dev/tty
+                else
+                    echo "Пожалуйста, введите y/n" >&3
+                fi
                 ;;
         esac
     done
@@ -249,6 +271,7 @@ VENV_NAME="${VENV_NAME:-venv_smart_home_climate}"
 LOG_DIR="${LOG_DIR:-$DIR_PATH/logs}"
 WORK_LOG="${WORK_LOG:-$LOG_DIR/work_log.log}"
 API_LOG="${API_LOG:-$LOG_DIR/api_log.log}"
+RUN_LOG="${RUN_LOG:-$LOG_DIR/run_log.log}"
 BACKUP="${BACKUP:-$DIR_PATH/backup}"
 SERVER_HOST="${SERVER_HOST:-0.0.0.0}"
 SERVER_PORT="${SERVER_PORT:-8000}"
@@ -261,7 +284,7 @@ RELAY_INVERTED="${RELAY_INVERTED:-false}"
 RELAY_TIMEOUT="${RELAY_TIMEOUT:-2.0}"
 RELAY_MAX_RETRIES="${RELAY_MAX_RETRIES:-3}"
 
-export DB_DIR DB_NAME BACKUP LOG_DIR WORK_LOG API_LOG SERVER_HOST SERVER_PORT PROJECT_DIR APP_ENV LOCATION_LAT LOCATION_LON SITE_WEATHER VENV_DIR VENV_NAME PYTHON_VERSION RELAY_ID RELAY_INVERTED RELAY_TIMEOUT RELAY_MAX_RETRIES
+export DB_DIR DB_NAME BACKUP LOG_DIR WORK_LOG API_LOG RUN_LOG SERVER_HOST SERVER_PORT PROJECT_DIR APP_ENV LOCATION_LAT LOCATION_LON SITE_WEATHER VENV_DIR VENV_NAME PYTHON_VERSION RELAY_ID RELAY_INVERTED RELAY_TIMEOUT RELAY_MAX_RETRIES
 
 ######################################################## Перезапись .env (только Dev) #######################################################
 if [ "$SERVER_MODE" = false ]; then
@@ -326,6 +349,13 @@ fi
 #################################### Путь к venv ###################################################
 VENV_PATH="$VENV_DIR/$VENV_NAME"
 
+####################################################### Папки и файлы логов/БД #######################################################
+check_or_create_dir "$LOG_DIR" 
+check_or_create_file "$WORK_LOG" "run/log.txt"
+check_or_create_file "$API_LOG" "run/log.txt"
+check_or_create_dir "$DB_DIR" 
+check_or_create_dir "$BACKUP"
+
 #################################################################################### Проверка Python 3.12 #########################################################
 if command -v python3.12 &>/dev/null; then
     echo "✅ Python 3.12 уже установлен."
@@ -367,23 +397,22 @@ if [ -d "$VENV_DIR" ]; then
     fi
 fi
 
-####################################################### Папки и файлы логов/БД #######################################################
-check_or_create_dir "$LOG_DIR" 
-check_or_create_file "$WORK_LOG" "run/log.txt"
-check_or_create_file "$API_LOG" "run/log.txt"
-check_or_create_dir "$DB_DIR" 
-check_or_create_dir "$BACKUP"
-
 ################################################# Запуск приложения #######################################################
 if [ -f "$VENV_PATH/bin/activate" ]; then
     source "$VENV_PATH/bin/activate"
 fi
 
+echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ run_program.py"
 echo "########################################### Запуск run_program.py #############################"
 python3.12 run/run_program.py
 
+echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ migrator.py"
 echo "########################################### Запуск run_migrator.py #############################"
 python3.12 run/migrator.py
+
+echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ main.py"
+# Восстановление стандартных потоков вывода и ошибок (systemd / консоль)
+exec 1>&3 2>&4 3>&- 4>&-
 
 echo "######################## Пуск основной программы проекта main.py ######################"
 python3.12 -m app.main
