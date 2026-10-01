@@ -14,6 +14,7 @@ not_magrate_tables = {"table_sensor_data",
     # "ventilation_table",
     # "heating_table",
     "hourly_coefficients_table",
+    "relay_table"
 }
 
 def get_db_connection(path_db: str | Path) -> sqlite3.Connection:

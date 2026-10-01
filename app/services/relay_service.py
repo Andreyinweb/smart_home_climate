@@ -1,12 +1,12 @@
-# app/services/relay_service.py
-
 import asyncio
+from datetime import datetime
 import logging
 import shutil
 import subprocess
 from typing import Optional
 
 from app.core.config import settings
+import app.db.repository as db
 
 logger = logging.getLogger("climat_app.relay_service")
 
@@ -39,8 +39,9 @@ class RelayParseError(RelayError):
 class RelayController:
     """
     Класс управления USB-реле через системную утилиту usbrelay.
-    Поддерживает асинхронные вызовы, инверсию логики (NO/NC)
-    и повторные попытки при сбоях USB.
+    Поддерживает асинхронные вызовы, инверсию логики (NO/NC),
+    повторные попытки при сбоях USB, защиту котла от частого переключения
+    и принудительное отключение при остановке приложения.
     """
 
     def __init__(
@@ -63,7 +64,7 @@ class RelayController:
 
     @staticmethod
     def _check_dependency() -> None:
-        """Проверяетличие утилиты usbrelay в PATH."""
+        """Проверяет наличие утилиты usbrelay в PATH."""
         if shutil.which("usbrelay") is None:
             raise RelayDependencyError(
                 "Утилита 'usbrelay' не найдена в системном PATH. "
@@ -172,10 +173,79 @@ class RelayController:
             raise RelayExecutionError(msg) from last_exception
         raise RelayExecutionError(msg)
 
-    async def turn_on(self) -> bool:
-        """Включает целевой прибор."""
-        return await self.set_state(True)
+    async def turn_on(self, min_off_interval: int = 180) -> bool:
+        """
+        Включает котел с проверкой минимального времени простоя (по умолчанию 180 сек / 3 мин).
+        При успешном включении записывает timestamp_start в relay_table (id=1).
+        """
+        record = await db.get_record_by_id("relay_table", 1, pk_col="id")
+        now = datetime.now()
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    async def turn_off(self) -> bool:
-        """Выключает целевой прибор."""
-        return await self.set_state(False)
+        if record and record.get("timestamp_stop"):
+            try:
+                last_stop = datetime.strptime(record["timestamp_stop"], "%Y-%m-%d %H:%M:%S")
+                elapsed = (now - last_stop).total_seconds()
+                if elapsed < min_off_interval:
+                    remaining = int(min_off_interval - elapsed)
+                    logger.warning(
+                        f"[USB-Relay] Блокировка включения: с момента выключения прошло {int(elapsed)} с. "
+                        f"Минимальный интервал простоя {min_off_interval} с. Повторите попытку через {remaining} с."
+                    )
+                    return False
+            except ValueError as e:
+                logger.error(f"[USB-Relay] Ошибка формата timestamp_stop в БД '{record.get('timestamp_stop')}': {e}")
+
+        success = await self.set_state(True)
+        if success:
+            stop_ts = record.get("timestamp_stop") if record else None
+            relay_data = {
+                "id": 1,
+                "timestamp_start": now_str,
+                "timestamp_stop": stop_ts,
+            }
+            await db.upsert_record("relay_table", relay_data, pk_col="id")
+            logger.info(f"[USB-Relay] Зафиксирован запуск котла в relay_table (id=1): timestamp_start={now_str}")
+        return success
+
+    async def turn_off(self, stop_programm: int = 0, min_on_interval: int = 180) -> bool:
+        """
+        Выключает котел.
+        Если stop_programm == 0, проверяет минимальное время работы котла (180 сек / 3 мин).
+        Если stop_programm != 0, выполняет принудительное аварийное отключение без проверок.
+        При выключении записывает timestamp_stop в relay_table (id=1).
+        """
+        now = datetime.now()
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        record = await db.get_record_by_id("relay_table", 1, pk_col="id")
+
+        if stop_programm == 0:
+            if record and record.get("timestamp_start"):
+                try:
+                    last_start = datetime.strptime(record["timestamp_start"], "%Y-%m-%d %H:%M:%S")
+                    elapsed = (now - last_start).total_seconds()
+                    if elapsed < min_on_interval:
+                        remaining = int(min_on_interval - elapsed)
+                        logger.warning(
+                            f"[USB-Relay] Блокировка выключения: с момента запуска прошло {int(elapsed)} с. "
+                            f"Минимальный интервал работы {min_on_interval} с. Повторите попытку через {remaining} с."
+                        )
+                        return False
+                except ValueError as e:
+                    logger.error(f"[USB-Relay] Ошибка формата timestamp_start в БД '{record.get('timestamp_start')}': {e}")
+
+        success = await self.set_state(False)
+        if success or stop_programm != 0:
+            start_ts = record.get("timestamp_start") if record else None
+            relay_data = {
+                "id": 1,
+                "timestamp_start": start_ts,
+                "timestamp_stop": now_str,
+            }
+            await db.upsert_record("relay_table", relay_data, pk_col="id")
+            logger.info(
+                f"[USB-Relay] Зафиксирована остановка котла в relay_table (id=1): "
+                f"timestamp_stop={now_str} (stop_programm={stop_programm})"
+            )
+            return True
+        return False

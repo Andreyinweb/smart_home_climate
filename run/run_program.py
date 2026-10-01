@@ -260,3 +260,13 @@ if __name__ == "__main__":
             print("Инициализирована таблица 'hourly_coefficients_table' 24 часовыми записями.")
         except Exception as e:
             print(f"Ошибка заполнения hourly_coefficients_table: {e}")
+
+
+    # Создаём таблицу relay_table
+    fields_db = """ (
+        id INTEGER PRIMARY KEY,
+        timestamp_start TEXT,
+        timestamp_stop TEXT
+        )
+        """
+    create_table(db_path=database_file, table_name='relay_table', fields=fields_db)
