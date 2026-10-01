@@ -9,10 +9,17 @@
     {% endif %}
     <title>{% block title %}Новая программа{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/legacy.css?v=3">
+    <style>
+        .navbar-warning { background-color: #fff3cd !important; color: #856404 !important; border-bottom: 2px solid #ffeeba; }
+        .navbar-error { background-color: #f8d7da !important; color: #721c24 !important; border-bottom: 2px solid #f5c6cb; }
+        .cycle-alerts { padding: 8px 15px; margin: 0; font-size: 0.9em; list-style-type: none; }
+        .cycle-alerts li { margin-bottom: 4px; }
+    </style>
 </head>
 <body>
+    {% set cycle_info = get_cycle_logs() %}
     <!-- Верхняя панель навигации -->
-    <header class="navbar">
+    <header class="navbar {% if cycle_info.status == 'warning' %}navbar-warning{% elif cycle_info.status == 'error' %}navbar-error{% endif %}">
         <div class="nav-container">
             <a href="/" class="nav-brand">🌡️ Новая программа</a>
             <nav class="nav-menu">
@@ -28,6 +35,13 @@
                 <a href="/debug/api-log" class="nav-link">🌐 API Log</a>
             </nav>
         </div>
+        {% if cycle_info.messages %}
+        <ul class="cycle-alerts">
+            {% for msg in cycle_info.messages %}
+            <li>⚠️ [Цикл #{{ cycle_info.cycle_id }}] {{ msg }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
     </header>
 
     <!-- Основной контент -->

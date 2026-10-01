@@ -181,80 +181,80 @@ except Exception as e:
     sys.exit(1)
 
 
-def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
-    def clean_logger_name(record: logging.LogRecord) -> bool:
-        if record.name.startswith(("climat_app.", "api_app.")):
-            record.name = record.name.split(".")[-1]
-        return True
+# def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
+#     def clean_logger_name(record: logging.LogRecord) -> bool:
+#         if record.name.startswith(("climat_app.", "api_app.")):
+#             record.name = record.name.split(".")[-1]
+#         return True
 
-    log_level = logging.DEBUG if config.app_env == AppEnv.DEVELOPMENT else logging.INFO
+#     log_level = logging.DEBUG if config.app_env == AppEnv.DEVELOPMENT else logging.INFO
 
-    formatter = logging.Formatter(
-        "%(asctime)s:%(levelname)s:%(name)s:%(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+#     formatter = logging.Formatter(
+#         "%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+#         datefmt="%Y-%m-%d %H:%M:%S"
+#     )
 
-    work_handler = logging.FileHandler(config.work_log, mode="a")
-    work_handler.setFormatter(formatter)
-    work_handler.addFilter(clean_logger_name)
+#     work_handler = logging.FileHandler(config.work_log, mode="a")
+#     work_handler.setFormatter(formatter)
+#     work_handler.addFilter(clean_logger_name)
 
-    work_logger = logging.getLogger("climat_app")
-    work_logger.setLevel(log_level)
-    work_logger.addHandler(work_handler)
-    work_logger.propagate = False
+#     work_logger = logging.getLogger("climat_app")
+#     work_logger.setLevel(log_level)
+#     work_logger.addHandler(work_handler)
+#     work_logger.propagate = False
 
-    api_handler = logging.FileHandler(config.api_log, mode="a")
-    api_handler.setFormatter(formatter)
-    api_handler.addFilter(clean_logger_name)
+#     api_handler = logging.FileHandler(config.api_log, mode="a")
+#     api_handler.setFormatter(formatter)
+#     api_handler.addFilter(clean_logger_name)
 
-    api_logger = logging.getLogger("api_app")
-    api_logger.setLevel(log_level)
-    api_logger.addHandler(api_handler)
-    api_logger.propagate = False
+#     api_logger = logging.getLogger("api_app")
+#     api_logger.setLevel(log_level)
+#     api_logger.addHandler(api_handler)
+#     api_logger.propagate = False
 
-    try:
-        import uvicorn.config
-        uvicorn_config_dict = uvicorn.config.LOGGING_CONFIG
+#     try:
+#         import uvicorn.config
+#         uvicorn_config_dict = uvicorn.config.LOGGING_CONFIG
         
-        fmt_str = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
-        date_fmt = "%Y-%m-%d %H:%M:%S"
+#         fmt_str = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
+#         date_fmt = "%Y-%m-%d %H:%M:%S"
 
-        if "default" in uvicorn_config_dict.get("formatters", {}):
-            uvicorn_config_dict["formatters"]["default"]["use_colors"] = False
-            uvicorn_config_dict["formatters"]["default"]["fmt"] = fmt_str
-            uvicorn_config_dict["formatters"]["default"]["datefmt"] = date_fmt
-        if "access" in uvicorn_config_dict.get("formatters", {}):
-            uvicorn_config_dict["formatters"]["access"]["use_colors"] = False
-            uvicorn_config_dict["formatters"]["access"]["fmt"] = "%(asctime)s:%(levelname)s:%(name)s:%(client_addr)s - \"%(request_line)s\" %(status_code)s"
-            uvicorn_config_dict["formatters"]["access"]["datefmt"] = date_fmt
+#         if "default" in uvicorn_config_dict.get("formatters", {}):
+#             uvicorn_config_dict["formatters"]["default"]["use_colors"] = False
+#             uvicorn_config_dict["formatters"]["default"]["fmt"] = fmt_str
+#             uvicorn_config_dict["formatters"]["default"]["datefmt"] = date_fmt
+#         if "access" in uvicorn_config_dict.get("formatters", {}):
+#             uvicorn_config_dict["formatters"]["access"]["use_colors"] = False
+#             uvicorn_config_dict["formatters"]["access"]["fmt"] = "%(asctime)s:%(levelname)s:%(name)s:%(client_addr)s - \"%(request_line)s\" %(status_code)s"
+#             uvicorn_config_dict["formatters"]["access"]["datefmt"] = date_fmt
 
-        uvicorn_config_dict["handlers"]["api_file"] = {
-            "class": "logging.FileHandler",
-            "filename": str(config.api_log),
-            "mode": "a",
-            "formatter": "default",
-        }
-        uvicorn_config_dict["handlers"]["api_access_file"] = {
-            "class": "logging.FileHandler",
-            "filename": str(config.api_log),
-            "mode": "a",
-            "formatter": "access",
-        }
+#         uvicorn_config_dict["handlers"]["api_file"] = {
+#             "class": "logging.FileHandler",
+#             "filename": str(config.api_log),
+#             "mode": "a",
+#             "formatter": "default",
+#         }
+#         uvicorn_config_dict["handlers"]["api_access_file"] = {
+#             "class": "logging.FileHandler",
+#             "filename": str(config.api_log),
+#             "mode": "a",
+#             "formatter": "access",
+#         }
         
-        uvicorn_config_dict["loggers"]["uvicorn"]["handlers"] = ["api_file"]
-        uvicorn_config_dict["loggers"]["uvicorn.error"]["handlers"] = ["api_file"]
-        uvicorn_config_dict["loggers"]["uvicorn.access"]["handlers"] = ["api_access_file"]
-    except Exception:
-        pass
+#         uvicorn_config_dict["loggers"]["uvicorn"]["handlers"] = ["api_file"]
+#         uvicorn_config_dict["loggers"]["uvicorn.error"]["handlers"] = ["api_file"]
+#         uvicorn_config_dict["loggers"]["uvicorn.access"]["handlers"] = ["api_access_file"]
+#     except Exception:
+#         pass
 
-    for uvicorn_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
-        u_logger = logging.getLogger(uvicorn_name)
-        u_logger.handlers = [api_handler]
-        u_logger.propagate = False
-        u_logger.setLevel(logging.INFO)
+#     for uvicorn_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+#         u_logger = logging.getLogger(uvicorn_name)
+#         u_logger.handlers = [api_handler]
+#         u_logger.propagate = False
+#         u_logger.setLevel(logging.INFO)
 
-    return work_logger, api_logger
+#     return work_logger, api_logger
 
 
-setup_loggers(settings)
+# setup_loggers(settings)
 
