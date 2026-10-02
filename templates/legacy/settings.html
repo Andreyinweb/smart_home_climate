@@ -18,6 +18,15 @@
     </div>
 
     <div class="form-group" style="margin-bottom: 15px;">
+        <label for="programmer_mode" style="display: block; font-weight: bold; margin-bottom: 5px;">Режим программатора (programmer_mode):</label>
+        <select id="programmer_mode" name="programmer_mode" class="input-field" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="PROGRAMMER_CONST" {% if programmer_mode == 'PROGRAMMER_CONST' %}selected{% endif %}>PROGRAMMER_CONST</option>
+            <option value="PROGRAMMER_TEMPORARILY" {% if programmer_mode == 'PROGRAMMER_TEMPORARILY' %}selected{% endif %}>PROGRAMMER_TEMPORARILY</option>
+            <option value="PROGRAMMER_WEEK" {% if programmer_mode == 'PROGRAMMER_WEEK' %}selected{% endif %}>PROGRAMMER_WEEK</option>
+        </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
         <label for="interval_seconds" style="display: block; font-weight: bold; margin-bottom: 5px;">Интервал опроса (сек):</label>
         <input type="number" id="interval_seconds" name="interval_seconds" value="{{ interval_seconds }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
     </div>
@@ -77,6 +86,11 @@
     <div class="form-group" style="margin-bottom: 15px;">
         <label for="maximum_temperature" style="display: block; font-weight: bold; margin-bottom: 5px;">Максимальная температура (°C):</label>
         <input type="number" step="0.1" id="maximum_temperature" name="maximum_temperature" value="{{ maximum_temperature }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label for="hysteresis_temperature" style="display: block; font-weight: bold; margin-bottom: 5px;">Гистерезис температуры (hysteresis_temperature, °C):</label>
+        <input type="number" step="0.1" id="hysteresis_temperature" name="hysteresis_temperature" value="{{ hysteresis_temperature }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
     </div>
 
     <div class="form-group" style="margin-bottom: 20px;">

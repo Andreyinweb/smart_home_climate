@@ -121,7 +121,9 @@ if __name__ == "__main__":
         hot_water_per_hour REAL,
         minimum_temperature  REAL,
         target_temperature REAL,
-        maximum_temperature REAL
+        maximum_temperature REAL,
+        hysteresis_temperature REAL,
+        programmer_mode TEXT
         )
         """
     create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
