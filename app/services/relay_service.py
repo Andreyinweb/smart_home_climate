@@ -102,10 +102,10 @@ class RelayController:
         try:
             result = await asyncio.to_thread(self._exec_usbrelay_sync, [])
         except subprocess.TimeoutExpired as e:
-            logger.error(f"[USB-Relay] Таймаут чтения статуса реле (timeout={self.timeout}s).")
+            logger.error(f"[get_state] Таймаут чтения статуса реле (timeout={self.timeout}s).")
             raise RelayExecutionError(f"Превышено время ожидания ответа реле: {e}") from e
         except Exception as e:
-            logger.error(f"[USB-Relay] Ошибка исполнения usbrelay: {e}")
+            logger.error(f"[get_state] Ошибка исполнения usbrelay: {e}")
             raise RelayExecutionError(f"Ошибка вызова системной утилиты: {e}") from e
 
         if result.returncode != 0:
@@ -142,33 +142,33 @@ class RelayController:
         for attempt in range(1, self.max_retries + 1):
             try:
                 logger.debug(
-                    f"[USB-Relay] Попытка {attempt}/{self.max_retries}: установка state={state} (physical={physical_val})"
+                    f"[set_state] Попытка {attempt}/{self.max_retries}: установка state={state} (physical={physical_val})"
                 )
                 result = await asyncio.to_thread(self._exec_usbrelay_sync, [arg])
 
                 if result.returncode == 0:
                     current_state = await self.get_state()
                     if current_state == state:
-                        logger.info(f"[USB-Relay] Состояние реле '{self.relay_id}' успешно установлено в {state}.")
+                        logger.info(f"[set_state] Состояние реле '{self.relay_id}' успешно установлено в {state}.")
                         return True
                     else:
                         logger.warning(
-                            f"[USB-Relay] Попытка {attempt}: команда state={state} отправлена, "
+                            f"[set_state] Попытка {attempt}: команда state={state} отправлена, "
                             f"но фактический ответ {current_state}."
                         )
                 else:
                     logger.warning(
-                        f"[USB-Relay] Попытка {attempt}: usbrelay вернул код {result.returncode}. stderr: {result.stderr.strip()}"
+                        f"[set_state] Попытка {attempt}: usbrelay вернул код {result.returncode}. stderr: {result.stderr.strip()}"
                     )
             except (subprocess.TimeoutExpired, RelayExecutionError, RelayParseError) as e:
                 last_exception = e
-                logger.warning(f"[USB-Relay] Сбой USB на попытке {attempt}/{self.max_retries}: {e}")
+                logger.warning(f"[set_state] Сбой USB на попытке {attempt}/{self.max_retries}: {e}")
 
             if attempt < self.max_retries:
                 await asyncio.sleep(0.5 * attempt)
 
         msg = f"Не удалось установить состояние state={state} для реле '{self.relay_id}' за {self.max_retries} попыток."
-        logger.error(f"[USB-Relay] {msg}")
+        logger.error(f"[set_state] {msg}")
         if last_exception:
             raise RelayExecutionError(msg) from last_exception
         raise RelayExecutionError(msg)
@@ -189,12 +189,12 @@ class RelayController:
                 if elapsed < min_off_interval:
                     remaining = int(min_off_interval - elapsed)
                     logger.warning(
-                        f"[USB-Relay] Блокировка включения: с момента выключения прошло {int(elapsed)} с. "
+                        f"[turn_on] Блокировка включения: с момента выключения прошло {int(elapsed)} с. "
                         f"Минимальный интервал простоя {min_off_interval} с. Повторите попытку через {remaining} с."
                     )
                     return False
             except ValueError as e:
-                logger.error(f"[USB-Relay] Ошибка формата timestamp_stop в БД '{record.get('timestamp_stop')}': {e}")
+                logger.error(f"[turn_on] Ошибка формата timestamp_stop в БД '{record.get('timestamp_stop')}': {e}")
 
         success = await self.set_state(True)
         if success:
@@ -205,7 +205,7 @@ class RelayController:
                 "timestamp_stop": stop_ts,
             }
             await db.upsert_record("relay_table", relay_data, pk_col="id")
-            logger.info(f"[USB-Relay] Зафиксирован запуск котла в relay_table (id=1): timestamp_start={now_str}")
+            logger.info(f"[turn_on] Зафиксирован запуск котла в relay_table (id=1): timestamp_start={now_str}")
         return success
 
     async def turn_off(self, stop_programm: int = 0, min_on_interval: int = 180) -> bool:
@@ -232,7 +232,7 @@ class RelayController:
                         )
                         return False
                 except ValueError as e:
-                    logger.error(f"[USB-Relay] Ошибка формата timestamp_start в БД '{record.get('timestamp_start')}': {e}")
+                    logger.error(f"[turn_off] Ошибка формата timestamp_start в БД '{record.get('timestamp_start')}': {e}")
 
         success = await self.set_state(False)
         if success or stop_programm != 0:
@@ -244,8 +244,32 @@ class RelayController:
             }
             await db.upsert_record("relay_table", relay_data, pk_col="id")
             logger.info(
-                f"[USB-Relay] Зафиксирована остановка котла в relay_table (id=1): "
+                f"[turn_off] Зафиксирована остановка котла в relay_table (id=1): "
                 f"timestamp_stop={now_str} (stop_programm={stop_programm})"
             )
             return True
         return False
+    async def verification_relay(self):
+        # Сверка и синхронизация фактического состояния USB-реле с heating_table
+        try:
+            latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            target_heat_status = bool(latest_heat.get("status_heating")) if latest_heat else False
+
+            actual_relay_state = await self.get_state()
+
+            if actual_relay_state != target_heat_status:
+                logger.warning(
+                    f"[verification_relay] Обнаружено расхождение состояния реле! В БД status_heating={target_heat_status}, "
+                    f"а фактически реле={actual_relay_state}. Выполняется синхронизация..."
+                )
+                if target_heat_status:
+                    await self.turn_on()
+                    if await self.get_state():
+                        logger.info(f"[verification_relay] Состояние реле приведено к status_heating={target_heat_status}.")
+                else:
+                    await self.turn_off()
+                    if not await self.get_state():
+                        logger.info(f"[verification_relay] Состояние реле приведено к status_heating={target_heat_status}.")
+        except Exception as e:
+            logger.error(f"[verification_relay] Ошибка при сверке состояния реле котла: {e}")
+        

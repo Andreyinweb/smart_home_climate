@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
         f"Запуск Smart Home Climate API  app_env={settings.app_env.value}     "
         f"sensor_mode={settings.sensor_mode.value}    site_weather={settings.site_weather.value}"
     )
+    relay_ctrl = get_relay_controller()
 
     async def ble_polling_loop():
         while True:
@@ -87,26 +88,8 @@ async def lifespan(app: FastAPI):
                 else:
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
 
-                # Сверка и синхронизация фактического состояния USB-реле с heating_table
-                try:
-                    latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
-                    target_heat_status = bool(latest_heat.get("status_heating")) if latest_heat else False
-
-                    relay_ctrl = get_relay_controller()
-                    actual_relay_state = await relay_ctrl.get_state()
-
-                    if actual_relay_state != target_heat_status:
-                        work_log.warning(
-                            f"[Цикл] Обнаружено расхождение состояния реле! В БД status_heating={target_heat_status}, "
-                            f"а фактически реле={actual_relay_state}. Выполняется синхронизация..."
-                        )
-                        if target_heat_status:
-                            await relay_ctrl.turn_on()
-                        else:
-                            await relay_ctrl.turn_off(stop_programm=0)
-                        work_log.info(f"[Цикл] Состояние реле приведено к status_heating={target_heat_status}.")
-                except Exception as e:
-                    work_log.error(f"[Цикл] Ошибка при сверке состояния реле котла: {e}")
+                
+                await relay_ctrl.verification_relay()
 
                 coeff_hour = await db.get_record_by_id("hourly_coefficients_table", int(timestamp_str[11:13]), pk_col="hour", log_to_api=False)
                 updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
@@ -143,7 +126,6 @@ async def lifespan(app: FastAPI):
 
     # Аварийное / программное выключение реле при остановке приложения
     try:
-        relay_ctrl = get_relay_controller()
         work_log.info("[Lifespan] Выполнение принудительного выключения реле котла (stop_programm=1)...")
         await relay_ctrl.turn_off(stop_programm=1)
     except Exception as e:
