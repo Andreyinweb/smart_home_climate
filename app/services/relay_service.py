@@ -1,3 +1,5 @@
+# app/services/relay_service.py
+
 import asyncio
 from datetime import datetime
 import logging
@@ -227,7 +229,7 @@ class RelayController:
                     if elapsed < min_on_interval:
                         remaining = int(min_on_interval - elapsed)
                         logger.warning(
-                            f"[USB-Relay] Блокировка выключения: с момента запуска прошло {int(elapsed)} с. "
+                            f"[turn_off] Блокировка выключения: с момента запуска прошло {int(elapsed)} с. "
                             f"Минимальный интервал работы {min_on_interval} с. Повторите попытку через {remaining} с."
                         )
                         return False
