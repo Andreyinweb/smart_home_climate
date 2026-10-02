@@ -150,7 +150,7 @@ class RelayController:
                     current_state = await self.get_state()
                     if current_state == state:
                         logger.info(f"[USB-Relay] Состояние реле '{self.relay_id}' успешно установлено в {state}.")
-                        return current_state
+                        return True
                     else:
                         logger.warning(
                             f"[USB-Relay] Попытка {attempt}: команда state={state} отправлена, "

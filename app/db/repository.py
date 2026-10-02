@@ -390,7 +390,7 @@ def _get_sensor_data_for_graphs_sync(hours: int = 24, log_to_api: bool = False) 
         CASE WHEN EXISTS (
             SELECT 1 FROM heating_table h
             WHERE h.id > 0 AND s.id >= h.id
-            AND (h.stop_heat__plus = 0 OR h.stop_heat__plus IS NULL OR s.id <= h.id + h.stop_heat__plus)
+            AND (h.stop_heat_plus = 0 OR h.stop_heat_plus IS NULL OR s.id <= h.id + h.stop_heat_plus)
         ) THEN 1 ELSE 0 END AS heat_status
     FROM table_sensor_data s
     WHERE s.timestamp >= datetime((SELECT IFNULL(MAX(timestamp), datetime('now')) FROM table_sensor_data), ?)
@@ -1019,7 +1019,7 @@ def get_repository() -> BaseRepository:
 #         CASE WHEN EXISTS (
 #             SELECT 1 FROM heating_table h
 #             WHERE h.id > 0 AND s.id >= h.id
-#             AND (h.stop_heat__plus = 0 OR h.stop_heat__plus IS NULL OR s.id <= h.id + h.stop_heat__plus)
+#             AND (h.stop_heat_plus = 0 OR h.stop_heat_plus IS NULL OR s.id <= h.id + h.stop_heat_plus)
 #         ) THEN 1 ELSE 0 END AS heat_status
 #     FROM table_sensor_data s
 #     WHERE s.timestamp >= datetime((SELECT IFNULL(MAX(timestamp), datetime('now')) FROM table_sensor_data), ?)

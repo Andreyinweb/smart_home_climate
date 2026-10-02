@@ -219,8 +219,9 @@ if __name__ == "__main__":
         id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,
         status_heating BOOLEAN,
-        stop_heat__plus INTEGER,
-        heating_automation BOOLEAN
+        stop_heat_plus INTEGER,
+        automation_start BOOLEAN,
+        automation_stop BOOLEAN
         )
         """
     create_table(db_path=database_file, table_name='heating_table', fields=fields_db)

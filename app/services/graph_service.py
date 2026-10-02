@@ -84,7 +84,7 @@ def sample_points_to_target(
     if heat_events:
         for he in heat_events:
             h_start = he.get("id")
-            h_plus = he.get("stop_heat__plus", 0) or 0
+            h_plus = he.get("stop_heat_plus", 0) or 0
             h_stop = (h_start + h_plus) if (h_start is not None and h_plus > 0) else None
             if h_start is not None and h_start in id_to_idx:
                 mandatory.add(id_to_idx[h_start])
@@ -289,7 +289,7 @@ def render_temperature_graph(
         fl_temps.append(row.get("floor_temp", 0.0))
 
     vent_spans = get_event_spans(vent_events or [], data_rows, "id", "stop_vent_plus")
-    heat_spans = get_event_spans(heat_events or [], data_rows, "id", "stop_heat__plus")
+    heat_spans = get_event_spans(heat_events or [], data_rows, "id", "stop_heat_plus")
 
     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
     end_str = timestamps[-1].strftime("%d.%m.%Y %H:%M")
@@ -392,7 +392,7 @@ def render_humidity_graph(
         fl_hums.append(row.get("floor_humi", 0.0))
 
     vent_spans = get_event_spans(vent_events or [], data_rows, "id", "stop_vent_plus")
-    heat_spans = get_event_spans(heat_events or [], data_rows, "id", "stop_heat__plus")
+    heat_spans = get_event_spans(heat_events or [], data_rows, "id", "stop_heat_plus")
 
     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
     end_str = timestamps[-1].strftime("%d.%m.%Y %H:%M")
@@ -735,7 +735,7 @@ async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
 #     if heat_events:
 #         for he in heat_events:
 #             h_start = he.get("id")
-#             h_plus = he.get("stop_heat__plus", 0) or 0
+#             h_plus = he.get("stop_heat_plus", 0) or 0
 #             h_stop = (h_start + h_plus) if (h_start is not None and h_plus > 0) else None
 #             if h_start is not None and h_start in id_to_idx:
 #                 mandatory.add(id_to_idx[h_start])
@@ -949,7 +949,7 @@ async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
 #         vent_events or [], data_rows, "id", "stop_vent_plus"
 #     )
 #     heat_spans = get_event_spans(
-#         heat_events or [], data_rows, "id", "stop_heat__plus"
+#         heat_events or [], data_rows, "id", "stop_heat_plus"
 #     )
 
 #     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")

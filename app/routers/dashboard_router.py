@@ -290,7 +290,7 @@ async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
 
         latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
         if latest_api:
-            reduced_interval_in_seconds = int(latest_api["vent_time_val"] / 2 * 60)
+            reduced_interval_in_seconds = int(latest_api["vent_time_val"] / 3 * 60)
             if reduced_interval_in_seconds < 60:
                 reduced_interval_in_seconds = 60
             dto = SystemSettingsUpdate(interval_seconds=reduced_interval_in_seconds, previous_interval_in_seconds=sys_settings.interval_seconds)
