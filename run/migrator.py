@@ -12,7 +12,7 @@ not_magrate_tables = {"table_sensor_data",
     "sqlite_sequence",
     # "api_table",
     # "ventilation_table",
-    "heating_table",
+    # "heating_table",
     "hourly_coefficients_table",
     "relay_table"
 }
