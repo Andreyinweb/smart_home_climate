@@ -21,7 +21,7 @@ class HeatingController:
         """
         Запуск отопления (ручной или автоматический по порогу).
         """
-        latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
         if latest_heat and latest_heat.get("status_heating") is True:
             logger.info("[start] Отопление уже запущено. Запуск пропущен.")
             return False
@@ -56,7 +56,7 @@ class HeatingController:
             "automation_stop": False,
         }
 
-        await self.repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+        await self.repo.upsert_record("history_of_heating", data_to_write, pk_col="id", log_to_api=False)
         logger.info(
             f"[start] Успешный запуск отопления зафиксирован в БД: sensor_id={latest_sensor['id']}, reheating_to={reheating_to}"
         )
@@ -66,7 +66,7 @@ class HeatingController:
         """
         Остановка отопления (ручная или автоматическая по порогу).
         """
-        latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
         if not latest_heat or not latest_heat.get("status_heating"):
             logger.info("[stop] Отопление выключено. Остановка пропущена.")
             return False
@@ -88,7 +88,7 @@ class HeatingController:
             return False
 
         if stop_heat_plus == 0:
-            await self.repo.delete_record_by_id("heating_table", heat_start_id, pk_col="id", log_to_api=False)
+            await self.repo.delete_record_by_id("history_of_heating", heat_start_id, pk_col="id", log_to_api=False)
             logger.info(f"[stop] Запись отопления удалена (stop_heat_plus=0): id={heat_start_id}")
         else:
             data_to_write: Dict[str, Any] = {
@@ -100,7 +100,7 @@ class HeatingController:
                 "automation_start": latest_heat.get("automation_start", False),
                 "automation_stop": is_automation,
             }
-            await self.repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+            await self.repo.upsert_record("history_of_heating", data_to_write, pk_col="id", log_to_api=False)
             logger.info(
                 f"[stop] Зафиксирована остановка отопления: start_id={heat_start_id}, "
                 f"current_id={current_sensor_id}, diff={stop_heat_plus}"
@@ -123,7 +123,7 @@ class HeatingController:
         minimum_temperature = getattr(sys_settings, "minimum_temperature", None)
         maximum_temperature = getattr(sys_settings, "maximum_temperature", None)
 
-        latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
         is_heating_active = bool(latest_heat and latest_heat.get("status_heating"))
 
         if not is_heating_active:
@@ -182,7 +182,7 @@ class Programmer:
             logger.warning("[_process_programmer_const] Некорректные значения const_min или const_max.")
             return
 
-        latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
         is_heating_active = bool(latest_heat and latest_heat.get("status_heating"))
 
         if not is_heating_active:
@@ -231,7 +231,7 @@ class Programmer:
 #         """
 #         Запуск отопления (ручной или автоматический по порогу).
 #         """
-#         latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+#         latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
 #         if latest_heat and latest_heat.get("status_heating") is True:
 #             logger.info("[start] Отопление уже запущено. Запуск пропущен.")
 #             return False
@@ -260,7 +260,7 @@ class Programmer:
 #             "automation_start": is_automation,
 #         }
 
-#         await self.repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+#         await self.repo.upsert_record("history_of_heating", data_to_write, pk_col="id", log_to_api=False)
 #         logger.info(f"[start] Успешный запуск отопления зафиксирован в БД: sensor_id={latest_sensor['id']}")
 #         return True
 
@@ -268,7 +268,7 @@ class Programmer:
 #         """
 #         Остановка отопления (ручная или автоматическая по порогу).
 #         """
-#         latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+#         latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
 #         if not latest_heat or not latest_heat.get("status_heating"):
 #             logger.info("[stop] Отопление выключено. Остановка пропущена.")
 #             return False
@@ -290,7 +290,7 @@ class Programmer:
 #             return False
 
 #         if stop_heat_plus == 0:
-#             await self.repo.delete_record_by_id("heating_table", heat_start_id, pk_col="id", log_to_api=False)
+#             await self.repo.delete_record_by_id("history_of_heating", heat_start_id, pk_col="id", log_to_api=False)
 #             logger.info(f"[stop] Запись отопления удалена (stop_heat_plus=0): id={heat_start_id}")
 #         else:
 #             data_to_write: Dict[str, Any] = {
@@ -300,7 +300,7 @@ class Programmer:
 #                 "stop_heat_plus": stop_heat_plus,
 #                 "automation_stop": is_automation,
 #             }
-#             await self.repo.upsert_record("heating_table", data_to_write, pk_col="id", log_to_api=False)
+#             await self.repo.upsert_record("history_of_heating", data_to_write, pk_col="id", log_to_api=False)
 #             logger.info(
 #                 f"[stop] Зафиксирована остановка отопления: start_id={heat_start_id}, "
 #                 f"current_id={current_sensor_id}, diff={stop_heat_plus}"
@@ -324,7 +324,7 @@ class Programmer:
 #         target_temperature = getattr(sys_settings, "target_temperature", None)
 #         maximum_temperature = getattr(sys_settings, "maximum_temperature", None)
 
-#         latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+#         latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
 #         is_heating_active = bool(latest_heat and latest_heat.get("status_heating"))
 
 #         if not is_heating_active:

@@ -506,7 +506,7 @@ async def update_temperature_graph_cache_if_needed() -> Optional[bool]:
                     sensor_data = [p.model_dump() for p in points]
 
                 vent_events = await db.fetch_range("ventilation_table", order_asc=True, log_to_api=False)
-                heat_events = await db.fetch_range("heating_table", order_asc=True, log_to_api=False)
+                heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
 
                 if sensor_data:
                     await asyncio.to_thread(
@@ -587,7 +587,7 @@ async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
                     sensor_data = [p.model_dump() for p in points]
 
                 vent_events = await db.fetch_range("ventilation_table", order_asc=True, log_to_api=False)
-                heat_events = await db.fetch_range("heating_table", order_asc=True, log_to_api=False)
+                heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
 
                 sys_settings = await db.get_or_create_settings(log_to_api=False)
                 target_floor_humi = None
@@ -1130,7 +1130,7 @@ async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
 #             work_log.debug(f"[update_graphs_cache_if_needed] Загружено строк сенсоров: {len(sensor_data)}")
 
 #             vent_events = await db.fetch_range("ventilation_table", order_asc=True, log_to_api=False)
-#             heat_events = await db.fetch_range("heating_table", order_asc=True, log_to_api=False)
+#             heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
 #             work_log.debug(f"[update_graphs_cache_if_needed] Загружено событий: проветривания={len(vent_events)}, отопления={len(heat_events)}")
 
 #             sys_settings = await db.get_or_create_settings(log_to_api=False)

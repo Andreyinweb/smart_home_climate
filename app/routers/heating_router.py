@@ -77,7 +77,7 @@ async def get_heating_page(
 
     latest_heat = None
     try:
-        latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        latest_heat = await repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
     except Exception:
         pass
 

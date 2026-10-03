@@ -216,7 +216,7 @@ if __name__ == "__main__":
         """
     create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
 
-    # Создаём таблицу heating_table
+    # Создаём таблицу history_of_heating
     fields_db = """ (
         id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,
@@ -227,7 +227,7 @@ if __name__ == "__main__":
         automation_stop BOOLEAN
         )
         """
-    create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
+    create_table(db_path=database_file, table_name='history_of_heating', fields=fields_db)
 
     # Таблица сырых данных с сайта (weather_site_table)
     fields_db = """ (
@@ -273,6 +273,18 @@ if __name__ == "__main__":
         )
         """
     create_table(db_path=database_file, table_name='relay_table', fields=fields_db)
+
+    
+    # Создаём таблицу heating_table
+    fields_db = """ (
+        id INTEGER PRIMARY KEY,
+        temperature_start REAL,
+        temperature_stop REAL,
+        status_heating BOOLEAN,
+        updated_at TEXT
+        )
+        """
+    create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
     
     # Создаём таблицу programmer_const
     fields_db = """ (

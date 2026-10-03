@@ -372,7 +372,7 @@ def _get_sensor_data_for_graphs_sync(hours: int = 24, log_to_api: bool = False) 
             AND (v.stop_vent_plus = 0 OR v.stop_vent_plus IS NULL OR s.id <= v.id + v.stop_vent_plus)
         ) THEN 1 ELSE 0 END AS vent_status,
         CASE WHEN EXISTS (
-            SELECT 1 FROM heating_table h
+            SELECT 1 FROM history_of_heating h
             WHERE h.id > 0 AND s.id >= h.id
             AND (h.stop_heat_plus = 0 OR h.stop_heat_plus IS NULL OR s.id <= h.id + h.stop_heat_plus)
         ) THEN 1 ELSE 0 END AS heat_status
@@ -1006,7 +1006,7 @@ def get_repository() -> BaseRepository:
 #             AND (v.stop_vent_plus = 0 OR v.stop_vent_plus IS NULL OR s.id <= v.id + v.stop_vent_plus)
 #         ) THEN 1 ELSE 0 END AS vent_status,
 #         CASE WHEN EXISTS (
-#             SELECT 1 FROM heating_table h
+#             SELECT 1 FROM history_of_heating h
 #             WHERE h.id > 0 AND s.id >= h.id
 #             AND (h.stop_heat_plus = 0 OR h.stop_heat_plus IS NULL OR s.id <= h.id + h.stop_heat_plus)
 #         ) THEN 1 ELSE 0 END AS heat_status

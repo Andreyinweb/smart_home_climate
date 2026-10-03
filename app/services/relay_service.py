@@ -252,9 +252,9 @@ class RelayController:
             return True
         return False
     async def verification_relay(self):
-        # Сверка и синхронизация фактического состояния USB-реле с heating_table
+        # Сверка и синхронизация фактического состояния USB-реле с history_of_heating
         try:
-            latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            latest_heat = await db.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
             target_heat_status = bool(latest_heat.get("status_heating")) if latest_heat else False
 
             actual_relay_state = await self.get_state()
