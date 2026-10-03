@@ -6,7 +6,7 @@ from fastapi import Depends, Request
 from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
-from app.services.heating_service import HeatingController
+from app.services.heating_service import HeatingController, Programmer
 from app.services.logs_service import get_current_cycle_logs
 from app.services.relay_service import RelayController
 
@@ -55,4 +55,72 @@ def get_heating_controller(
 ) -> HeatingController:
     """Провайдер сервиса управления отоплением."""
     return HeatingController(repo=repo, relay=relay)
+
+
+def get_programmer(
+    repo: BaseRepository = Depends(get_repository),
+    heating_controller: HeatingController = Depends(get_heating_controller),
+) -> Programmer:
+    """Провайдер сервиса программатора."""
+    return Programmer(repo=repo, heating_controller=heating_controller)
+
+
+
+# # app/dependencies.py
+
+# import os
+# from typing import Optional
+# from fastapi import Depends, Request
+# from fastapi.templating import Jinja2Templates
+
+# from app.db.repository import BaseRepository
+# from app.services.heating_service import HeatingController
+# from app.services.logs_service import get_current_cycle_logs
+# from app.services.relay_service import RelayController
+
+# _templates = Jinja2Templates(directory="templates")
+# _templates.env.globals["get_cycle_logs"] = get_current_cycle_logs
+# _relay_controller: Optional[RelayController] = None
+
+
+# def get_templates() -> Jinja2Templates:
+#     """Возвращает настроенный объект Jinja2Templates."""
+#     return _templates
+
+
+# def get_template_path(template_name: str, request: Request) -> str:
+#     """Определяет путь к шаблону с учетом User-Agent и наличия файла в web."""
+#     user_agent = request.headers.get("user-agent", "").lower()
+#     legacy_keywords = [
+#         "smart-tv", "smarttv", "opera tv", "netcast",
+#         "viera", "tizen/2", "tizen/3", "web0s/1", "web0s/2"
+#     ]
+#     is_legacy_device = any(keyword in user_agent for keyword in legacy_keywords)
+#     web_template_file = os.path.join("templates", "web", template_name)
+
+#     if not is_legacy_device and os.path.exists(web_template_file):
+#         return f"web/{template_name}"
+
+#     return f"legacy/{template_name}"
+
+
+# def get_repository() -> BaseRepository:
+#     """Провайдер экземпляра репозитория для работы с БД."""
+#     return BaseRepository()
+
+
+# def get_relay_controller() -> RelayController:
+#     """Провайдер синглтона контроллера USB-реле."""
+#     global _relay_controller
+#     if _relay_controller is None:
+#         _relay_controller = RelayController()
+#     return _relay_controller
+
+
+# def get_heating_controller(
+#     repo: BaseRepository = Depends(get_repository),
+#     relay: RelayController = Depends(get_relay_controller),
+# ) -> HeatingController:
+#     """Провайдер сервиса управления отоплением."""
+#     return HeatingController(repo=repo, relay=relay)
 
