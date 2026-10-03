@@ -121,7 +121,7 @@ async def get_index(
             pass
 
         try:
-            latest_heat = await repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
+            latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
             if latest_heat and latest_heat.get("status_heating"):
                 active_modes.append("Отопление")
         except Exception:

@@ -54,9 +54,9 @@ async def get_heating_page(
     sys_settings = await repo.get_or_create_settings(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
-    minimum_temperature = getattr(sys_settings, "minimum_temperature", None)
-    target_temperature = getattr(sys_settings, "target_temperature", None)
-    maximum_temperature = getattr(sys_settings, "maximum_temperature", None)
+    latest_heating_table = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+    minimum_temperature = latest_heating_table.get("temperature_start")
+    maximum_temperature = latest_heating_table.get("temperature_stop")
 
     latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
     latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
@@ -78,12 +78,13 @@ async def get_heating_page(
     latest_heat = None
     try:
         latest_heat = await repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
+        
     except Exception:
         pass
 
     latest_heat_exists = latest_heat is not None
 
-    if latest_heat and latest_heat.get("status_heating"):
+    if latest_heat and latest_heating_table.get("status_heating"):
         heat_active = True
         heat_start_id = latest_heat.get("id")
         sensor_before = await repo.get_record_by_id("table_sensor_data", heat_start_id, log_to_api=False) if heat_start_id else None
@@ -145,8 +146,6 @@ async def get_heating_page(
         heat_now_time = "—"
         card_title = "Отопление не включалось"
 
-    start_basement_temp = heat_before.get("basement_temp") if heat_before else db_data.get("basement_temp")
-    target_heat_limit = target_temperature
     
     if heat_start_time != "—" and heat_now_time != "—":
         heat_difference_time = get_time_difference_str(str(heat_start_time)[11:16], str(heat_now_time)[11:16])
@@ -185,9 +184,7 @@ async def get_heating_page(
     context = {
         "website_return_time": website_return_time,
         "minimum_temperature": minimum_temperature,
-        "target_temperature": target_temperature,
         "maximum_temperature": maximum_temperature,
-        "target_heat_limit": target_heat_limit,
         "btn_start_class": btn_start_class,
         "btn_stop_class": btn_stop_class,
         "btn_start_disabled": btn_start_disabled,

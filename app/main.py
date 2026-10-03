@@ -94,7 +94,8 @@ async def lifespan(app: FastAPI):
                         await programmer.evaluate(sensor_record)
 
                         # 2. Защитная проверка пределов (минимум и максимум)
-                        await heating_ctrl.check_temperature(sensor_record)
+                        await heating_ctrl.check_temperature(sensor_record["basement_temp"])
+                        await heating_ctrl.min_max_temperature(sensor_record)
                     except Exception as e:
                         work_log.error(f"[Цикл] Ошибка при проверке автоматики отопления: {e}")
 
@@ -272,7 +273,7 @@ if __name__ == "__main__":
 #                     try:
 #                         repo = get_repository()
 #                         heating_ctrl = get_heating_controller(repo=repo, relay=relay_ctrl)
-#                         await heating_ctrl.check_temperature(sensor_record)
+#                         await heating_ctrl.min_max_temperature(sensor_record)
 #                     except Exception as e:
 #                         work_log.error(f"[Цикл] Ошибка при проверке автоматики отопления: {e}")
 
