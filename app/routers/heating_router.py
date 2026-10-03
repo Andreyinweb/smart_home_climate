@@ -223,6 +223,6 @@ async def start_heating(
 async def stop_heating(
     heating_ctrl: HeatingController = Depends(get_heating_controller),
 ):
-    """Остановка отопления через HeatingController."""
-    await heating_ctrl.stop(is_automation=False)
+    """Принудительная остановка отопления через HeatingController."""
+    await heating_ctrl.stop(is_automation=False, stop_forcibly=1)
     return RedirectResponse(url="/heating", status_code=status.HTTP_303_SEE_OTHER)

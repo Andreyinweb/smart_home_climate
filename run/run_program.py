@@ -221,6 +221,7 @@ if __name__ == "__main__":
         id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,
         status_heating BOOLEAN,
+        reheating_to REAL,
         stop_heat_plus INTEGER,
         automation_start BOOLEAN,
         automation_stop BOOLEAN
@@ -264,7 +265,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Ошибка заполнения hourly_coefficients_table: {e}")
 
-
     # Создаём таблицу relay_table
     fields_db = """ (
         id INTEGER PRIMARY KEY,
@@ -273,3 +273,36 @@ if __name__ == "__main__":
         )
         """
     create_table(db_path=database_file, table_name='relay_table', fields=fields_db)
+    
+    # Создаём таблицу programmer_const
+    fields_db = """ (
+        id INTEGER PRIMARY KEY,
+        const_min REAL,
+        const_max REAL,
+        updated_at TEXT
+        )
+        """
+    create_table(db_path=database_file, table_name='programmer_const', fields=fields_db)
+
+    # Создаём таблицу programmer_temporarily
+    fields_db = """ (
+        id INTEGER PRIMARY KEY,
+        temporarily_min REAL,
+        temporarily_max REAL,
+        temporarily_time TEXT,
+        updated_at TEXT
+        )
+        """
+    create_table(db_path=database_file, table_name='programmer_temporarily', fields=fields_db)
+
+    # Создаём таблицу programmer_week.  Mo Tu We Th Fr Sa Su Mo-Fr Mo-Sa day weekdays week
+    fields_db = """ (
+        id INTEGER PRIMARY KEY,
+        week_mode TEXT,
+        week_day TEXT,
+        week_time TEXT,
+        week_temperature REAL,
+        updated_at TEXT
+        )
+        """
+    create_table(db_path=database_file, table_name='programmer_week', fields=fields_db)

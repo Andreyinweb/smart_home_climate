@@ -7,7 +7,7 @@
     {% if website_return_time %}
     <meta http-equiv="refresh" content="{{ website_return_time }}">
     {% endif %}
-    <title>{% block title %}Новая программа{% endblock %}</title>
+    <title>{% block title %}Управление климатом{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/legacy.css?v=3">
     <style>
         .navbar-warning { background-color: #fff3cd !important; color: #856404 !important; border-bottom: 2px solid #ffeeba; }
@@ -18,14 +18,14 @@
 </head>
 <body>
     {% set cycle_info = get_cycle_logs() %}
-    <!-- Верхняя панель навигации -->
     <header class="navbar {% if cycle_info.status == 'warning' %}navbar-warning{% elif cycle_info.status == 'error' %}navbar-error{% endif %}">
         <div class="nav-container">
-            <a href="/" class="nav-brand">🌡️ Новая программа</a>
+            <a href="/" class="nav-brand">🌡️ Климат Контроль</a>
             <nav class="nav-menu">
                 <a href="/" class="nav-link">🏠 Главная</a>
                 <a href="/ventilation" class="nav-link">💨 Проветривание</a>
                 <a href="/heating" class="nav-link">🔥 Отопление</a>
+                <a href="/programmer" class="nav-link">⏱️ Программатор</a>
                 <a href="/graphs/temperature" class="nav-link">T, °C</a>
                 <a href="/graphs/humidity" class="nav-link">Влажность</a>
                 <a href="/gas/table" class="nav-link">📊 Таблица</a>
@@ -44,7 +44,6 @@
         {% endif %}
     </header>
 
-    <!-- Основной контент -->
     <main class="content-container">
         {% block content %}{% endblock %}
     </main>

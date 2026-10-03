@@ -10,12 +10,14 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import AppEnv, settings
 import app.services.logs_service as logs_service
 import app.db.repository as db
+# from app.core.db_start_config import init_db_start_data
 from app.db.connection import get_db_connection
 from app.dependencies import (
     get_relay_controller,
     get_repository,
     get_heating_controller,
 )
+from app.core.db_start_config import init_db_start_data
 from app.routers import (
     dashboard_router,
     debug_router,
@@ -23,6 +25,7 @@ from app.routers import (
     graphs_router,
     heating_router,
     settings_router,
+    programmer_router
 )
 
 from app.services.ble_service import fetch_all_ble_sensors
@@ -43,8 +46,9 @@ async def lifespan(app: FastAPI):
         f"Запуск Smart Home Climate API  app_env={settings.app_env.value}     "
         f"sensor_mode={settings.sensor_mode.value}    site_weather={settings.site_weather.value}"
     )
+    # Стартовые установки.
     relay_ctrl = get_relay_controller()
-
+    await init_db_start_data()
     async def ble_polling_loop():
         while True:
             try:
@@ -157,6 +161,7 @@ app.include_router(gas_router.router)
 app.include_router(graphs_router.router)
 app.include_router(settings_router.router)
 app.include_router(heating_router.router)
+app.include_router(programmer_router.router)
 
 if settings.app_env == AppEnv.DEVELOPMENT:
     app.include_router(debug_router.router)

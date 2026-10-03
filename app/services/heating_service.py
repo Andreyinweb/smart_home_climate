@@ -54,7 +54,7 @@ class HeatingController:
         logger.info(f"[start] Успешный запуск отопления зафиксирован в БД: sensor_id={latest_sensor['id']}")
         return True
 
-    async def stop(self, is_automation: bool = False) -> bool:
+    async def stop(self, is_automation: bool = False, stop_forcibly: int = 0) -> bool:
         """
         Остановка отопления (ручная или автоматическая по порогу).
         """
@@ -68,7 +68,7 @@ class HeatingController:
         heat_start_id = latest_heat["id"]
         stop_heat_plus = max(0, current_sensor_id - heat_start_id)
 
-        turn_off_success = await self.relay.turn_off()
+        turn_off_success = await self.relay.turn_off(stop_programm=stop_forcibly)
         relay_state = await self.relay.get_state()
 
         if not turn_off_success or relay_state:

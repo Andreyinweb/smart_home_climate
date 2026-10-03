@@ -1,0 +1,215 @@
+<!-- templates/legacy/programmer.html -->
+{% extends "legacy/base.html" %}
+
+{% block title %}Программатор — Управление климатом{% endblock %}
+
+{% block content %}
+<style>
+    .card-programmer {
+        max-width: 430px;
+        margin: 18px auto;
+        padding: 12px;
+    }
+    .programmer-block {
+        background-color: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+    }
+    .input-blue {
+        border: 2px solid #2b6cb0;
+        background-color: #ebf8ff;
+        color: #2b6cb0;
+        font-weight: bold;
+        font-size: 0.98rem;
+        padding: 4px 6px;
+        border-radius: 4px;
+        width: 90px;
+        text-align: center;
+    }
+    .input-blue:focus {
+        outline: none;
+        border-color: #3182ce;
+        background-color: #ebf8ff;
+        box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.5);
+    }
+    .programmer-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0;
+    }
+    .programmer-table td {
+        padding: 6px 8px;
+        vertical-align: middle;
+        font-size: 0.95rem;
+    }
+    .section-title {
+        font-weight: bold;
+        font-size: 0.98rem;
+        padding-bottom: 4px;
+        border-bottom: 2px solid #cbd5e0;
+        margin-bottom: 8px;
+        color: #2d3748;
+    }
+    .text-gray {
+        color: #a0aec0 !important;
+    }
+    .val-highlight {
+        color: #2b6cb0;
+        font-weight: bold;
+    }
+    .checkbox-lg {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+    }
+    .btn-save-container {
+        text-align: center;
+        margin-top: 10px;
+        padding-top: 10px;
+    }
+</style>
+
+<div class="card card-programmer">
+    <div class="card-header" style="margin-bottom: 12px;">
+        <h2 class="card-title" style="font-size: 1.15rem;">⏱️ Настройка программатора</h2>
+    </div>
+
+    <!-- Блок текущих показателей датчика -->
+    <div class="programmer-block">
+        <div class="section-title">Текущее состояние</div>
+        <table class="programmer-table">
+            <tr>
+                <td><strong>День / Время</strong></td>
+                <td>
+                    <span class="val-highlight">{{ current_dow if current_dow else '—' }} {{ current_time if current_time else '—' }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Подвал Т</strong></td>
+                <td>
+                    <span class="val-highlight">{{ "%.1f"|format(basement_temp) if basement_temp is defined and basement_temp is not none else '—' }} °C</span>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <form action="/api/programmer/update" method="post" id="programmerForm" onsubmit="return validateForm(event)">
+        <!-- Блок Временно -->
+        <div class="programmer-block">
+            <div class="section-title">Временно</div>
+            <table class="programmer-table">
+                <tr>
+                    <td><strong>Min</strong></td>
+                    <td>
+                        <input type="number" name="temporarily_min" value="{{ "%.1f"|format(temporarily_min) if temporarily_min is defined and temporarily_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Max</strong></td>
+                    <td>
+                        <input type="number" name="temporarily_max" value="{{ "%.1f"|format(temporarily_max) if temporarily_max is defined and temporarily_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Время</strong></td>
+                    <td>
+                        <input type="time" name="temporarily_time" value="{{ temporarily_time if temporarily_time else '05:41' }}" class="input-blue" style="width: 108px;" required>
+                    </td>
+                </tr>
+                <tr>
+                    <td><label for="flag_temporarily"><strong>Флаг</strong></label></td>
+                    <td>
+                        <input type="checkbox" id="flag_temporarily" name="flag_temporarily" class="checkbox-lg" {% if flag_temporarily %}checked{% endif %} onchange="updateFlags()">
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Блок Постоянно -->
+        <div class="programmer-block">
+            <div class="section-title">Постоянно</div>
+            <table class="programmer-table">
+                <tr>
+                    <td><strong>Min</strong></td>
+                    <td>
+                        <input type="number" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Max</strong></td>
+                    <td>
+                        <input type="number" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <label for="flag_const" id="label_const_text"><strong>Флаг</strong></label>
+                    </td>
+                    <td>
+                        <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const or flag_temporarily %}checked{% endif %} onclick="preventUncheckConst(event)">
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="btn-save-container">
+            <button type="submit" class="btn btn-start" style="padding: 8px 24px; font-size: 0.9rem;">Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function updateFlags() {
+        const tempFlag = document.getElementById('flag_temporarily');
+        const constFlag = document.getElementById('flag_const');
+        const constLabel = document.getElementById('label_const_text');
+
+        if (tempFlag.checked) {
+            constFlag.checked = true;
+            constFlag.disabled = true;
+            if (constLabel) constLabel.classList.add('text-gray');
+        } else {
+            constFlag.checked = true;
+            constFlag.disabled = false;
+            if (constLabel) constLabel.classList.remove('text-gray');
+        }
+    }
+
+    function preventUncheckConst(event) {
+        const tempFlag = document.getElementById('flag_temporarily');
+        if (!tempFlag.checked) {
+            event.preventDefault();
+        }
+    }
+
+    function validateForm(event) {
+        const tempMin = parseFloat(document.querySelector('[name="temporarily_min"]').value);
+        const tempMax = parseFloat(document.querySelector('[name="temporarily_max"]').value);
+        const constMin = parseFloat(document.querySelector('[name="const_min"]').value);
+        const constMax = parseFloat(document.querySelector('[name="const_max"]').value);
+
+        if (tempMin >= tempMax) {
+            alert('Ошибка: Значение Min (Временно) должно быть строго меньше Max (Временно).');
+            event.preventDefault();
+            return false;
+        }
+
+        if (constMin >= constMax) {
+            alert('Ошибка: Значение Min (Постоянно) должно быть строго меньше Max (Постоянно).');
+            event.preventDefault();
+            return false;
+        }
+
+        const constFlag = document.getElementById('flag_const');
+        if (constFlag.disabled) {
+            constFlag.disabled = false;
+        }
+
+        return true;
+    }
+
+    document.addEventListener('DOMContentLoaded', updateFlags);
+</script>
+{% endblock %}
