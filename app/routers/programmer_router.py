@@ -4,6 +4,12 @@ from datetime import datetime
 import logging
 from typing import Any
 
+from app.dependencies import get_programmer
+from app.services.heating_service import Programmer
+from typing import Optional
+from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi.responses import RedirectResponse
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -62,31 +68,16 @@ async def get_programmer_page(
     except Exception as e:
         api_log.error(f"Ошибка получения данных из programmer_const: {e}")
 
-    latest_temp = None
-    try:
-        latest_temp = await repo.get_latest_record("programmer_temporarily", order_by_col="id", log_to_api=False)
-    except Exception as e:
-        api_log.error(f"Ошибка получения данных из programmer_temporarily: {e}")
-
     const_min = latest_const.get("const_min", 18.0) if latest_const and latest_const.get("const_min") is not None else 18.0
     const_max = latest_const.get("const_max", 24.0) if latest_const and latest_const.get("const_max") is not None else 24.0
 
-    temporarily_min = latest_temp.get("temporarily_min", 18.0) if latest_temp and latest_temp.get("temporarily_min") is not None else 18.0
-    temporarily_max = latest_temp.get("temporarily_max", 24.0) if latest_temp and latest_temp.get("temporarily_max") is not None else 24.0
-    temporarily_time = latest_temp.get("temporarily_time", "05:41") if latest_temp and latest_temp.get("temporarily_time") else "05:41"
-
-    flag_temporarily = (programmer_mode == "PROGRAMMER_TEMPORARILY")
-    flag_const = (programmer_mode == "PROGRAMMER_CONST" or flag_temporarily)
+    flag_const = (programmer_mode == "PROGRAMMER_CONST")
 
     context = {
         "website_return_time": website_return_time,
         "current_dow": current_dow,
         "current_time": current_time,
         "basement_temp": basement_temp,
-        "temporarily_min": temporarily_min,
-        "temporarily_max": temporarily_max,
-        "temporarily_time": temporarily_time,
-        "flag_temporarily": flag_temporarily,
         "const_min": const_min,
         "const_max": const_max,
         "flag_const": flag_const,
@@ -97,3 +88,19 @@ async def get_programmer_page(
         name=get_template_path("programmer.html", request),
         context=context,
     )
+
+@router.post("/api/programmer/update")
+async def update_programmer_const(
+    const_min: float = Form(...),
+    const_max: float = Form(...),
+    flag_const: Optional[str] = Form(None),
+    programmer: Programmer = Depends(get_programmer),
+):
+    if const_min >= const_max:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Минимальная температура должна быть строго меньше максимальной.",
+        )
+
+    await programmer.save_programmer_const(const_min, const_max)
+    return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)

@@ -91,14 +91,16 @@ async def lifespan(app: FastAPI):
                         programmer = get_programmer(repo=repo, heating_controller=heating_ctrl)
 
                         # 1. Запуск логики программатора
-                        await programmer.evaluate(sensor_record)
+                        await programmer.evaluate()
 
                         # 2. Защитная проверка пределов (минимум и максимум)
-                        await heating_ctrl.check_temperature(sensor_record["basement_temp"])
-                        await heating_ctrl.min_max_temperature(sensor_record)
+                        
                     except Exception as e:
                         work_log.error(f"[Цикл] Ошибка при проверке автоматики отопления: {e}")
-
+                        
+                    await heating_ctrl.check_temperature(sensor_record["basement_temp"])
+                    # Защитная проверка пределов (минимум и максимум)
+                    await heating_ctrl.min_max_temperature(sensor_record)
                 else:
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
 

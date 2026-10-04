@@ -48,9 +48,9 @@ class ClimatePhysicsDefaults(BaseModel):
     hot_water_per_hour: float = Field(default=0.0457, description="Расход горячей воды в час")
     start_of_month_gas_meter: float = Field(default=36870.0, description="Начальные показания счетчика газа")
 
-    minimum_temperature: float = Field(default=18.0, description="Минимальная допустимая температура")
+    minimum_temperature: float = Field(default=17.0, description="Минимальная допустимая температура")
     target_temperature: float = Field(default=22.0, description="Целевая температура")
-    maximum_temperature: float = Field(default=25.0, description="Опасная минимальная температура")
+    maximum_temperature: float = Field(default=26.0, description="Опасная минимальная температура")
     hysteresis_temperature: float = Field(default=1.0, description="Гистерезис температуры")
     programmer_mode: ProgrammerMode = Field(default=ProgrammerMode.PROGRAMMER_CONST, description="Режим работы программатора")
 

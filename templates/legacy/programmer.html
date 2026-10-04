@@ -52,9 +52,6 @@
         margin-bottom: 8px;
         color: #2d3748;
     }
-    .text-gray {
-        color: #a0aec0 !important;
-    }
     .val-highlight {
         color: #2b6cb0;
         font-weight: bold;
@@ -96,37 +93,6 @@
     </div>
 
     <form action="/api/programmer/update" method="post" id="programmerForm" onsubmit="return validateForm(event)">
-        <!-- Блок Временно -->
-        <div class="programmer-block">
-            <div class="section-title">Временно</div>
-            <table class="programmer-table">
-                <tr>
-                    <td><strong>Min</strong></td>
-                    <td>
-                        <input type="number" name="temporarily_min" value="{{ "%.1f"|format(temporarily_min) if temporarily_min is defined and temporarily_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
-                    </td>
-                </tr>
-                <tr>
-                    <td><strong>Max</strong></td>
-                    <td>
-                        <input type="number" name="temporarily_max" value="{{ "%.1f"|format(temporarily_max) if temporarily_max is defined and temporarily_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
-                    </td>
-                </tr>
-                <tr>
-                    <td><strong>Время</strong></td>
-                    <td>
-                        <input type="time" name="temporarily_time" value="{{ temporarily_time if temporarily_time else '05:41' }}" class="input-blue" style="width: 108px;" required>
-                    </td>
-                </tr>
-                <tr>
-                    <td><label for="flag_temporarily"><strong>Флаг</strong></label></td>
-                    <td>
-                        <input type="checkbox" id="flag_temporarily" name="flag_temporarily" class="checkbox-lg" {% if flag_temporarily %}checked{% endif %} onchange="updateFlags()">
-                    </td>
-                </tr>
-            </table>
-        </div>
-
         <!-- Блок Постоянно -->
         <div class="programmer-block">
             <div class="section-title">Постоянно</div>
@@ -148,7 +114,7 @@
                         <label for="flag_const" id="label_const_text"><strong>Флаг</strong></label>
                     </td>
                     <td>
-                        <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const or flag_temporarily %}checked{% endif %} onclick="preventUncheckConst(event)">
+                        <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const %}checked{% endif %}>
                     </td>
                 </tr>
             </table>
@@ -161,40 +127,9 @@
 </div>
 
 <script>
-    function updateFlags() {
-        const tempFlag = document.getElementById('flag_temporarily');
-        const constFlag = document.getElementById('flag_const');
-        const constLabel = document.getElementById('label_const_text');
-
-        if (tempFlag.checked) {
-            constFlag.checked = true;
-            constFlag.disabled = true;
-            if (constLabel) constLabel.classList.add('text-gray');
-        } else {
-            constFlag.checked = true;
-            constFlag.disabled = false;
-            if (constLabel) constLabel.classList.remove('text-gray');
-        }
-    }
-
-    function preventUncheckConst(event) {
-        const tempFlag = document.getElementById('flag_temporarily');
-        if (!tempFlag.checked) {
-            event.preventDefault();
-        }
-    }
-
     function validateForm(event) {
-        const tempMin = parseFloat(document.querySelector('[name="temporarily_min"]').value);
-        const tempMax = parseFloat(document.querySelector('[name="temporarily_max"]').value);
         const constMin = parseFloat(document.querySelector('[name="const_min"]').value);
         const constMax = parseFloat(document.querySelector('[name="const_max"]').value);
-
-        if (tempMin >= tempMax) {
-            alert('Ошибка: Значение Min (Временно) должно быть строго меньше Max (Временно).');
-            event.preventDefault();
-            return false;
-        }
 
         if (constMin >= constMax) {
             alert('Ошибка: Значение Min (Постоянно) должно быть строго меньше Max (Постоянно).');
@@ -202,14 +137,7 @@
             return false;
         }
 
-        const constFlag = document.getElementById('flag_const');
-        if (constFlag.disabled) {
-            constFlag.disabled = false;
-        }
-
         return true;
     }
-
-    document.addEventListener('DOMContentLoaded', updateFlags);
 </script>
 {% endblock %}
