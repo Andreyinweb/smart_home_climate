@@ -589,7 +589,7 @@ async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
                 vent_events = await db.fetch_range("ventilation_table", order_asc=True, log_to_api=False)
                 heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
 
-                sys_settings = await db.get_or_create_settings(log_to_api=False)
+                sys_settings = await db.get_settings_db(log_to_api=False)
                 target_floor_humi = None
 
                 if sys_settings:
@@ -1133,7 +1133,7 @@ async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
 #             heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
 #             work_log.debug(f"[update_graphs_cache_if_needed] Загружено событий: проветривания={len(vent_events)}, отопления={len(heat_events)}")
 
-#             sys_settings = await db.get_or_create_settings(log_to_api=False)
+#             sys_settings = await db.get_settings_db(log_to_api=False)
 #             target_floor_humi = None
 
 #             if sys_settings:

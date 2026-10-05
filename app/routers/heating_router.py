@@ -51,7 +51,7 @@ async def get_heating_page(
     repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Страница ручного управления отоплением и сравнительного анализа."""
-    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_settings_db(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
     latest_heating_table = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)

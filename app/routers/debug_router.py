@@ -51,7 +51,7 @@ async def get_work_log(
     """Отображение последних 100 строк файла work_log.log."""
     api_log.info("GET /debug/work-log -> просмотр лога основной логики")
 
-    sys_settings = await repo.get_or_create_settings(log_to_api=True)
+    sys_settings = await repo.get_settings_db(log_to_api=True)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
     log_lines = read_last_lines(settings.work_log, max_lines=100)
@@ -81,7 +81,7 @@ async def get_api_log(
     """Отображение последних 100 строк файла api_log.log."""
     api_log.info("GET /debug/api-log -> просмотр лога веб-сервера")
 
-    sys_settings = await repo.get_or_create_settings(log_to_api=True)
+    sys_settings = await repo.get_settings_db(log_to_api=True)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
     log_lines = read_last_lines(settings.api_log, max_lines=100)

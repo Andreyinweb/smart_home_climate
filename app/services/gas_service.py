@@ -96,7 +96,7 @@ class GasEngineService:
         }
 
     async def get_gas_page_context(self, error: Optional[str] = None) -> Dict[str, Any]:
-        sys_settings = await self.repo.get_or_create_settings(log_to_api=False)
+        sys_settings = await self.repo.get_settings_db(log_to_api=False)
         website_return_time = getattr(sys_settings, "website_return_time", 60)
         price_gas = getattr(sys_settings, "price_gas", 0.0) or 0.0
 
@@ -199,7 +199,7 @@ class GasEngineService:
                     f"Значение на начало месяца ({start_gas:.3f}) превышает первое записанное показание месяца ({first_gas_meter:.3f})"
                 )
 
-        sys_settings = await self.repo.get_or_create_settings(log_to_api=False)
+        sys_settings = await self.repo.get_settings_db(log_to_api=False)
         price_gas = float(getattr(sys_settings, "price_gas", 0.0) or 0.0)
         hot_water_per_hour = float(getattr(sys_settings, "hot_water_per_hour", 0.0) or 0.0)
 
@@ -252,7 +252,7 @@ class GasEngineService:
         return record_to_write
 
     async def get_gas_table_context(self) -> Dict[str, Any]:
-        sys_settings = await self.repo.get_or_create_settings(log_to_api=False)
+        sys_settings = await self.repo.get_settings_db(log_to_api=False)
         website_return_time = getattr(sys_settings, "website_return_time", 60)
 
         latest_gas = await self.repo.get_latest_record("gas_table", order_by_col="id", log_to_api=False)

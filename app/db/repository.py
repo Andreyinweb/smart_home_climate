@@ -206,8 +206,8 @@ class BaseRepository:
     async def get_settings(self, log_to_api: bool = False) -> SystemSettings:
         return await get_settings(log_to_api=log_to_api)
 
-    async def get_or_create_settings(self, log_to_api: bool = False) -> SystemSettings:
-        return await get_or_create_settings(log_to_api=log_to_api)
+    async def get_settings_db(self, log_to_api: bool = False) -> SystemSettings:
+        return await get_settings_db(log_to_api=log_to_api)
 
     async def update_settings(
         self,
@@ -477,7 +477,7 @@ async def get_settings(log_to_api: bool = False) -> SystemSettings:
     return await asyncio.to_thread(_get_settings_sync, log_to_api)
 
 
-async def get_or_create_settings(log_to_api: bool = False) -> SystemSettings:
+async def get_settings_db(log_to_api: bool = False) -> SystemSettings:
     return await get_settings(log_to_api=log_to_api)
 
 
@@ -819,8 +819,8 @@ def get_repository() -> BaseRepository:
 
 #     # --- Публичные асинхронные методы класса BaseRepository ---
 
-#     async def get_or_create_settings(self, log_to_api: bool = False) -> SystemSettings:
-#         return await get_or_create_settings(log_to_api=log_to_api)
+#     async def get_settings_db(self, log_to_api: bool = False) -> SystemSettings:
+#         return await get_settings_db(log_to_api=log_to_api)
 
 #     async def update_settings(
 #         self,
@@ -1107,7 +1107,7 @@ def get_repository() -> BaseRepository:
 
 # # --- Модульные асинхронные функции ---
 
-# async def get_or_create_settings(log_to_api: bool = False) -> SystemSettings:
+# async def get_settings_db(log_to_api: bool = False) -> SystemSettings:
 #     return await asyncio.to_thread(_get_or_create_settings_sync, log_to_api)
 
 

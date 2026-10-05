@@ -27,7 +27,7 @@ async def get_settings_page(
     """HTML-страница просмотра и редактирования настроек системы."""
     api_log.info("GET /settings -> открытие страницы настроек")
 
-    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_settings_db(log_to_api=False)
     latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 
     average_temp = "—"
@@ -66,7 +66,7 @@ async def update_settings(
                 pass
         return default
 
-    current_settings = await repo.get_or_create_settings(log_to_api=False)
+    current_settings = await repo.get_settings_db(log_to_api=False)
     latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 
     last_sensor_timestamp = latest_sensor.get("timestamp", "—") if latest_sensor else "—"

@@ -35,7 +35,7 @@ async def get_programmer_page(
     repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Точка входа для отображения страницы настройки программатора."""
-    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_settings_db(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
     programmer_mode = getattr(sys_settings, "programmer_mode", "PROGRAMMER_CONST")
 

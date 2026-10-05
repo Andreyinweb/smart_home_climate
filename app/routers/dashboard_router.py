@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.core.config import settings
 from app.db.repository import BaseRepository
 from app.dependencies import get_repository, get_template_path, get_templates
 from app.schemas.settings_schema import SystemSettingsUpdate
@@ -55,10 +56,11 @@ async def get_index(
     api_log.info("GET / -> открытие главной страницы дашборда")
 
     try:
-        sys_settings = await repo.get_or_create_settings(log_to_api=True)
+        sys_settings = await repo.get_settings_db(log_to_api=True)
         website_return_time = getattr(sys_settings, "website_return_time", 60)
         target_rh = getattr(sys_settings, "target_rh", 60.0)
-        abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)
+        abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)        
+        app_env = settings.app_env.value
 
         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=True)
         latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=True)
@@ -141,7 +143,8 @@ async def get_index(
             "heat_class": heat_class,
             "heat_display_class": heat_display_class,
             "active_mode": active_mode,
-            **db_data,
+            "app_env": app_env,
+            **db_data
         }
 
         return templates.TemplateResponse(
@@ -168,7 +171,7 @@ async def get_ventilation_page(
     repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Страница ручного управления проветриванием и таблицы сравнения."""
-    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_settings_db(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
     latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
@@ -269,7 +272,7 @@ async def get_ventilation_page(
 @router.post("/api/ventilation/start")
 async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
     """Запуск проветривания."""
-    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_settings_db(log_to_api=False)
     latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
 
     can_start = True
@@ -302,7 +305,7 @@ async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
 @router.post("/api/ventilation/stop")
 async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
     """Остановка проветривания."""
-    sys_settings = await repo.get_or_create_settings(log_to_api=False)
+    sys_settings = await repo.get_settings_db(log_to_api=False)
     latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
     if latest_vent and latest_vent.get("status_ventilation"):
         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)

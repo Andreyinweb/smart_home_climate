@@ -158,7 +158,7 @@ class HeatingController:
         if basement_temp is None:
             return
 
-        sys_settings = await self.repo.get_or_create_settings(log_to_api=False)
+        sys_settings = await self.repo.get_settings_db(log_to_api=False)
         minimum_temperature = getattr(sys_settings, "minimum_temperature", None)
         maximum_temperature = getattr(sys_settings, "maximum_temperature", None)
 
@@ -192,7 +192,7 @@ class Programmer:
         """
         Основной метод проверки programmer_mode и вызова соответствующей логики.
         """
-        sys_settings = await self.repo.get_or_create_settings(log_to_api=False)
+        sys_settings = await self.repo.get_settings_db(log_to_api=False)
         programmer_mode = getattr(sys_settings, "programmer_mode", "PROGRAMMER_CONST")
 
         if programmer_mode == "PROGRAMMER_CONST":

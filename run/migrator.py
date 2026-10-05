@@ -22,9 +22,9 @@ not_magrate_tables = {
 }
 
 copying_tables = {
-    # "settings_table",
-    # "relay_table",
-    # "heating_table",
+    "settings_table",
+    "relay_table",
+    "heating_table",
     "programmer_const",
     "programmer_temporarily",
     "programmer_week",

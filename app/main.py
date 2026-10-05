@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
             try:
                 timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                sys_settings = await db.get_or_create_settings(log_to_api=False)
+                sys_settings = await db.get_settings_db(log_to_api=False)
 
                 latest = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
                 now_id = (latest["id"] + 1) if latest and "id" in latest else 1
@@ -121,7 +121,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 work_log.error(f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True)
 
-            sys_settings = await db.get_or_create_settings(log_to_api=False)
+            sys_settings = await db.get_settings_db(log_to_api=False)
             interval_settings = getattr(sys_settings, "interval_seconds", settings.interval_seconds)
             delta_time = round((datetime.now() - datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")).total_seconds())
             interval = 60 if (interval_settings - delta_time) < 60 else interval_settings - delta_time
@@ -241,7 +241,7 @@ if __name__ == "__main__":
 #             try:
 #                 timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-#                 sys_settings = await db.get_or_create_settings(log_to_api=False)
+#                 sys_settings = await db.get_settings_db(log_to_api=False)
 
 #                 latest = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 #                 now_id = (latest["id"] + 1) if latest and "id" in latest else 1
@@ -299,7 +299,7 @@ if __name__ == "__main__":
 #             except Exception as e:
 #                 work_log.error(f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True)
 
-#             sys_settings = await db.get_or_create_settings(log_to_api=False)
+#             sys_settings = await db.get_settings_db(log_to_api=False)
 #             interval_settings = getattr(sys_settings, "interval_seconds", settings.interval_seconds)
 #             delta_time = round((datetime.now() - datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")).total_seconds())
 #             interval = 60 if (interval_settings - delta_time) < 60 else interval_settings - delta_time
