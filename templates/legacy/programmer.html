@@ -16,6 +16,11 @@
         border-radius: 6px;
         padding: 10px 12px;
         margin-bottom: 12px;
+        transition: opacity 0.2s ease, background-color 0.2s ease;
+    }
+    .programmer-block.disabled-block {
+        opacity: 0.5;
+        background-color: #edf2f7;
     }
     .input-blue {
         border: 2px solid #2b6cb0;
@@ -33,6 +38,11 @@
         border-color: #3182ce;
         background-color: #ebf8ff;
         box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.5);
+    }
+    .input-blue:disabled {
+        background-color: #e2e8f0;
+        border-color: #cbd5e0;
+        color: #a0aec0;
     }
     .programmer-table {
         width: 100%;
@@ -93,28 +103,43 @@
     </div>
 
     <form action="/api/programmer/update" method="post" id="programmerForm" onsubmit="return validateForm(event)">
+        <!-- Блок Временно -->
+        <div class="programmer-block" id="block_temporarily">
+            <div class="section-title">
+                <input type="checkbox" id="flag_temporarily" name="flag_temporarily" class="checkbox-lg" {% if flag_temporarily %}checked{% endif %} onchange="toggleMode('temporarily')"> Временно
+            </div>
+            <table class="programmer-table">
+                <tr>
+                    <td><strong>Температура</strong></td>
+                    <td>
+                        <input type="number" id="temporarily_temp" name="temporarily_temp" value="{{ "%.1f"|format(temporarily_temp) if temporarily_temp is defined and temporarily_temp is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue">
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Время</strong></td>
+                    <td>
+                        <input type="time" id="temporarily_time" name="temporarily_time" value="{{ temporarily_time if temporarily_time else '' }}" class="input-blue" style="width: 110px;">
+                    </td>
+                </tr>
+            </table>
+        </div>
+
         <!-- Блок Постоянно -->
-        <div class="programmer-block">
-            <div class="section-title">Постоянно</div>
+        <div class="programmer-block" id="block_const">
+            <div class="section-title">
+                <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const %}checked{% endif %} onchange="toggleMode('const')"> Постоянно
+            </div>
             <table class="programmer-table">
                 <tr>
                     <td><strong>Min</strong></td>
                     <td>
-                        <input type="number" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
+                        <input type="number" id="const_min" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue">
                     </td>
                 </tr>
                 <tr>
                     <td><strong>Max</strong></td>
                     <td>
-                        <input type="number" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" required>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <label for="flag_const" id="label_const_text"><strong>Флаг</strong></label>
-                    </td>
-                    <td>
-                        <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const %}checked{% endif %}>
+                        <input type="number" id="const_max" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue">
                     </td>
                 </tr>
             </table>
@@ -127,17 +152,77 @@
 </div>
 
 <script>
-    function validateForm(event) {
-        const constMin = parseFloat(document.querySelector('[name="const_min"]').value);
-        const constMax = parseFloat(document.querySelector('[name="const_max"]').value);
+    function toggleMode(changedSource) {
+        const chkTemp = document.getElementById('flag_temporarily');
+        const chkConst = document.getElementById('flag_const');
 
-        if (constMin >= constMax) {
-            alert('Ошибка: Значение Min (Постоянно) должно быть строго меньше Max (Постоянно).');
-            event.preventDefault();
-            return false;
+        const blockTemp = document.getElementById('block_temporarily');
+        const blockConst = document.getElementById('block_const');
+
+        const tempInputs = blockTemp.querySelectorAll('input:not([type="checkbox"])');
+        const constInputs = blockConst.querySelectorAll('input:not([type="checkbox"])');
+
+        if (changedSource === 'temporarily' && chkTemp.checked) {
+            chkConst.checked = false;
+        } else if (changedSource === 'const' && chkConst.checked) {
+            chkTemp.checked = false;
         }
+
+        if (!chkTemp.checked) {
+            blockTemp.classList.add('disabled-block');
+            tempInputs.forEach(input => input.disabled = true);
+        } else {
+            blockTemp.classList.remove('disabled-block');
+            tempInputs.forEach(input => input.disabled = false);
+        }
+
+        if (!chkConst.checked) {
+            blockConst.classList.add('disabled-block');
+            constInputs.forEach(input => input.disabled = true);
+        } else {
+            blockConst.classList.remove('disabled-block');
+            constInputs.forEach(input => input.disabled = false);
+        }
+    }
+
+    function validateForm(event) {
+        const chkConst = document.getElementById('flag_const');
+        const chkTemp = document.getElementById('flag_temporarily');
+
+        if (chkTemp.checked) {
+            const timeVal = document.getElementById('temporarily_time').value.trim();
+            if (!timeVal || timeVal === '00:00' || timeVal === '0') {
+                alert('Ошибка: Для временного режима укажите время окончания.');
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        if (chkConst.checked) {
+            const constMinVal = document.getElementById('const_min').value;
+            const constMaxVal = document.getElementById('const_max').value;
+            const constMin = parseFloat(constMinVal);
+            const constMax = parseFloat(constMaxVal);
+
+            if (isNaN(constMin) || isNaN(constMax) || constMin >= constMax) {
+                alert('Ошибка: Значение Min (Постоянно) должно быть заполнено и строго меньше Max (Постоянно).');
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        const inputs = document.querySelectorAll('#programmerForm input');
+        inputs.forEach(input => input.disabled = false);
 
         return true;
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('flag_temporarily').checked) {
+            toggleMode('temporarily');
+        } else {
+            toggleMode('const');
+        }
+    });
 </script>
 {% endblock %}

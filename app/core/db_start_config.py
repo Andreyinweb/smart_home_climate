@@ -130,13 +130,11 @@ async def init_programmer_temporarily_table(log_to_api: bool = False) -> None:
     work_log.info("[DB Init] Запись id=1 в 'programmer_temporarily' не найдена. Первичное заполнение...")
 
     now = datetime.now()
-    temp_min = round(settings.target_temperature - settings.hysteresis_temperature / 2, 1)
-    temp_max = round(settings.target_temperature + settings.hysteresis_temperature / 2, 1)
+    temporarily = settings.target_temperature
 
     default_data = {
         "id": 1,
-        "temporarily_min": temp_min,
-        "temporarily_max": temp_max,
+        "temporarily": temporarily,
         "updated_at": now.strftime("%Y-%m-%d %H:%M:%S"),
     }
 

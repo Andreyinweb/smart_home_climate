@@ -26,7 +26,7 @@ copying_tables = {
     "relay_table",
     "heating_table",
     "programmer_const",
-    "programmer_temporarily",
+    # "programmer_temporarily",
     "programmer_week",
 }
 

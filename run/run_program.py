@@ -298,8 +298,7 @@ if __name__ == "__main__":
     # Создаём таблицу programmer_temporarily
     fields_db = """ (
         id INTEGER PRIMARY KEY,
-        temporarily_min REAL,
-        temporarily_max REAL,
+        temporarily REAL,
         temporarily_time TEXT,
         updated_at TEXT
         )
