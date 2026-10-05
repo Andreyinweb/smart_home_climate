@@ -21,7 +21,8 @@
         <label for="programmer_mode" style="display: block; font-weight: bold; margin-bottom: 5px;">Режим программатора (programmer_mode):</label>
         <select id="programmer_mode" name="programmer_mode" class="input-field" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
             <option value="PROGRAMMER_CONST" {% if programmer_mode == 'PROGRAMMER_CONST' %}selected{% endif %}>PROGRAMMER_CONST</option>
-            <option value="PROGRAMMER_TEMPORARILY" {% if programmer_mode == 'PROGRAMMER_TEMPORARILY' %}selected{% endif %}>PROGRAMMER_TEMPORARILY</option>
+            <option value="PROGRAMMER_TEMPORARILY_CONST" {% if programmer_mode == 'PROGRAMMER_TEMPORARILY_CONST' %}selected{% endif %}>PROGRAMMER_TEMPORARILY_CONST</option>
+            <option value="PROGRAMMER_TEMPORARILY_WEEK" {% if programmer_mode == 'PROGRAMMER_TEMPORARILY_WEEK' %}selected{% endif %}>PROGRAMMER_TEMPORARILY_WEEK</option>
             <option value="PROGRAMMER_WEEK" {% if programmer_mode == 'PROGRAMMER_WEEK' %}selected{% endif %}>PROGRAMMER_WEEK</option>
         </select>
     </div>

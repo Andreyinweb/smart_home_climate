@@ -49,9 +49,9 @@ class ClimatePhysicsDefaults(BaseModel):
     hot_water_per_hour: float = Field(default=0.0457, description="Расход горячей воды в час")
     start_of_month_gas_meter: float = Field(default=36870.0, description="Начальные показания счетчика газа")
 
-    minimum_temperature: float = Field(default=17.0, description="Минимальная допустимая температура")
-    target_temperature: float = Field(default=22.0, description="Целевая температура")
-    maximum_temperature: float = Field(default=26.0, description="Опасная минимальная температура")
+    minimum_temperature: float = Field(default=15.0, description="Минимальная допустимая температура")
+    target_temperature: float = Field(default=21.0, description="Целевая температура")
+    maximum_temperature: float = Field(default=25.0, description="Опасная минимальная температура")
     hysteresis_temperature: float = Field(default=1.0, description="Гистерезис температуры")
     programmer_mode: ProgrammerMode = Field(default=ProgrammerMode.PROGRAMMER_CONST, description="Режим работы программатора")
 
@@ -90,7 +90,7 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
     interval_seconds: int = Field(default=300, alias="INTERVAL_SECONDS", ge=1)
     previous_interval_in_seconds: int = Field(default=300, alias="INTERVAL_SECONDS", ge=1)
     max_retries: int = Field(default=5, alias="MAX_RETRIES", ge=1)
-    website_return_time: int = Field(default=390, alias="WEBSITE_RETURN_TIME", ge=0)
+    website_return_time: int = Field(default=300, alias="WEBSITE_RETURN_TIME", ge=0)
 
     # --- BLE MAC-адреса (входные значения из env файлов) ---
     street_mac: Optional[str] = Field(default=None, alias="STREET_MAC")

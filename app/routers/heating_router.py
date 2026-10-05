@@ -136,7 +136,7 @@ async def get_heating_page(
 
         heat_start_time = heat_before.get("timestamp", latest_heat.get("timestamp", "—"))
         heat_now_time = db_data.get("timestamp", "—")
-        card_title = f"История {heat_start_time}, последнего отопления"
+        card_title = f"История {heat_start_time}, отопления"
 
     else:
         heat_active = False
