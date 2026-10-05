@@ -6,7 +6,8 @@ from fastapi import Depends, Request
 from fastapi.templating import Jinja2Templates
 
 from app.db.repository import BaseRepository
-from app.services.heating_service import HeatingController, Programmer
+from app.services.heating_service import HeatingController
+from app.services.programmer_service import Programmer
 from app.services.logs_service import get_current_cycle_logs
 from app.services.relay_service import RelayController
 
@@ -66,6 +67,7 @@ def get_programmer(
 
 
 
+
 # # app/dependencies.py
 
 # import os
@@ -74,7 +76,7 @@ def get_programmer(
 # from fastapi.templating import Jinja2Templates
 
 # from app.db.repository import BaseRepository
-# from app.services.heating_service import HeatingController
+# from app.services.heating_service import HeatingController, Programmer
 # from app.services.logs_service import get_current_cycle_logs
 # from app.services.relay_service import RelayController
 
@@ -123,4 +125,12 @@ def get_programmer(
 # ) -> HeatingController:
 #     """Провайдер сервиса управления отоплением."""
 #     return HeatingController(repo=repo, relay=relay)
+
+
+# def get_programmer(
+#     repo: BaseRepository = Depends(get_repository),
+#     heating_controller: HeatingController = Depends(get_heating_controller),
+# ) -> Programmer:
+#     """Провайдер сервиса программатора."""
+#     return Programmer(repo=repo, heating_controller=heating_controller)
 
