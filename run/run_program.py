@@ -305,9 +305,11 @@ if __name__ == "__main__":
         """
     create_table(db_path=database_file, table_name='programmer_temporarily', fields=fields_db)
 
-    # Создаём таблицу programmer_week.  Mo Tu We Th Fr Sa Su Mo-Fr Mo-Sa day weekdays week
+    # Создаём таблицу programmer_week.  ["Mo", "Tu", "We", "Th", "Fr", "Mo", "Sa", "Mo_Su", "Mo_Fr", "Sa_Su"] day weekdays weekdays_weekend week
     fields_db = """ (
         id INTEGER PRIMARY KEY,
+        now_id INTEGER,
+        next_id INTEGER,
         week_mode TEXT,
         week_day TEXT,
         week_time TEXT,
