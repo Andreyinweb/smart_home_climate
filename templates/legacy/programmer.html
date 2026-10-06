@@ -44,15 +44,36 @@
         border-color: #cbd5e0;
         color: #a0aec0;
     }
+    .select-blue {
+        border: 2px solid #2b6cb0;
+        background-color: #ebf8ff;
+        color: #2b6cb0;
+        font-weight: bold;
+        font-size: 0.95rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        width: 160px;
+    }
+    .select-blue:disabled {
+        background-color: #e2e8f0;
+        border-color: #cbd5e0;
+        color: #a0aec0;
+    }
     .programmer-table {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 0;
     }
-    .programmer-table td {
+    .programmer-table td, .programmer-table th {
         padding: 6px 8px;
         vertical-align: middle;
         font-size: 0.95rem;
+    }
+    .programmer-table th {
+        border-bottom: 1px solid #cbd5e0;
+        text-align: left;
+        color: #4a5568;
+        font-weight: 600;
     }
     .section-title {
         font-weight: bold;
@@ -145,6 +166,47 @@
             </table>
         </div>
 
+        <!-- Блок По неделе -->
+        <div class="programmer-block" id="block_week">
+            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <input type="checkbox" id="flag_week" name="flag_week" class="checkbox-lg" {% if flag_week %}checked{% endif %} onchange="toggleMode('week')"> По неделе
+                </div>
+                <div>
+                    <select id="week_mode" name="week_mode" class="select-blue" onchange="onWeekModeChange()">
+                        {% for mode_item in week_modes_list %}
+                            <option value="{{ mode_item }}" {% if week_mode == mode_item %}selected{% endif %}>{{ mode_item }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <table class="programmer-table" style="margin-top: 6px;">
+                <thead>
+                    <tr>
+                        <th>День</th>
+                        <th>Время</th>
+                        <th>Т °C</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if week_records and week_records|length > 0 %}
+                        {% for row in week_records %}
+                            <tr>
+                                <td><span class="val-highlight">{{ row.week_day }}</span></td>
+                                <td>{{ row.week_time }}</td>
+                                <td><span class="val-highlight">{{ "%.1f"|format(row.week_temperature) if row.week_temperature is defined and row.week_temperature is not none else '—' }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" style="text-align: center; color: #718096; padding: 10px;">Нет данных для режима {{ week_mode }}</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
         <div class="btn-save-container">
             <button type="submit" class="btn btn-start" style="padding: 8px 24px; font-size: 0.9rem;">Сохранить</button>
         </div>
@@ -155,17 +217,20 @@
     function toggleMode(changedSource) {
         const chkTemp = document.getElementById('flag_temporarily');
         const chkConst = document.getElementById('flag_const');
+        const chkWeek = document.getElementById('flag_week');
 
         const blockTemp = document.getElementById('block_temporarily');
         const blockConst = document.getElementById('block_const');
+        const blockWeek = document.getElementById('block_week');
 
         const tempInputs = blockTemp.querySelectorAll('input:not([type="checkbox"])');
         const constInputs = blockConst.querySelectorAll('input:not([type="checkbox"])');
+        const weekSelect = document.getElementById('week_mode');
 
-        if (changedSource === 'temporarily' && chkTemp.checked) {
+        if (changedSource === 'const' && chkConst.checked) {
+            chkWeek.checked = false;
+        } else if (changedSource === 'week' && chkWeek.checked) {
             chkConst.checked = false;
-        } else if (changedSource === 'const' && chkConst.checked) {
-            chkTemp.checked = false;
         }
 
         if (!chkTemp.checked) {
@@ -183,16 +248,38 @@
             blockConst.classList.remove('disabled-block');
             constInputs.forEach(input => input.disabled = false);
         }
+
+        if (!chkWeek.checked) {
+            blockWeek.classList.add('disabled-block');
+            weekSelect.disabled = true;
+        } else {
+            blockWeek.classList.remove('disabled-block');
+            weekSelect.disabled = false;
+        }
+    }
+
+    function onWeekModeChange() {
+        const form = document.getElementById('programmerForm');
+        const inputs = form.querySelectorAll('input, select');
+        inputs.forEach(input => input.disabled = false);
+        form.submit();
     }
 
     function validateForm(event) {
         const chkConst = document.getElementById('flag_const');
         const chkTemp = document.getElementById('flag_temporarily');
+        const chkWeek = document.getElementById('flag_week');
 
-        if (chkTemp.checked) {
+        if (!chkConst.checked && !chkWeek.checked) {
+            alert('Ошибка: Должен быть выбран один из базовых режимов ("Постоянно" или "По неделе").');
+            event.preventDefault();
+            return false;
+        }
+
+        if (chkTemp.checked && chkConst.checked) {
             const timeVal = document.getElementById('temporarily_time').value.trim();
             if (!timeVal || timeVal === '00:00' || timeVal === '0') {
-                alert('Ошибка: Для временного режима укажите время окончания.');
+                alert('Ошибка: Для временного режима при базовом "Постоянно" укажите время окончания.');
                 event.preventDefault();
                 return false;
             }
@@ -211,15 +298,20 @@
             }
         }
 
-        const inputs = document.querySelectorAll('#programmerForm input');
+        const inputs = document.querySelectorAll('#programmerForm input, #programmerForm select');
         inputs.forEach(input => input.disabled = false);
 
         return true;
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        if (document.getElementById('flag_temporarily').checked) {
+        const chkTemp = document.getElementById('flag_temporarily');
+        const chkWeek = document.getElementById('flag_week');
+
+        if (chkTemp.checked) {
             toggleMode('temporarily');
+        } else if (chkWeek.checked) {
+            toggleMode('week');
         } else {
             toggleMode('const');
         }

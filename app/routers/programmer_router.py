@@ -89,8 +89,27 @@ async def get_programmer_page(
     const_min = latest_const.get("const_min", 18.0) if latest_const and latest_const.get("const_min") is not None else 18.0
     const_max = latest_const.get("const_max", 24.0) if latest_const and latest_const.get("const_max") is not None else 24.0
 
+    week_sys_row = None
+    try:
+        week_sys_row = await repo.get_record_by_id("programmer_week", 1)
+    except Exception as e:
+        api_log.error(f"Ошибка получения системной строки из programmer_week: {e}")
+
+    week_mode = week_sys_row.get("week_mode", "week") if week_sys_row and week_sys_row.get("week_mode") else "week"
+
+    all_week_records = await repo.fetch_range(
+        table_name="programmer_week",
+        filter_col="week_mode",
+        start_val=week_mode,
+        stop_val=week_mode,
+    )
+
+    week_records = [rec for rec in all_week_records if rec.get("id") != 1]
+    week_records.sort(key=lambda x: str(x.get("week_time", "")))
+
     flag_temporarily = (programmer_mode in ("PROGRAMMER_TEMPORARILY_CONST", "PROGRAMMER_TEMPORARILY_WEEK"))
-    flag_const = (programmer_mode == "PROGRAMMER_CONST")
+    flag_const = (programmer_mode in ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST"))
+    flag_week = (programmer_mode in ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK"))
 
     context = {
         "website_return_time": website_return_time,
@@ -103,7 +122,11 @@ async def get_programmer_page(
         "const_max": const_max,
         "flag_temporarily": flag_temporarily,
         "flag_const": flag_const,
+        "flag_week": flag_week,
         "programmer_mode": programmer_mode,
+        "week_mode": week_mode,
+        "week_records": week_records,
+        "week_modes_list": ["day", "weekdays", "weekdays_weekend", "week"],
     }
 
     return templates.TemplateResponse(
@@ -121,6 +144,8 @@ async def update_programmer(
     temporarily_temp: Optional[str] = Form(None),
     temporarily_time: Optional[str] = Form(None),
     flag_temporarily: Optional[str] = Form(None),
+    flag_week: Optional[str] = Form(None),
+    week_mode: Optional[str] = Form(None),
     programmer: Programmer = Depends(get_programmer),
     repo: BaseRepository = Depends(get_repository),
 ):
@@ -129,6 +154,7 @@ async def update_programmer(
 
     is_flag_temporarily = bool(flag_temporarily)
     is_flag_const = bool(flag_const)
+    is_flag_week = bool(flag_week)
 
     c_min = _parse_float(const_min)
     c_max = _parse_float(const_max)
@@ -136,11 +162,11 @@ async def update_programmer(
     t_time = temporarily_time.strip() if temporarily_time else ""
 
     if is_flag_temporarily:
-        if current_mode in ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST"):
+        if current_mode in ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST", "PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK"):
             if not t_time or t_time in ("00:00", "0"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Для временного режима при постоянном базовом режиме время не должно быть нулевым или пустым.",
+                    detail="Для временного режима время не должно быть нулевым или пустым.",
                 )
 
     if is_flag_const:
@@ -164,15 +190,25 @@ async def update_programmer(
             temporarily_time=t_time,
         )
 
-    await programmer.update_programmer_mode(
-        flag_temporarily=is_flag_temporarily,
-        flag_const=is_flag_const,
-    )
+    if week_mode:
+        await repo.update_record("programmer_week", 1, {"week_mode": week_mode})
+
+    if hasattr(programmer, "update_programmer_mode"):
+        try:
+            await programmer.update_programmer_mode(
+                flag_temporarily=is_flag_temporarily,
+                flag_const=is_flag_const,
+                flag_week=is_flag_week,
+            )
+        except TypeError:
+            await programmer.update_programmer_mode(
+                flag_temporarily=is_flag_temporarily,
+                flag_const=is_flag_const,
+            )
 
     await programmer.evaluate()
 
     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
-
 
 
 # # app/routers/programmer_router.py
@@ -192,7 +228,7 @@ async def update_programmer(
 #     get_template_path,
 #     get_templates,
 # )
-# from app.services.heating_service import Programmer
+# from app.services.programmer_service import Programmer
 
 # api_log = logging.getLogger("api_app.routers.programmer")
 
@@ -349,3 +385,4 @@ async def update_programmer(
 #     await programmer.evaluate()
 
 #     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
+
