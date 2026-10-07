@@ -6,7 +6,7 @@
 {% block content %}
 <style>
     .card-programmer {
-        max-width: 430px;
+        max-width: 460px;
         margin: 18px auto;
         padding: 12px;
     }
@@ -27,10 +27,9 @@
         background-color: #ebf8ff;
         color: #2b6cb0;
         font-weight: bold;
-        font-size: 0.98rem;
-        padding: 4px 6px;
+        font-size: 0.9rem;
+        padding: 3px 5px;
         border-radius: 4px;
-        width: 90px;
         text-align: center;
     }
     .input-blue:focus {
@@ -49,10 +48,10 @@
         background-color: #ebf8ff;
         color: #2b6cb0;
         font-weight: bold;
-        font-size: 0.95rem;
-        padding: 4px 8px;
+        font-size: 0.9rem;
+        padding: 3px 6px;
         border-radius: 4px;
-        width: 160px;
+        cursor: pointer;
     }
     .select-blue:disabled {
         background-color: #e2e8f0;
@@ -64,16 +63,15 @@
         border-collapse: collapse;
         margin-bottom: 0;
     }
-    .programmer-table td, .programmer-table th {
-        padding: 6px 8px;
+    .programmer-table th, .programmer-table td {
+        padding: 5px 4px;
         vertical-align: middle;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
+        text-align: left;
     }
     .programmer-table th {
         border-bottom: 1px solid #cbd5e0;
-        text-align: left;
         color: #4a5568;
-        font-weight: 600;
     }
     .section-title {
         font-weight: bold;
@@ -82,6 +80,9 @@
         border-bottom: 2px solid #cbd5e0;
         margin-bottom: 8px;
         color: #2d3748;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
     .val-highlight {
         color: #2b6cb0;
@@ -96,6 +97,38 @@
         text-align: center;
         margin-top: 10px;
         padding-top: 10px;
+    }
+    .btn-del {
+        background-color: #e53e3e;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 3px 7px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.8rem;
+        line-height: 1;
+    }
+    .btn-del:hover {
+        background-color: #c53030;
+    }
+    .btn-add {
+        background-color: #38a169;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1.1rem;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .btn-add:hover {
+        background-color: #2f855a;
     }
 </style>
 
@@ -127,13 +160,15 @@
         <!-- Блок Временно -->
         <div class="programmer-block" id="block_temporarily">
             <div class="section-title">
-                <input type="checkbox" id="flag_temporarily" name="flag_temporarily" class="checkbox-lg" {% if flag_temporarily %}checked{% endif %} onchange="toggleMode('temporarily')"> Временно
+                <span>
+                    <input type="checkbox" id="flag_temporarily" name="flag_temporarily" class="checkbox-lg" {% if flag_temporarily %}checked{% endif %} onchange="toggleMode('temporarily')"> Временно
+                </span>
             </div>
             <table class="programmer-table">
                 <tr>
                     <td><strong>Температура</strong></td>
                     <td>
-                        <input type="number" id="temporarily_temp" name="temporarily_temp" value="{{ "%.1f"|format(temporarily_temp) if temporarily_temp is defined and temporarily_temp is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue">
+                        <input type="number" id="temporarily_temp" name="temporarily_temp" value="{{ "%.1f"|format(temporarily_temp) if temporarily_temp is defined and temporarily_temp is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 90px;">
                     </td>
                 </tr>
                 <tr>
@@ -148,63 +183,87 @@
         <!-- Блок Постоянно -->
         <div class="programmer-block" id="block_const">
             <div class="section-title">
-                <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const %}checked{% endif %} onchange="toggleMode('const')"> Постоянно
+                <span>
+                    <input type="checkbox" id="flag_const" name="flag_const" class="checkbox-lg" {% if flag_const %}checked{% endif %} onchange="toggleMode('const')"> Постоянно
+                </span>
             </div>
             <table class="programmer-table">
                 <tr>
                     <td><strong>Min</strong></td>
                     <td>
-                        <input type="number" id="const_min" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue">
+                        <input type="number" id="const_min" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 90px;">
                     </td>
                 </tr>
                 <tr>
                     <td><strong>Max</strong></td>
                     <td>
-                        <input type="number" id="const_max" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue">
+                        <input type="number" id="const_max" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 90px;">
                     </td>
                 </tr>
             </table>
         </div>
 
-        <!-- Блок По неделе -->
+        <!-- Блок Недельный программатор -->
         <div class="programmer-block" id="block_week">
-            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
+            <div class="section-title">
+                <span>
                     <input type="checkbox" id="flag_week" name="flag_week" class="checkbox-lg" {% if flag_week %}checked{% endif %} onchange="toggleMode('week')"> По неделе
-                </div>
-                <div>
-                    <select id="week_mode" name="week_mode" class="select-blue" onchange="onWeekModeChange()">
-                        {% for mode_item in week_modes_list %}
-                            <option value="{{ mode_item }}" {% if week_mode == mode_item %}selected{% endif %}>{{ mode_item }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                </span>
+                <select id="week_mode" name="week_mode" class="select-blue" onchange="document.getElementById('programmerForm').submit()">
+                    {% for m in week_modes_list %}
+                        <option value="{{ m }}" {% if m == week_mode %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
             </div>
-
-            <table class="programmer-table" style="margin-top: 6px;">
+            
+            {% if week_records %}
+            <table class="programmer-table">
                 <thead>
                     <tr>
                         <th>День</th>
                         <th>Время</th>
-                        <th>Т °C</th>
+                        <th>Т, °C</th>
+                        <th style="width: 30px;"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% if week_records and week_records|length > 0 %}
-                        {% for row in week_records %}
-                            <tr>
-                                <td><span class="val-highlight">{{ row.week_day }}</span></td>
-                                <td>{{ row.week_time }}</td>
-                                <td><span class="val-highlight">{{ "%.1f"|format(row.week_temperature) if row.week_temperature is defined and row.week_temperature is not none else '—' }}</span></td>
-                            </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="3" style="text-align: center; color: #718096; padding: 10px;">Нет данных для режима {{ week_mode }}</td>
-                        </tr>
-                    {% endif %}
+                    {% for row in week_records %}
+                    <tr>
+                        <td>
+                            <input type="hidden" name="week_ids" value="{{ row.id }}">
+                            {% if week_mode == 'week' %}
+                                <select class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;" disabled data-locked="true">
+                                    <option value="Mo_Su" selected>Mo_Su</option>
+                                </select>
+                                <input type="hidden" name="week_days" value="Mo_Su">
+                            {% else %}
+                                <select name="week_days" class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;">
+                                    {% for d in week_days_list %}
+                                        <option value="{{ d }}" {% if d == row.week_day %}selected{% endif %}>{{ d }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <input type="time" name="week_times" value="{{ row.week_time }}" class="input-blue" style="width: 85px; padding: 2px 4px; font-size: 0.85rem;">
+                        </td>
+                        <td>
+                            <input type="number" name="week_temps" value="{{ "%.1f"|format(row.week_temperature) if row.week_temperature is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 65px; padding: 2px 4px; font-size: 0.85rem;">
+                        </td>
+                        <td style="text-align: center;">
+                            <button type="submit" formaction="/api/programmer/week/delete/{{ row.id }}" class="btn-del" title="Удалить строку">✖</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
+            {% else %}
+            <div style="text-align: center; color: #718096; padding: 8px 0;">Записи для режима {{ week_mode }} отсутствуют.</div>
+            {% endif %}
+
+            <div style="text-align: right; margin-top: 8px;">
+                <button type="submit" formaction="/api/programmer/week/add" class="btn-add" title="Добавить строку">+</button>
+            </div>
         </div>
 
         <div class="btn-save-container">
@@ -225,7 +284,7 @@
 
         const tempInputs = blockTemp.querySelectorAll('input:not([type="checkbox"])');
         const constInputs = blockConst.querySelectorAll('input:not([type="checkbox"])');
-        const weekSelect = document.getElementById('week_mode');
+        const weekInputs = blockWeek.querySelectorAll('select, input:not([type="checkbox"]), button');
 
         if (changedSource === 'const' && chkConst.checked) {
             chkWeek.checked = false;
@@ -251,35 +310,27 @@
 
         if (!chkWeek.checked) {
             blockWeek.classList.add('disabled-block');
-            weekSelect.disabled = true;
+            weekInputs.forEach(input => input.disabled = true);
         } else {
             blockWeek.classList.remove('disabled-block');
-            weekSelect.disabled = false;
+            weekInputs.forEach(input => {
+                if (input.getAttribute('data-locked') === 'true') {
+                    input.disabled = true;
+                } else {
+                    input.disabled = false;
+                }
+            });
         }
-    }
-
-    function onWeekModeChange() {
-        const form = document.getElementById('programmerForm');
-        const inputs = form.querySelectorAll('input, select');
-        inputs.forEach(input => input.disabled = false);
-        form.submit();
     }
 
     function validateForm(event) {
         const chkConst = document.getElementById('flag_const');
         const chkTemp = document.getElementById('flag_temporarily');
-        const chkWeek = document.getElementById('flag_week');
 
-        if (!chkConst.checked && !chkWeek.checked) {
-            alert('Ошибка: Должен быть выбран один из базовых режимов ("Постоянно" или "По неделе").');
-            event.preventDefault();
-            return false;
-        }
-
-        if (chkTemp.checked && chkConst.checked) {
+        if (chkTemp.checked) {
             const timeVal = document.getElementById('temporarily_time').value.trim();
             if (!timeVal || timeVal === '00:00' || timeVal === '0') {
-                alert('Ошибка: Для временного режима при базовом "Постоянно" укажите время окончания.');
+                alert('Ошибка: Для временного режима укажите время окончания.');
                 event.preventDefault();
                 return false;
             }
@@ -298,23 +349,18 @@
             }
         }
 
-        const inputs = document.querySelectorAll('#programmerForm input, #programmerForm select');
-        inputs.forEach(input => input.disabled = false);
+        const inputs = document.querySelectorAll('#programmerForm input, #programmerForm select, #programmerForm button');
+        inputs.forEach(input => {
+            if (input.getAttribute('data-locked') !== 'true') {
+                input.disabled = false;
+            }
+        });
 
         return true;
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        const chkTemp = document.getElementById('flag_temporarily');
-        const chkWeek = document.getElementById('flag_week');
-
-        if (chkTemp.checked) {
-            toggleMode('temporarily');
-        } else if (chkWeek.checked) {
-            toggleMode('week');
-        } else {
-            toggleMode('const');
-        }
+        toggleMode('');
     });
 </script>
 {% endblock %}

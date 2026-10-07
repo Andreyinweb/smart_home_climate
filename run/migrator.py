@@ -13,7 +13,7 @@ not_magrate_tables = {
     "sqlite_sequence",
     # "api_table",
     # "ventilation_table",
-    # "history_of_heating",
+    "history_of_heating",
     "hourly_coefficients_table",
     "relay_table",
     "programmer_const",
