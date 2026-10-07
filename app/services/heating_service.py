@@ -83,11 +83,17 @@ class HeatingController:
             return None
 
         async with self._lock:
-            latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
             latest_off = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
             if not latest_off or not latest_off.get("status_heating"):
                 logger.info("[stop] Отопление выключено. Остановка пропущена.")
                 return False
+
+            latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
+            if not latest_heat:
+                logger.warning("[stop] Запись о старте в history_of_heating не найдена.")
+                await self.repo.upsert_record("heating_table", {"id": 1, "status_heating": False}, pk_col="id", log_to_api=False)
+                await self.relay.turn_off(stop_programm=stop_forcibly)
+                return True
 
             latest_sensor = await self.repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
             current_sensor_id = latest_sensor["id"] if (latest_sensor and "id" in latest_sensor) else latest_heat["id"]
@@ -105,9 +111,17 @@ class HeatingController:
                 )
                 return False
 
+            # 1. Гарантированный сброс статуса активности в heating_table
+            data_to_heating_table: Dict[str, Any] = {
+                "id": 1,
+                "status_heating": False
+            }
+            await self.repo.upsert_record("heating_table", data_to_heating_table, pk_col="id", log_to_api=False)
+
+            # 2. Удаление записи при нулевой длительности или фиксация завершенного цикла
             if stop_heat_plus == 0:
                 await self.repo.delete_record_by_id("history_of_heating", heat_start_id, pk_col="id", log_to_api=False)
-                logger.info(f"[stop] Запись отопления удалена (stop_heat_plus=0): id={heat_start_id}")
+                logger.info(f"[stop] Нулевой цикл отопления удален (stop_heat_plus=0): id={heat_start_id}")
             else:
                 data_to_history: Dict[str, Any] = {
                     "id": heat_start_id,
@@ -117,12 +131,6 @@ class HeatingController:
                     "automation_start": latest_heat.get("automation_start", False),
                     "automation_stop": is_automation,
                 }
-                data_to_heating_table: Dict[str, Any] = {
-                    "id": 1,
-                    "status_heating": False
-                }
-                
-                await self.repo.upsert_record("heating_table", data_to_heating_table, pk_col="id", log_to_api=False)
                 await self.repo.upsert_record("history_of_heating", data_to_history, pk_col="id", log_to_api=False)
                 logger.info(
                     f"[stop] Зафиксирована остановка отопления: start_id={heat_start_id}, "
@@ -130,6 +138,64 @@ class HeatingController:
                 )
 
             return True
+
+    # async def stop(self, is_automation: bool = False, stop_forcibly: int = 0) -> Optional[bool]:
+    #     """
+    #     Остановка отопления (ручная или автоматическая по порогу).
+    #     Если операция уже выполняется другим запросом, возвращает None.
+    #     """
+    #     if self._lock.locked():
+    #         logger.warning("[stop] Операция уже выполняется другим запросом. Запрос отклонен.")
+    #         return None
+
+    #     async with self._lock:
+    #         latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
+    #         latest_off = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+    #         if not latest_off or not latest_off.get("status_heating"):
+    #             logger.info("[stop] Отопление выключено. Остановка пропущена.")
+    #             return False
+
+    #         latest_sensor = await self.repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    #         current_sensor_id = latest_sensor["id"] if (latest_sensor and "id" in latest_sensor) else latest_heat["id"]
+    #         heat_start_id = latest_heat["id"]
+    #         stop_heat_plus = max(0, current_sensor_id - heat_start_id)
+
+    #         turn_off_success = await self.relay.turn_off(stop_programm=stop_forcibly)
+    #         relay_state = await self.relay.get_state()
+
+    #         if not turn_off_success or relay_state:
+    #             logger.error(
+    #                 "[stop] Сбой или блокировка выключения реле: turn_off=%s, get_state=%s. Запись в БД отменена.",
+    #                 turn_off_success,
+    #                 relay_state,
+    #             )
+    #             return False
+
+    #         if stop_heat_plus == 0:
+    #             await self.repo.delete_record_by_id("history_of_heating", heat_start_id, pk_col="id", log_to_api=False)
+    #             logger.info(f"[stop] Запись отопления удалена (stop_heat_plus=0): id={heat_start_id}")
+    #         else:
+    #             data_to_history: Dict[str, Any] = {
+    #                 "id": heat_start_id,
+    #                 "timestamp": latest_heat["timestamp"],
+    #                 "status_heating": False,
+    #                 "stop_heat_plus": stop_heat_plus,
+    #                 "automation_start": latest_heat.get("automation_start", False),
+    #                 "automation_stop": is_automation,
+    #             }
+    #             data_to_heating_table: Dict[str, Any] = {
+    #                 "id": 1,
+    #                 "status_heating": False
+    #             }
+                
+    #             await self.repo.upsert_record("heating_table", data_to_heating_table, pk_col="id", log_to_api=False)
+    #             await self.repo.upsert_record("history_of_heating", data_to_history, pk_col="id", log_to_api=False)
+    #             logger.info(
+    #                 f"[stop] Зафиксирована остановка отопления: start_id={heat_start_id}, "
+    #                 f"current_id={current_sensor_id}, diff={stop_heat_plus}"
+    #             )
+
+    #         return True
 
     async def check_temperature(self, temperature: float) -> Optional[bool]:
         latest_heating = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
