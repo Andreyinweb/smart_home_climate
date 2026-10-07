@@ -181,7 +181,6 @@ async def init_heating_table(log_to_api: bool = False) -> None:
     else:
         work_log.error("[DB Init] Ошибка при первичном заполнении 'heating_table'.")
 
-
 async def init_programmer_week_table(log_to_api: bool = False) -> None:
     """
     Проверяет наличие записи id=1 в programmer_week.
@@ -274,6 +273,7 @@ async def init_programmer_week_table(log_to_api: bool = False) -> None:
 
     next_datetime_str = f"{target_date.strftime('%Y-%m-%d')} {next_item['week_time']}:00"
 
+    # Формируем системную строку (id=1), содержащую ссылки now_id и next_id
     system_record = {
         "id": 1,
         "now_id": active_item["id"],
@@ -289,12 +289,10 @@ async def init_programmer_week_table(log_to_api: bool = False) -> None:
         "programmer_week", system_record, pk_col="id", log_to_api=log_to_api
     )
 
-    for idx, item in enumerate(sorted_schedule):
-        next_item_in_seq = sorted_schedule[(idx + 1) % n]
+    # Сохраняем элементы расписания (id > 1) без полей now_id и next_id
+    for item in sorted_schedule:
         record = {
             "id": item["id"],
-            "now_id": item["id"],
-            "next_id": next_item_in_seq["id"],
             "week_mode": item["week_mode"],
             "week_day": item["week_day"],
             "week_time": item["week_time"],
@@ -311,6 +309,137 @@ async def init_programmer_week_table(log_to_api: bool = False) -> None:
         work_log.info("[DB Init] Первичное заполнение 'programmer_week' успешно завершено.")
     else:
         work_log.error("[DB Init] Ошибка при первичном заполнении 'programmer_week'.")
+
+
+# async def init_programmer_week_table(log_to_api: bool = False) -> None:
+#     """
+#     Проверяет наличие записи id=1 в programmer_week.
+#     Если запись отсутствует, выполняет первичное заполнение таблицы
+#     на основе начального списка интервалов и текущего времени.
+#     """
+#     existing_record = await db.get_record_by_id(
+#         "programmer_week", 1, pk_col="id", log_to_api=log_to_api
+#     )
+
+#     if existing_record is not None:
+#         work_log.info("[DB Init] Таблица 'programmer_week' уже содержит записи (id=1).")
+#         return
+
+#     work_log.info("[DB Init] Запись id=1 в 'programmer_week' не найдена. Первичное заполнение...")
+
+#     default_schedule = [
+#         {
+#             "id": 2,
+#             "week_mode": "week",
+#             "week_day": "Mo_Su",
+#             "week_time": "06:00",
+#             "week_temperature": float(settings.target_temperature),
+#         },
+#         {
+#             "id": 3,
+#             "week_mode": "week",
+#             "week_day": "Mo_Su",
+#             "week_time": "10:00",
+#             "week_temperature": float(settings.target_temperature - 2),
+#         },
+#         {
+#             "id": 4,
+#             "week_mode": "week",
+#             "week_day": "Mo_Su",
+#             "week_time": "14:00",
+#             "week_temperature": float(settings.target_temperature),
+#         },
+#         {
+#             "id": 5,
+#             "week_mode": "week",
+#             "week_day": "Mo_Su",
+#             "week_time": "16:00",
+#             "week_temperature": float(settings.target_temperature - 2),
+#         },
+#         {
+#             "id": 6,
+#             "week_mode": "week",
+#             "week_day": "Mo_Su",
+#             "week_time": "18:00",
+#             "week_temperature": float(settings.target_temperature),
+#         },
+#         {
+#             "id": 7,
+#             "week_mode": "week",
+#             "week_day": "Mo_Su",
+#             "week_time": "22:00",
+#             "week_temperature": 19.0,
+#         },
+#     ]
+
+#     now = datetime.now()
+#     now_time_str = now.strftime("%H:%M")
+#     now_datetime_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+#     # Сортируем расписание по времени хронологически
+#     sorted_schedule = sorted(default_schedule, key=lambda x: x["week_time"])
+#     n = len(sorted_schedule)
+
+#     # Определяем активный интервал по умолчанию (последний интервал суток)
+#     active_idx = n - 1
+
+#     # Ищем актуальный интервал для текущего времени
+#     for idx, item in enumerate(sorted_schedule):
+#         if now_time_str >= item["week_time"]:
+#             active_idx = idx
+#         else:
+#             break
+
+#     next_idx = (active_idx + 1) % n
+
+#     active_item = sorted_schedule[active_idx]
+#     next_item = sorted_schedule[next_idx]
+
+#     # Вычисляем дату и время следующего перехода
+#     if next_item["week_time"] > now_time_str:
+#         target_date = now.date()
+#     else:
+#         target_date = now.date() + timedelta(days=1)
+
+#     next_datetime_str = f"{target_date.strftime('%Y-%m-%d')} {next_item['week_time']}:00"
+
+#     system_record = {
+#         "id": 1,
+#         "now_id": active_item["id"],
+#         "next_id": next_item["id"],
+#         "week_mode": active_item["week_mode"],
+#         "week_day": active_item["week_day"],
+#         "week_time": next_datetime_str,
+#         "week_temperature": active_item["week_temperature"],
+#         "updated_at": now_datetime_str,
+#     }
+
+#     all_success = await db.upsert_record(
+#         "programmer_week", system_record, pk_col="id", log_to_api=log_to_api
+#     )
+
+#     for idx, item in enumerate(sorted_schedule):
+#         next_item_in_seq = sorted_schedule[(idx + 1) % n]
+#         record = {
+#             "id": item["id"],
+#             "now_id": item["id"],
+#             "next_id": next_item_in_seq["id"],
+#             "week_mode": item["week_mode"],
+#             "week_day": item["week_day"],
+#             "week_time": item["week_time"],
+#             "week_temperature": item["week_temperature"],
+#             "updated_at": now_datetime_str,
+#         }
+#         success = await db.upsert_record(
+#             "programmer_week", record, pk_col="id", log_to_api=log_to_api
+#         )
+#         if not success:
+#             all_success = False
+
+#     if all_success:
+#         work_log.info("[DB Init] Первичное заполнение 'programmer_week' успешно завершено.")
+#     else:
+#         work_log.error("[DB Init] Ошибка при первичном заполнении 'programmer_week'.")
 
 
 async def init_db_start_data() -> None:
