@@ -286,12 +286,14 @@
         const constInputs = blockConst.querySelectorAll('input:not([type="checkbox"])');
         const weekInputs = blockWeek.querySelectorAll('select, input:not([type="checkbox"]), button');
 
+        // Взаимоисключение базовых режимов (Постоянно и По неделе)
         if (changedSource === 'const' && chkConst.checked) {
             chkWeek.checked = false;
         } else if (changedSource === 'week' && chkWeek.checked) {
             chkConst.checked = false;
         }
 
+        // Блок Временно
         if (!chkTemp.checked) {
             blockTemp.classList.add('disabled-block');
             tempInputs.forEach(input => input.disabled = true);
@@ -300,7 +302,8 @@
             tempInputs.forEach(input => input.disabled = false);
         }
 
-        if (!chkConst.checked) {
+        // Блок Постоянно: сереет, если флаг не взведен ИЛИ если активен временный режим
+        if (!chkConst.checked || chkTemp.checked) {
             blockConst.classList.add('disabled-block');
             constInputs.forEach(input => input.disabled = true);
         } else {
@@ -308,7 +311,8 @@
             constInputs.forEach(input => input.disabled = false);
         }
 
-        if (!chkWeek.checked) {
+        // Блок По неделе: сереет, если флаг не взведен ИЛИ если активен временный режим
+        if (!chkWeek.checked || chkTemp.checked) {
             blockWeek.classList.add('disabled-block');
             weekInputs.forEach(input => input.disabled = true);
         } else {
@@ -329,11 +333,15 @@
 
         if (chkTemp.checked) {
             const timeVal = document.getElementById('temporarily_time').value.trim();
-            if (!timeVal || timeVal === '00:00' || timeVal === '0') {
-                alert('Ошибка: Для временного режима укажите время окончания.');
-                event.preventDefault();
-                return false;
+            // Для временного с постоянным время обязательно
+            if (chkConst.checked) {
+                if (!timeVal || timeVal === '00:00' || timeVal === '0') {
+                    alert('Ошибка: Для временного режима с постоянным укажите время окончания.');
+                    event.preventDefault();
+                    return false;
+                }
             }
+            // Для временного с недельным время может быть пустым или 00:00
         }
 
         if (chkConst.checked) {

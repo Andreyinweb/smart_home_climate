@@ -243,17 +243,19 @@ class Programmer:
         sys_settings = await self.repo.get_settings_db(log_to_api=False)
         current_mode = getattr(sys_settings, "programmer_mode", "PROGRAMMER_CONST")
 
-        if flag_temporarily:
-            if current_mode in ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK") or flag_week:
-                new_mode = "PROGRAMMER_TEMPORARILY_WEEK"
-            else:
-                new_mode = "PROGRAMMER_TEMPORARILY_CONST"
-        elif flag_week:
-            new_mode = "PROGRAMMER_WEEK"
+        # Определяем базовый режим (По неделе или Постоянно)
+        if flag_week:
+            is_week = True
         elif flag_const:
-            new_mode = "PROGRAMMER_CONST"
+            is_week = False
         else:
-            new_mode = current_mode if current_mode else "PROGRAMMER_CONST"
+            is_week = current_mode in ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK")
+
+        # Определяем итоговый режим с учетом временного
+        if flag_temporarily:
+            new_mode = "PROGRAMMER_TEMPORARILY_WEEK" if is_week else "PROGRAMMER_TEMPORARILY_CONST"
+        else:
+            new_mode = "PROGRAMMER_WEEK" if is_week else "PROGRAMMER_CONST"
 
         logger.debug(f"[update_programmer_mode] Смена режима: {current_mode} -> {new_mode}")
 
@@ -337,8 +339,11 @@ class Programmer:
         target_dt = None
         if temporarily_time and str(temporarily_time).strip() not in ("", "0", "00:00", "None"):
             target_dt = self._calculate_target_datetime(now_str, str(temporarily_time))
-
-        target_time_str = target_dt.strftime("%Y-%m-%d %H:%M:%S") if target_dt else None
+            target_time_str = target_dt.strftime("%Y-%m-%d %H:%M:%S") if target_dt else None
+        else:
+            week_db_date = await self.repo.get_record_by_id("programmer_week", 1)            
+            target_time_str = week_db_date["week_time"]
+        
 
         data = {
             "id": 1,
@@ -350,6 +355,7 @@ class Programmer:
         await self.repo.upsert_record("programmer_temporarily", data, pk_col="id")
         return True
 
+
     async def save_programmer_week(
         self,
         week_ids: List[int],
@@ -358,14 +364,21 @@ class Programmer:
         week_temps: List[Optional[float]],
     ) -> bool:
         """
-        Сохранение изменений строк таблицы programmer_week (для id > 1) и синхронизация системной строки id=1.
+        Сохранение изменений строк таблицы programmer_week (для id > 1),
+        синхронизация системной строки id=1 и удаление дубликатов по времени (с большими id) в пределах каждого week_mode.
         """
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         sys_rec = await self.repo.get_record_by_id("programmer_week", 1)
         current_now_id = sys_rec.get("now_id") if sys_rec else None
 
+        updated_modes = set()
+
         for w_id, w_day, w_time, w_temp in zip(week_ids, week_days, week_times, week_temps):
             if w_id > 1 and w_temp is not None:
+                rec = await self.repo.get_record_by_id("programmer_week", w_id)
+                if rec and rec.get("week_mode"):
+                    updated_modes.add(rec["week_mode"])
+
                 data = {
                     "id": w_id,
                     "week_day": w_day,
@@ -386,7 +399,30 @@ class Programmer:
                     logger.debug(f"[save_programmer_week] Синхронизация активной системной строки id=1: {sys_update}")
                     await self.repo.upsert_record("programmer_week", sys_update, pk_col="id")
 
+        # Проверка и удаление дубликатов времени для каждого измененного week_mode
+        for week_mode in updated_modes:
+            mode_records = await self._get_mode_records(week_mode)
+
+            time_groups = {}
+            for r in mode_records:
+                w_time = str(r.get("week_time", "")).strip()
+                time_groups.setdefault(w_time, []).append(r)
+
+            for w_time, group in time_groups.items():
+                if len(group) > 1:
+                    group.sort(key=lambda x: x.get("id", 0))
+                    # Оставляем запись с меньшим id (group[0]), все остальные (с большими id) удаляем
+                    for dup_rec in group[1:]:
+                        dup_id = dup_rec.get("id")
+                        if dup_id:
+                            logger.info(
+                                f"[save_programmer_week] Удаление дубликата записи id={dup_id} "
+                                f"с совпадающим week_time='{w_time}' в режиме '{week_mode}'"
+                            )
+                            await self.delete_programmer_week_row(dup_id)
+
         return True
+
 
     async def add_programmer_week_row(self, new_record: dict) -> bool:
         """
