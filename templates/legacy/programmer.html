@@ -130,6 +130,33 @@
     .btn-add:hover {
         background-color: #2f855a;
     }
+    .day-block {
+        border: 1px solid #cbd5e0;
+        border-radius: 6px;
+        padding: 8px;
+        margin-bottom: 10px;
+        background-color: #ffffff;
+    }
+    .day-block-header {
+        font-weight: bold;
+        font-size: 0.9rem;
+        color: #2b6cb0;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 4px;
+    }
+    tr.active-row {
+        background-color: #feebc8;
+    }
+    tr.active-row td {
+        font-weight: bold;
+    }
+    tr.active-row .input-blue,
+    tr.active-row .select-blue {
+        border-color: #dd6b20;
+        background-color: #fffaf0;
+        color: #c05621;
+    }
 </style>
 
 <div class="card card-programmer">
@@ -217,46 +244,57 @@
             </div>
             
             {% if week_records %}
-            <table class="programmer-table">
-                <thead>
-                    <tr>
-                        <th>День</th>
-                        <th>Время</th>
-                        <th>Т, °C</th>
-                        <th style="width: 30px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in week_records %}
-                    <tr>
-                        <td>
-                            <input type="hidden" name="week_ids" value="{{ row.id }}">
-                            {% if week_mode == 'week' %}
-                                <select class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;" disabled data-locked="true">
-                                    <option value="Mo_Su" selected>Mo_Su</option>
-                                </select>
-                                <input type="hidden" name="week_days" value="Mo_Su">
-                            {% else %}
-                                <select name="week_days" class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;">
-                                    {% for d in week_days_list %}
-                                        <option value="{{ d }}" {% if d == row.week_day %}selected{% endif %}>{{ d }}</option>
-                                    {% endfor %}
-                                </select>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <input type="time" name="week_times" value="{{ row.week_time }}" class="input-blue" style="width: 85px; padding: 2px 4px; font-size: 0.85rem;">
-                        </td>
-                        <td>
-                            <input type="number" name="week_temps" value="{{ "%.1f"|format(row.week_temperature) if row.week_temperature is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 65px; padding: 2px 4px; font-size: 0.85rem;">
-                        </td>
-                        <td style="text-align: center;">
-                            <button type="submit" formaction="/api/programmer/week/delete/{{ row.id }}" class="btn-del" title="Удалить строку">✖</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                {% for group in grouped_records %}
+                <div class="day-block">
+                    <div class="day-block-header">
+                        📅 Дни: {{ group.day }}
+                    </div>
+                    {% if group.records %}
+                    <table class="programmer-table">
+                        <thead>
+                            <tr>
+                                <th>День</th>
+                                <th>Время</th>
+                                <th>Т, °C</th>
+                                <th style="width: 30px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in group.records %}
+                            <tr class="{% if flag_week and active_row_id is not none and row.id == active_row_id %}active-row{% endif %}">
+                                <td>
+                                    <input type="hidden" name="week_ids" value="{{ row.id }}">
+                                    {% if week_mode == 'week' %}
+                                        <select class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;" disabled data-locked="true">
+                                            <option value="Mo_Su" selected>Mo_Su</option>
+                                        </select>
+                                        <input type="hidden" name="week_days" value="Mo_Su">
+                                    {% else %}
+                                        <select name="week_days" class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;">
+                                            {% for d in allowed_days %}
+                                                <option value="{{ d }}" {% if d == row.week_day %}selected{% endif %}>{{ d }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <input type="time" name="week_times" value="{{ row.week_time }}" class="input-blue" style="width: 85px; padding: 2px 4px; font-size: 0.85rem;">
+                                </td>
+                                <td>
+                                    <input type="number" name="week_temps" value="{{ "%.1f"|format(row.week_temperature) if row.week_temperature is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 65px; padding: 2px 4px; font-size: 0.85rem;">
+                                </td>
+                                <td style="text-align: center;">
+                                    <button type="submit" formaction="/api/programmer/week/delete/{{ row.id }}" class="btn-del" title="Удалить строку">✖</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="font-size: 0.85rem; color: #a0aec0; font-style: italic; padding: 4px 0;">Записи отсутствуют</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
             {% else %}
             <div style="text-align: center; color: #718096; padding: 8px 0;">Записи для режима {{ week_mode }} отсутствуют.</div>
             {% endif %}

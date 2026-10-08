@@ -24,10 +24,10 @@ not_magrate_tables = {
 copying_tables = {
     "settings_table",
     "relay_table",
-    "heating_table",
-    "programmer_const",
-    "programmer_temporarily",
-    "programmer_week",
+    # "heating_table",
+    # "programmer_const",
+    # "programmer_temporarily",
+    # "programmer_week",
 }
 
 #  Не копируется "hourly_coefficients_table",

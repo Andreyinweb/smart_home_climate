@@ -49,11 +49,20 @@ class ClimatePhysicsDefaults(BaseModel):
     hot_water_per_hour: float = Field(default=0.0457, description="Расход горячей воды в час")
     start_of_month_gas_meter: float = Field(default=36870.0, description="Начальные показания счетчика газа")
 
-    minimum_temperature: float = Field(default=15.0, description="Минимальная допустимая температура")
-    target_temperature: float = Field(default=21.0, description="Целевая температура")
-    maximum_temperature: float = Field(default=25.0, description="Опасная минимальная температура")
+    minimum_temperature: float = Field(default=13.0, description="Минимальная допустимая температура")
+    target_temperature: float = Field(default=22.0, description="Целевая температура")
+    maximum_temperature: float = Field(default=26.0, description="Опасная минимальная температура")
     hysteresis_temperature: float = Field(default=1.0, description="Гистерезис температуры")
     programmer_mode: ProgrammerMode = Field(default=ProgrammerMode.PROGRAMMER_CONST, description="Режим работы программатора")
+    days_week_mode: Dict[str, List[str]] = Field(
+        default_factory=lambda: {
+            "week": ["Mo_Su"],
+            "weekdays": ["Mo_Fr", "Sa_Su"],
+            "weekdays_weekend": ["Mo_Fr", "Sa", "Su"],
+            "day": ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
+        },
+        description="Режимы дней недели программатора",
+    )
 
 
 class Settings(BaseSettings, ClimatePhysicsDefaults):
