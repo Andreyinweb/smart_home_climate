@@ -2,7 +2,7 @@
 
 from datetime import datetime
 import logging
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -24,6 +24,11 @@ router = APIRouter(
     tags=["Programmer"],
 )
 
+DAYS_SHORT = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+TEMPORARILY_MODES = ("PROGRAMMER_TEMPORARILY_CONST", "PROGRAMMER_TEMPORARILY_WEEK")
+CONST_MODES = ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST")
+WEEK_MODES = ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK")
+
 
 def _parse_float(val: Optional[str]) -> Optional[float]:
     """Безопасное преобразование строки из HTML-формы в float."""
@@ -38,69 +43,79 @@ def _parse_float(val: Optional[str]) -> Optional[float]:
         return None
 
 
+def _valid_week_mode(mode: Optional[str]) -> str:
+    """Возвращает режим дней недели, если он допустим, иначе 'week'."""
+    return mode if mode in settings.days_week_mode else "week"
+
+
+def _parse_sensor_time(latest_sensor: Optional[Dict[str, Any]]) -> tuple:
+    """Возвращает (день недели, время HH:MM, температура подвала) из последней записи датчиков."""
+    if not latest_sensor or not latest_sensor.get("timestamp"):
+        return "—", "—", None
+
+    ts_str = str(latest_sensor["timestamp"])
+    current_dow, current_time = "—", "—"
+    try:
+        dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
+        current_dow = DAYS_SHORT[dt.weekday()]
+        current_time = dt.strftime("%H:%M")
+    except ValueError:
+        if len(ts_str) >= 16:
+            current_time = ts_str[11:16]
+
+    return current_dow, current_time, latest_sensor.get("basement_temp")
+
+
 @router.get("/programmer", response_class=HTMLResponse, summary="Страница программатора")
 async def get_programmer_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
     repo: BaseRepository = Depends(get_repository),
 ) -> Any:
-    """Точка входа для отображения страницы настройки программатора."""
+    """Страница настройки программатора. Только чтение данных и рендер HTML."""
     sys_settings = await repo.get_settings_db(log_to_api=False)
     website_return_time = getattr(sys_settings, "website_return_time", 60)
     programmer_mode = getattr(sys_settings, "programmer_mode", "PROGRAMMER_CONST")
 
-    latest_sensor = None
     try:
         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
     except Exception as e:
         api_log.error(f"Ошибка получения данных из table_sensor_data: {e}")
+        latest_sensor = None
+    current_dow, current_time, basement_temp = _parse_sensor_time(latest_sensor)
 
-    current_dow = "—"
-    current_time = "—"
-    basement_temp = None
-
-    if latest_sensor and latest_sensor.get("timestamp"):
-        ts_str = str(latest_sensor["timestamp"])
-        try:
-            dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
-            days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-            current_dow = days[dt.weekday()]
-            current_time = dt.strftime("%H:%M")
-        except Exception:
-            if len(ts_str) >= 16:
-                current_time = ts_str[11:16]
-
-        basement_temp = latest_sensor.get("basement_temp")
-
-    latest_temp = None
     try:
         latest_temp = await repo.get_record_by_id("programmer_temporarily", 1)
     except Exception as e:
         api_log.error(f"Ошибка получения данных из programmer_temporarily: {e}")
+        latest_temp = None
 
-    temporarily_temp = latest_temp.get("temporarily", 20.0) if latest_temp and latest_temp.get("temporarily") is not None else 20.0
-    temporarily_time = latest_temp.get("temporarily_time", "") if latest_temp and latest_temp.get("temporarily_time") is not None else ""
+    temporarily_temp = 20.0
+    temporarily_time = ""
+    if latest_temp and latest_temp.get("temporarily") is not None:
+        temporarily_temp = latest_temp["temporarily"]
+    if latest_temp and latest_temp.get("temporarily_time"):
+        temporarily_time = str(latest_temp["temporarily_time"])[11:16]
 
-    latest_const = None
     try:
         latest_const = await repo.get_record_by_id("programmer_const", 1)
     except Exception as e:
         api_log.error(f"Ошибка получения данных из programmer_const: {e}")
+        latest_const = None
 
-    const_min = latest_const.get("const_min", 18.0) if latest_const and latest_const.get("const_max") is not None else 18.0
-    const_max = latest_const.get("const_max", 24.0) if latest_const and latest_const.get("const_max") is not None else 24.0
+    const_min, const_max = 18.0, 24.0
+    if latest_const and latest_const.get("const_max") is not None:
+        const_min = latest_const.get("const_min", 18.0)
+        const_max = latest_const["const_max"]
 
-    week_sys_row = None
     try:
         week_sys_row = await repo.get_record_by_id("programmer_week", 1)
     except Exception as e:
         api_log.error(f"Ошибка получения системной строки из programmer_week: {e}")
+        week_sys_row = None
 
     active_row_id = week_sys_row.get("now_id") if week_sys_row else None
-    week_mode = week_sys_row.get("week_mode", "week") if week_sys_row and week_sys_row.get("week_mode") else "week"
-    if week_mode not in settings.days_week_mode:
-        week_mode = "week"
-
+    week_mode = _valid_week_mode(week_sys_row.get("week_mode") if week_sys_row else None)
     allowed_days = settings.days_week_mode.get(week_mode, ["Mo_Su"])
 
     all_week_records = await repo.fetch_range(
@@ -109,29 +124,22 @@ async def get_programmer_page(
         start_val=week_mode,
         stop_val=week_mode,
     )
-
     week_records = [rec for rec in all_week_records if rec.get("id") != 1]
 
     def record_sort_key(rec):
         day = rec.get("week_day", "")
-        day_idx = allowed_days.index(day) if day in allowed_days else 999
-        time_str = str(rec.get("week_time", ""))
-        return (day_idx, time_str)
+        day_idx = allowed_days.index(day) if day in allowed_days else len(allowed_days)
+        return (day_idx, str(rec.get("week_time", "")))
 
     week_records.sort(key=record_sort_key)
 
-    grouped_records = []
-    for d in allowed_days:
-        recs = [r for r in week_records if r.get("week_day") == d]
-        grouped_records.append({"day": d, "records": recs})
-
+    grouped_records = [
+        {"day": d, "records": [r for r in week_records if r.get("week_day") == d]}
+        for d in allowed_days
+    ]
     other_recs = [r for r in week_records if r.get("week_day") not in allowed_days]
     if other_recs:
         grouped_records.append({"day": "Другие", "records": other_recs})
-
-    flag_temporarily = (programmer_mode in ("PROGRAMMER_TEMPORARILY_CONST", "PROGRAMMER_TEMPORARILY_WEEK"))
-    flag_const = (programmer_mode in ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST"))
-    flag_week = (programmer_mode in ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK"))
 
     context = {
         "website_return_time": website_return_time,
@@ -142,9 +150,9 @@ async def get_programmer_page(
         "temporarily_time": temporarily_time,
         "const_min": const_min,
         "const_max": const_max,
-        "flag_temporarily": flag_temporarily,
-        "flag_const": flag_const,
-        "flag_week": flag_week,
+        "flag_temporarily": programmer_mode in TEMPORARILY_MODES,
+        "flag_const": programmer_mode in CONST_MODES,
+        "flag_week": programmer_mode in WEEK_MODES,
         "programmer_mode": programmer_mode,
         "week_mode": week_mode,
         "week_records": week_records,
@@ -171,7 +179,6 @@ async def update_programmer(
     temporarily_time: Optional[str] = Form(None),
     flag_temporarily: Optional[str] = Form(None),
     flag_week: Optional[str] = Form(None),
-    week_mode: Optional[str] = Form(None),
     week_ids: List[int] = Form([]),
     week_days: List[str] = Form([]),
     week_times: List[str] = Form([]),
@@ -179,6 +186,7 @@ async def update_programmer(
     programmer: Programmer = Depends(get_programmer),
     repo: BaseRepository = Depends(get_repository),
 ):
+    """Сохранение уставок, флагов режима и строк расписания. Режим дней недели здесь не меняется."""
     is_flag_temporarily = bool(flag_temporarily)
     is_flag_const = bool(flag_const)
     is_flag_week = bool(flag_week)
@@ -188,13 +196,12 @@ async def update_programmer(
     t_temp = _parse_float(temporarily_temp)
     t_time = temporarily_time.strip() if temporarily_time else ""
 
-    if is_flag_temporarily:
-        if is_flag_const:
-            if not t_time or t_time in ("00:00", "0"):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Для временного режима с постоянным время не должно быть нулевым или пустым.",
-                )
+    if is_flag_temporarily and is_flag_const:
+        if not t_time or t_time in ("00:00", "0"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Для временного режима с постоянным время не должно быть нулевым или пустым.",
+            )
 
     if is_flag_const:
         if c_min is None or c_max is None:
@@ -214,21 +221,16 @@ async def update_programmer(
     if week_ids:
         parsed_temps = [_parse_float(t) for t in week_temps]
 
-        # Отправленные строки принадлежат ТЕКУЩЕМУ (старому) режиму из id=1,
+        # Отправленные строки принадлежат ТЕКУЩЕМУ режиму из системной строки id=1,
         # а не тому, что выбран в селекте. Проверяем дни по режиму самих строк.
         sys_row = await repo.get_record_by_id("programmer_week", 1)
-        rows_mode = sys_row.get("week_mode") if sys_row else None
-        if rows_mode not in settings.days_week_mode:
-            rows_mode = "week"
+        rows_mode = _valid_week_mode(sys_row.get("week_mode") if sys_row else None)
         allowed = settings.days_week_mode.get(rows_mode, ["Mo_Su"])
 
         if rows_mode == "week":
             sanitized_days = ["Mo_Su"] * len(week_ids)
         else:
-            sanitized_days = [
-                d if d in allowed else allowed[0]
-                for d in week_days
-            ]
+            sanitized_days = [d if d in allowed else allowed[0] for d in week_days]
 
         await programmer.save_programmer_week(
             week_ids=week_ids,
@@ -236,10 +238,6 @@ async def update_programmer(
             week_times=week_times,
             week_temps=parsed_temps,
         )
-
-    # Переключение на новый режим происходит уже после сохранения строк старого
-    if week_mode:
-        await programmer.update_week_mode(week_mode)
 
     await programmer.update_programmer_mode(
         flag_temporarily=is_flag_temporarily,
@@ -257,21 +255,33 @@ async def update_programmer(
 
     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
 
-@router.post("/api/programmer/week/add")
-async def add_programmer_week_row(
-    week_mode: Optional[str] = Form("week"),
-    repo: BaseRepository = Depends(get_repository),
+
+@router.post("/api/programmer/week/mode")
+async def switch_week_mode(
+    week_mode: Optional[str] = Form(None),
     programmer: Programmer = Depends(get_programmer),
 ):
-    """Добавление новой строки в расписание programmer_week."""
-    mode = week_mode if week_mode in settings.days_week_mode else "week"
-    allowed = settings.days_week_mode.get(mode, ["Mo_Su"])
-    day = allowed[0]
+    """
+    Переключение режима дней недели. Записи расписания и уставки не сохраняются.
+    После смены системной строки сразу пересчитываем применяемые пороги отопления.
+    """
+    await programmer.update_week_mode(_valid_week_mode(week_mode))
+    await programmer.evaluate()
+    return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/api/programmer/week/add")
+async def add_programmer_week_row(
+    programmer: Programmer = Depends(get_programmer),
+    repo: BaseRepository = Depends(get_repository),
+):
+    """Добавление новой строки в расписание programmer_week. Режим берётся из системной строки id=1."""
+    sys_row = await repo.get_record_by_id("programmer_week", 1)
+    mode = _valid_week_mode(sys_row.get("week_mode") if sys_row else None)
+    day = settings.days_week_mode.get(mode, ["Mo_Su"])[0]
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     new_record = {
-        "now_id": 0,
-        "next_id": 0,
         "week_mode": mode,
         "week_day": day,
         "week_time": "23:59",
@@ -279,36 +289,29 @@ async def add_programmer_week_row(
         "updated_at": now_str,
     }
 
-    if hasattr(programmer, "add_programmer_week_row"):
-        await programmer.add_programmer_week_row(new_record)
-    else:
-        await repo.insert_record("programmer_week", new_record)
-
+    await programmer.add_programmer_week_row(new_record)
     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/api/programmer/week/delete/{row_id}")
 async def delete_programmer_week_row(
     row_id: int,
-    repo: BaseRepository = Depends(get_repository),
     programmer: Programmer = Depends(get_programmer),
 ):
-    """Удаление строки из расписания programmer_week."""
+    """Удаление строки из расписания programmer_week. Системная строка id=1 не удаляется."""
     if row_id > 1:
-        if hasattr(programmer, "delete_programmer_week_row"):
-            await programmer.delete_programmer_week_row(row_id)
-        else:
-            await repo.delete_record("programmer_week", row_id)
+        await programmer.delete_programmer_week_row(row_id)
 
     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
 
 
 
 
+# # app/routers/programmer_router.py
 
 # from datetime import datetime
 # import logging
-# from typing import Any, List, Optional
+# from typing import Any, Dict, List, Optional
 
 # from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 # from fastapi.responses import HTMLResponse, RedirectResponse
@@ -330,6 +333,11 @@ async def delete_programmer_week_row(
 #     tags=["Programmer"],
 # )
 
+# DAYS_SHORT = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+# TEMPORARILY_MODES = ("PROGRAMMER_TEMPORARILY_CONST", "PROGRAMMER_TEMPORARILY_WEEK")
+# CONST_MODES = ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST")
+# WEEK_MODES = ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK")
+
 
 # def _parse_float(val: Optional[str]) -> Optional[float]:
 #     """Безопасное преобразование строки из HTML-формы в float."""
@@ -344,68 +352,79 @@ async def delete_programmer_week_row(
 #         return None
 
 
+# def _valid_week_mode(mode: Optional[str]) -> str:
+#     """Возвращает режим дней недели, если он допустим, иначе 'week'."""
+#     return mode if mode in settings.days_week_mode else "week"
+
+
+# def _parse_sensor_time(latest_sensor: Optional[Dict[str, Any]]) -> tuple:
+#     """Возвращает (день недели, время HH:MM, температура подвала) из последней записи датчиков."""
+#     if not latest_sensor or not latest_sensor.get("timestamp"):
+#         return "—", "—", None
+
+#     ts_str = str(latest_sensor["timestamp"])
+#     current_dow, current_time = "—", "—"
+#     try:
+#         dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
+#         current_dow = DAYS_SHORT[dt.weekday()]
+#         current_time = dt.strftime("%H:%M")
+#     except ValueError:
+#         if len(ts_str) >= 16:
+#             current_time = ts_str[11:16]
+
+#     return current_dow, current_time, latest_sensor.get("basement_temp")
+
+
 # @router.get("/programmer", response_class=HTMLResponse, summary="Страница программатора")
 # async def get_programmer_page(
 #     request: Request,
 #     templates: Jinja2Templates = Depends(get_templates),
 #     repo: BaseRepository = Depends(get_repository),
 # ) -> Any:
-#     """Точка входа для отображения страницы настройки программатора."""
+#     """Страница настройки программатора. Только чтение данных и рендер HTML."""
 #     sys_settings = await repo.get_settings_db(log_to_api=False)
 #     website_return_time = getattr(sys_settings, "website_return_time", 60)
 #     programmer_mode = getattr(sys_settings, "programmer_mode", "PROGRAMMER_CONST")
 
-#     latest_sensor = None
 #     try:
 #         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 #     except Exception as e:
 #         api_log.error(f"Ошибка получения данных из table_sensor_data: {e}")
+#         latest_sensor = None
+#     current_dow, current_time, basement_temp = _parse_sensor_time(latest_sensor)
 
-#     current_dow = "—"
-#     current_time = "—"
-#     basement_temp = None
-
-#     if latest_sensor and latest_sensor.get("timestamp"):
-#         ts_str = str(latest_sensor["timestamp"])
-#         try:
-#             dt = datetime.strptime(ts_str[:19], "%Y-%m-%d %H:%M:%S")
-#             days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-#             current_dow = days[dt.weekday()]
-#             current_time = dt.strftime("%H:%M")
-#         except Exception:
-#             if len(ts_str) >= 16:
-#                 current_time = ts_str[11:16]
-
-#         basement_temp = latest_sensor.get("basement_temp")
-
-#     latest_temp = None
 #     try:
 #         latest_temp = await repo.get_record_by_id("programmer_temporarily", 1)
 #     except Exception as e:
 #         api_log.error(f"Ошибка получения данных из programmer_temporarily: {e}")
+#         latest_temp = None
 
-#     temporarily_temp = latest_temp.get("temporarily", 20.0) if latest_temp and latest_temp.get("temporarily") is not None else 20.0
-#     temporarily_time = latest_temp.get("temporarily_time", "") if latest_temp and latest_temp.get("temporarily_time") is not None else ""
+#     temporarily_temp = 20.0
+#     temporarily_time = ""
+#     if latest_temp and latest_temp.get("temporarily") is not None:
+#         temporarily_temp = latest_temp["temporarily"]
+#     if latest_temp and latest_temp.get("temporarily_time"):
+#         temporarily_time = str(latest_temp["temporarily_time"])[11:16]
 
-#     latest_const = None
 #     try:
 #         latest_const = await repo.get_record_by_id("programmer_const", 1)
 #     except Exception as e:
 #         api_log.error(f"Ошибка получения данных из programmer_const: {e}")
+#         latest_const = None
 
-#     const_min = latest_const.get("const_min", 18.0) if latest_const and latest_const.get("const_max") is not None else 18.0
-#     const_max = latest_const.get("const_max", 24.0) if latest_const and latest_const.get("const_max") is not None else 24.0
+#     const_min, const_max = 18.0, 24.0
+#     if latest_const and latest_const.get("const_max") is not None:
+#         const_min = latest_const.get("const_min", 18.0)
+#         const_max = latest_const["const_max"]
 
-#     week_sys_row = None
 #     try:
 #         week_sys_row = await repo.get_record_by_id("programmer_week", 1)
 #     except Exception as e:
 #         api_log.error(f"Ошибка получения системной строки из programmer_week: {e}")
+#         week_sys_row = None
 
-#     week_mode = week_sys_row.get("week_mode", "week") if week_sys_row and week_sys_row.get("week_mode") else "week"
-#     if week_mode not in settings.days_week_mode:
-#         week_mode = "week"
-
+#     active_row_id = week_sys_row.get("now_id") if week_sys_row else None
+#     week_mode = _valid_week_mode(week_sys_row.get("week_mode") if week_sys_row else None)
 #     allowed_days = settings.days_week_mode.get(week_mode, ["Mo_Su"])
 
 #     all_week_records = await repo.fetch_range(
@@ -414,29 +433,22 @@ async def delete_programmer_week_row(
 #         start_val=week_mode,
 #         stop_val=week_mode,
 #     )
-
 #     week_records = [rec for rec in all_week_records if rec.get("id") != 1]
 
 #     def record_sort_key(rec):
 #         day = rec.get("week_day", "")
-#         day_idx = allowed_days.index(day) if day in allowed_days else 999
-#         time_str = str(rec.get("week_time", ""))
-#         return (day_idx, time_str)
+#         day_idx = allowed_days.index(day) if day in allowed_days else len(allowed_days)
+#         return (day_idx, str(rec.get("week_time", "")))
 
 #     week_records.sort(key=record_sort_key)
 
-#     grouped_records = []
-#     for d in allowed_days:
-#         recs = [r for r in week_records if r.get("week_day") == d]
-#         grouped_records.append({"day": d, "records": recs})
-
+#     grouped_records = [
+#         {"day": d, "records": [r for r in week_records if r.get("week_day") == d]}
+#         for d in allowed_days
+#     ]
 #     other_recs = [r for r in week_records if r.get("week_day") not in allowed_days]
 #     if other_recs:
 #         grouped_records.append({"day": "Другие", "records": other_recs})
-
-#     flag_temporarily = (programmer_mode in ("PROGRAMMER_TEMPORARILY_CONST", "PROGRAMMER_TEMPORARILY_WEEK"))
-#     flag_const = (programmer_mode in ("PROGRAMMER_CONST", "PROGRAMMER_TEMPORARILY_CONST"))
-#     flag_week = (programmer_mode in ("PROGRAMMER_WEEK", "PROGRAMMER_TEMPORARILY_WEEK"))
 
 #     context = {
 #         "website_return_time": website_return_time,
@@ -447,9 +459,9 @@ async def delete_programmer_week_row(
 #         "temporarily_time": temporarily_time,
 #         "const_min": const_min,
 #         "const_max": const_max,
-#         "flag_temporarily": flag_temporarily,
-#         "flag_const": flag_const,
-#         "flag_week": flag_week,
+#         "flag_temporarily": programmer_mode in TEMPORARILY_MODES,
+#         "flag_const": programmer_mode in CONST_MODES,
+#         "flag_week": programmer_mode in WEEK_MODES,
 #         "programmer_mode": programmer_mode,
 #         "week_mode": week_mode,
 #         "week_records": week_records,
@@ -457,6 +469,7 @@ async def delete_programmer_week_row(
 #         "allowed_days": allowed_days,
 #         "week_modes_list": list(settings.days_week_mode.keys()),
 #         "week_days_list": allowed_days,
+#         "active_row_id": active_row_id,
 #     }
 
 #     return templates.TemplateResponse(
@@ -492,13 +505,12 @@ async def delete_programmer_week_row(
 #     t_temp = _parse_float(temporarily_temp)
 #     t_time = temporarily_time.strip() if temporarily_time else ""
 
-#     if is_flag_temporarily:
-#         if is_flag_const:
-#             if not t_time or t_time in ("00:00", "0"):
-#                 raise HTTPException(
-#                     status_code=status.HTTP_400_BAD_REQUEST,
-#                     detail="Для временного режима с постоянным время не должно быть нулевым или пустым.",
-#                 )
+#     if is_flag_temporarily and is_flag_const:
+#         if not t_time or t_time in ("00:00", "0"):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Для временного режима с постоянным время не должно быть нулевым или пустым.",
+#             )
 
 #     if is_flag_const:
 #         if c_min is None or c_max is None:
@@ -517,16 +529,17 @@ async def delete_programmer_week_row(
 
 #     if week_ids:
 #         parsed_temps = [_parse_float(t) for t in week_temps]
-#         mode = week_mode if week_mode in settings.days_week_mode else "week"
-#         allowed = settings.days_week_mode.get(mode, ["Mo_Su"])
 
-#         if mode == "week":
+#         # Отправленные строки принадлежат ТЕКУЩЕМУ режиму из системной строки id=1,
+#         # а не тому, что выбран в селекте. Проверяем дни по режиму самих строк.
+#         sys_row = await repo.get_record_by_id("programmer_week", 1)
+#         rows_mode = _valid_week_mode(sys_row.get("week_mode") if sys_row else None)
+#         allowed = settings.days_week_mode.get(rows_mode, ["Mo_Su"])
+
+#         if rows_mode == "week":
 #             sanitized_days = ["Mo_Su"] * len(week_ids)
 #         else:
-#             sanitized_days = [
-#                 d if d in allowed else allowed[0]
-#                 for d in week_days
-#             ]
+#             sanitized_days = [d if d in allowed else allowed[0] for d in week_days]
 
 #         await programmer.save_programmer_week(
 #             week_ids=week_ids,
@@ -535,8 +548,9 @@ async def delete_programmer_week_row(
 #             week_temps=parsed_temps,
 #         )
 
+#     # Переключение на новый режим происходит уже после сохранения строк старого
 #     if week_mode:
-#         await programmer.update_week_mode(week_mode)
+#         await programmer.update_week_mode(_valid_week_mode(week_mode))
 
 #     await programmer.update_programmer_mode(
 #         flag_temporarily=is_flag_temporarily,
@@ -558,18 +572,14 @@ async def delete_programmer_week_row(
 # @router.post("/api/programmer/week/add")
 # async def add_programmer_week_row(
 #     week_mode: Optional[str] = Form("week"),
-#     repo: BaseRepository = Depends(get_repository),
 #     programmer: Programmer = Depends(get_programmer),
 # ):
 #     """Добавление новой строки в расписание programmer_week."""
-#     mode = week_mode if week_mode in settings.days_week_mode else "week"
-#     allowed = settings.days_week_mode.get(mode, ["Mo_Su"])
-#     day = allowed[0]
+#     mode = _valid_week_mode(week_mode)
+#     day = settings.days_week_mode.get(mode, ["Mo_Su"])[0]
 #     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 #     new_record = {
-#         "now_id": 0,
-#         "next_id": 0,
 #         "week_mode": mode,
 #         "week_day": day,
 #         "week_time": "23:59",
@@ -577,25 +587,17 @@ async def delete_programmer_week_row(
 #         "updated_at": now_str,
 #     }
 
-#     if hasattr(programmer, "add_programmer_week_row"):
-#         await programmer.add_programmer_week_row(new_record)
-#     else:
-#         await repo.insert_record("programmer_week", new_record)
-
+#     await programmer.add_programmer_week_row(new_record)
 #     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # @router.post("/api/programmer/week/delete/{row_id}")
 # async def delete_programmer_week_row(
 #     row_id: int,
-#     repo: BaseRepository = Depends(get_repository),
 #     programmer: Programmer = Depends(get_programmer),
 # ):
-#     """Удаление строки из расписания programmer_week."""
+#     """Удаление строки из расписания programmer_week. Системная строка id=1 не удаляется."""
 #     if row_id > 1:
-#         if hasattr(programmer, "delete_programmer_week_row"):
-#             await programmer.delete_programmer_week_row(row_id)
-#         else:
-#             await repo.delete_record("programmer_week", row_id)
+#         await programmer.delete_programmer_week_row(row_id)
 
 #     return RedirectResponse(url="/programmer", status_code=status.HTTP_303_SEE_OTHER)

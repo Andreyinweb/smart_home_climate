@@ -320,3 +320,13 @@ if __name__ == "__main__":
         )
         """
     create_table(db_path=database_file, table_name='programmer_week', fields=fields_db)
+
+#Таблица programmer_week:  id INTEGER PRIMARY KEY, now_id INTEGER, next_id INTEGER, week_mode TEXT,
+# week_day TEXT, week_time TEXT, week_temperature REAL,updated_at TEXT
+# Она заполняется при старте. 
+# Логика таблицы: первая строка это системная строка, now_id программа которая сейчас выполняется, 
+# next_id программа которая выполняется следующей, 
+# week_mode может принимать значения day, weekdays, weekdays_weekend, week, 
+# week_day может принимать значения ["Mo", "Tu", "We", "Th", "Fr", "Mo", "Sa", "Mo_Su", "Mo_Fr", "Sa_Su"], 
+# week_time в первой строке дата время окончания текущего цикла, в других строках время начала цикла.
+

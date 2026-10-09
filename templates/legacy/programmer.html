@@ -4,164 +4,9 @@
 {% block title %}Программатор — Управление климатом{% endblock %}
 
 {% block content %}
-<style>
-    .card-programmer {
-        max-width: 460px;
-        margin: 18px auto;
-        padding: 12px;
-    }
-    .programmer-block {
-        background-color: #f7fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        padding: 10px 12px;
-        margin-bottom: 12px;
-        transition: opacity 0.2s ease, background-color 0.2s ease;
-    }
-    .programmer-block.disabled-block {
-        opacity: 0.5;
-        background-color: #edf2f7;
-    }
-    .input-blue {
-        border: 2px solid #2b6cb0;
-        background-color: #ebf8ff;
-        color: #2b6cb0;
-        font-weight: bold;
-        font-size: 0.9rem;
-        padding: 3px 5px;
-        border-radius: 4px;
-        text-align: center;
-    }
-    .input-blue:focus {
-        outline: none;
-        border-color: #3182ce;
-        background-color: #ebf8ff;
-        box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.5);
-    }
-    .input-blue:disabled {
-        background-color: #e2e8f0;
-        border-color: #cbd5e0;
-        color: #a0aec0;
-    }
-    .select-blue {
-        border: 2px solid #2b6cb0;
-        background-color: #ebf8ff;
-        color: #2b6cb0;
-        font-weight: bold;
-        font-size: 0.9rem;
-        padding: 3px 6px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    .select-blue:disabled {
-        background-color: #e2e8f0;
-        border-color: #cbd5e0;
-        color: #a0aec0;
-    }
-    .programmer-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 0;
-    }
-    .programmer-table th, .programmer-table td {
-        padding: 5px 4px;
-        vertical-align: middle;
-        font-size: 0.9rem;
-        text-align: left;
-    }
-    .programmer-table th {
-        border-bottom: 1px solid #cbd5e0;
-        color: #4a5568;
-    }
-    .section-title {
-        font-weight: bold;
-        font-size: 0.98rem;
-        padding-bottom: 4px;
-        border-bottom: 2px solid #cbd5e0;
-        margin-bottom: 8px;
-        color: #2d3748;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .val-highlight {
-        color: #2b6cb0;
-        font-weight: bold;
-    }
-    .checkbox-lg {
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-    }
-    .btn-save-container {
-        text-align: center;
-        margin-top: 10px;
-        padding-top: 10px;
-    }
-    .btn-del {
-        background-color: #e53e3e;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 3px 7px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 0.8rem;
-        line-height: 1;
-    }
-    .btn-del:hover {
-        background-color: #c53030;
-    }
-    .btn-add {
-        background-color: #38a169;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 26px;
-        height: 26px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 1.1rem;
-        line-height: 1;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .btn-add:hover {
-        background-color: #2f855a;
-    }
-    .day-block {
-        border: 1px solid #cbd5e0;
-        border-radius: 6px;
-        padding: 8px;
-        margin-bottom: 10px;
-        background-color: #ffffff;
-    }
-    .day-block-header {
-        font-weight: bold;
-        font-size: 0.9rem;
-        color: #2b6cb0;
-        margin-bottom: 6px;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 4px;
-    }
-    tr.active-row {
-        background-color: #feebc8;
-    }
-    tr.active-row td {
-        font-weight: bold;
-    }
-    tr.active-row .input-blue,
-    tr.active-row .select-blue {
-        border-color: #dd6b20;
-        background-color: #fffaf0;
-        color: #c05621;
-    }
-</style>
-
 <div class="card card-programmer">
-    <div class="card-header" style="margin-bottom: 12px;">
-        <h2 class="card-title" style="font-size: 1.15rem;">⏱️ Настройка программатора</h2>
+    <div class="card-header programmer-card-header">
+        <h2 class="card-title">⏱️ Настройка программатора</h2>
     </div>
 
     <!-- Блок текущих показателей датчика -->
@@ -195,13 +40,13 @@
                 <tr>
                     <td><strong>Температура</strong></td>
                     <td>
-                        <input type="number" id="temporarily_temp" name="temporarily_temp" value="{{ "%.1f"|format(temporarily_temp) if temporarily_temp is defined and temporarily_temp is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 90px;">
+                        <input type="number" id="temporarily_temp" name="temporarily_temp" value="{{ "%.1f"|format(temporarily_temp) if temporarily_temp is defined and temporarily_temp is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue input-w-90">
                     </td>
                 </tr>
                 <tr>
                     <td><strong>Время</strong></td>
                     <td>
-                        <input type="time" id="temporarily_time" name="temporarily_time" value="{{ temporarily_time if temporarily_time else '' }}" class="input-blue" style="width: 110px;">
+                        <input type="time" id="temporarily_time" name="temporarily_time" value="{{ temporarily_time if temporarily_time else '' }}" class="input-blue input-w-110">
                     </td>
                 </tr>
             </table>
@@ -218,13 +63,13 @@
                 <tr>
                     <td><strong>Min</strong></td>
                     <td>
-                        <input type="number" id="const_min" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 90px;">
+                        <input type="number" id="const_min" name="const_min" value="{{ "%.1f"|format(const_min) if const_min is defined and const_min is not none else '18.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue input-w-90">
                     </td>
                 </tr>
                 <tr>
                     <td><strong>Max</strong></td>
                     <td>
-                        <input type="number" id="const_max" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 90px;">
+                        <input type="number" id="const_max" name="const_max" value="{{ "%.1f"|format(const_max) if const_max is defined and const_max is not none else '24.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue input-w-90">
                     </td>
                 </tr>
             </table>
@@ -236,13 +81,14 @@
                 <span>
                     <input type="checkbox" id="flag_week" name="flag_week" class="checkbox-lg" {% if flag_week %}checked{% endif %} onchange="toggleMode('week')"> По неделе
                 </span>
-                <select id="week_mode" name="week_mode" class="select-blue" onchange="document.getElementById('programmerForm').submit()">
+                <!-- Select без name: не уходит с основной формой, смена режима идёт отдельным запросом -->
+                <select id="week_mode" class="select-blue" data-current="{{ week_mode }}" onchange="switchWeekMode(this)">
                     {% for m in week_modes_list %}
                         <option value="{{ m }}" {% if m == week_mode %}selected{% endif %}>{{ m }}</option>
                     {% endfor %}
                 </select>
             </div>
-            
+
             {% if week_records %}
                 {% for group in grouped_records %}
                 <div class="day-block">
@@ -256,7 +102,7 @@
                                 <th>День</th>
                                 <th>Время</th>
                                 <th>Т, °C</th>
-                                <th style="width: 30px;"></th>
+                                <th class="th-action"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -265,12 +111,12 @@
                                 <td>
                                     <input type="hidden" name="week_ids" value="{{ row.id }}">
                                     {% if week_mode == 'week' %}
-                                        <select class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;" disabled data-locked="true">
+                                        <select class="select-blue select-compact" disabled data-locked="true">
                                             <option value="Mo_Su" selected>Mo_Su</option>
                                         </select>
                                         <input type="hidden" name="week_days" value="Mo_Su">
                                     {% else %}
-                                        <select name="week_days" class="select-blue" style="padding: 2px 4px; font-size: 0.85rem;">
+                                        <select name="week_days" class="select-blue select-compact">
                                             {% for d in allowed_days %}
                                                 <option value="{{ d }}" {% if d == row.week_day %}selected{% endif %}>{{ d }}</option>
                                             {% endfor %}
@@ -278,12 +124,12 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <input type="time" name="week_times" value="{{ row.week_time }}" class="input-blue" style="width: 85px; padding: 2px 4px; font-size: 0.85rem;">
+                                    <input type="time" name="week_times" value="{{ row.week_time }}" class="input-blue input-time-row">
                                 </td>
                                 <td>
-                                    <input type="number" name="week_temps" value="{{ "%.1f"|format(row.week_temperature) if row.week_temperature is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue" style="width: 65px; padding: 2px 4px; font-size: 0.85rem;">
+                                    <input type="number" name="week_temps" value="{{ "%.1f"|format(row.week_temperature) if row.week_temperature is not none else '20.0' }}" step="0.1" min="15.0" max="30.0" class="input-blue input-temp-row">
                                 </td>
-                                <td style="text-align: center;">
+                                <td class="td-center">
                                     <button type="submit" formaction="/api/programmer/week/delete/{{ row.id }}" class="btn-del" title="Удалить строку">✖</button>
                                 </td>
                             </tr>
@@ -291,26 +137,49 @@
                         </tbody>
                     </table>
                     {% else %}
-                    <div style="font-size: 0.85rem; color: #a0aec0; font-style: italic; padding: 4px 0;">Записи отсутствуют</div>
+                    <div class="empty-note">Записи отсутствуют</div>
                     {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
-            <div style="text-align: center; color: #718096; padding: 8px 0;">Записи для режима {{ week_mode }} отсутствуют.</div>
+            <div class="empty-week">Записи для режима {{ week_mode }} отсутствуют.</div>
             {% endif %}
 
-            <div style="text-align: right; margin-top: 8px;">
+            <div class="add-row-wrap">
                 <button type="submit" formaction="/api/programmer/week/add" class="btn-add" title="Добавить строку">+</button>
             </div>
         </div>
 
         <div class="btn-save-container">
-            <button type="submit" class="btn btn-start" style="padding: 8px 24px; font-size: 0.9rem;">Сохранить</button>
+            <button type="submit" class="btn btn-start btn-save">Сохранить</button>
         </div>
+    </form>
+
+    <!-- Отдельная форма смены режима дней недели. Вне programmerForm: вложенные формы недопустимы -->
+    <form id="weekModeForm" action="/api/programmer/week/mode" method="post" style="display:none">
+        <input type="hidden" name="week_mode" id="week_mode_target">
     </form>
 </div>
 
 <script>
+    // Отслеживание несохранённых правок в записях и флагах.
+    // Select режима исключён: его изменение не является правкой записей.
+    let programmerDirty = false;
+    document.getElementById('programmerForm').addEventListener('input', (e) => {
+        if (e.target.id !== 'week_mode') {
+            programmerDirty = true;
+        }
+    });
+
+    function switchWeekMode(select) {
+        if (programmerDirty && !confirm('Есть несохранённые изменения. Переключить режим без сохранения?')) {
+            select.value = select.dataset.current;
+            return;
+        }
+        document.getElementById('week_mode_target').value = select.value;
+        document.getElementById('weekModeForm').submit();
+    }
+
     function toggleMode(changedSource) {
         const chkTemp = document.getElementById('flag_temporarily');
         const chkConst = document.getElementById('flag_const');
