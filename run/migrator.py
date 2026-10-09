@@ -27,7 +27,7 @@ copying_tables = {
     "heating_table",
     "programmer_const",
     "programmer_temporarily",
-    # "programmer_week",
+    "programmer_week",
 }
 
 #  Не копируется "hourly_coefficients_table",
