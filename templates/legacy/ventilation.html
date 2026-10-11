@@ -1,3 +1,4 @@
+<!-- templates/legacy/ventilation.html -->
 {% extends "legacy/base.html" %}
 
 {% block title %}Проветривание — Мониторинг климата{% endblock %}
@@ -27,10 +28,16 @@
         </div>
     </div>
 
-    <!-- Таблица показателей до и во время проветривания -->
+    <!-- Сравнение показателей: текущий цикл или история последнего -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">📊 Сравнение показателей цикла</h2>
+            {% if is_history_title or (not vent_active and latest_vent_exists) %}
+            <h2 class="card-title">
+                <span class="btn btn-disabled" style="display: inline-block; pointer-events: none; margin: 0; padding: 4px 10px; font-size: 0.95rem;">{{ card_title }}</span>
+            </h2>
+            {% else %}
+            <h2 class="card-title">{{ card_title }}</h2>
+            {% endif %}
         </div>
 
         <table class="table-compact">
@@ -38,7 +45,7 @@
                 <tr>
                     <th>Параметр</th>
                     <th>Пуск <span class="val-bold text-blue">{{ vent_start_time if vent_start_time else '—' }}</span> |</th>
-                    <th>Текущие <span class="val-bold text-blue">{{ vent_now_time if vent_now_time else '—' }}</span></th>
+                    <th>{% if vent_active or not latest_vent_exists %}Текущие{% else %}Финиш{% endif %} <span class="val-bold text-blue">{{ vent_now_time if vent_now_time else '—' }}</span></th>
                     <th>Дельта <span class="val-bold text-blue">{{ vent_difference_time if vent_difference_time else '—' }}</span></th>
                 </tr>
             </thead>
@@ -94,12 +101,14 @@
             </tbody>
         </table>
     </div>
-<!-- Таблица начальных показателей -->
-    <div class="card-header">
+
+    <!-- Таблица начальных показателей -->
+    <div class="card">
+        <div class="card-header">
             <div>
                 <h2 class="card-title">📊 Начальные показатели</h2>
                 <div class="text-gray" style="font-size: 0.85rem; margin-top: 2px;">
-                    Время: <span class="text-blue val-bold">{{ vent_start_time if vent_start_time else '—' }}</span> 
+                    Время: <span class="text-blue val-bold">{{ vent_start_time if vent_start_time else '—' }}</span>
                 </div>
             </div>
         </div>
@@ -151,16 +160,9 @@
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
             <div>
                 <strong>Проветривание:</strong> {{ "%.2f"|format(before_humidity_difference) if before_humidity_difference is defined and before_humidity_difference is not none else '0.00' }} г/м³
-                
             </div>
-
+        </div>
     </div>
-
-
-
-
-
-
 
 </div>
 {% endblock %}
