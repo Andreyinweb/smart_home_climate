@@ -8,7 +8,7 @@ VENV_DIR="/home/venv" #  "/home/venv" #   Обязательно указать 
 VENV_NAME="venv_climate" # Имя виртуального окружения
 # Пути для проверки базы данных
 DATA_DIR="/home/base" # Папка для хранения базы данных
-DATA_FILE="climate_data.sqlite3"
+DATA_FILE="1_0_0_climate_data.sqlite3"
 # Версия Python, которую нужно установить
 desired_version="3.12"
 # Нужно дописать макадреса
