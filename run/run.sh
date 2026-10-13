@@ -265,7 +265,7 @@ fi
 LOCATION_LAT="${LOCATION_LAT:-50.4501}"
 LOCATION_LON="${LOCATION_LON:-30.5234}"
 DB_DIR="${DB_DIR:-$DIR_PATH}"
-DB_NAME="${DB_NAME:-2_0_0_climate_data.sqlite3}"
+DB_NAME="${DB_NAME:-3_0_0_climate_data.sqlite3}"
 VENV_DIR="${VENV_DIR:-$DIR_PATH/venv}"
 VENV_NAME="${VENV_NAME:-venv_smart_home_climate}"
 LOG_DIR="${LOG_DIR:-$DIR_PATH/logs}"

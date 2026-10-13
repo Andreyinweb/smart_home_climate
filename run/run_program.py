@@ -310,13 +310,13 @@ if __name__ == "__main__":
     # weekdays_weekend: ["Mo_Fr", "Sa", "Su"],  weekdays: ["Mo_Fr", "Sa_Su"], week: ["Mo_Su"]
     fields_db = """ (
         id INTEGER PRIMARY KEY,
-        now_id INTEGER,
-        next_id INTEGER,
         week_mode TEXT,
         week_day TEXT,
         week_time TEXT,
         week_temperature REAL,
-        updated_at TEXT
+        updated_at TEXT,
+        now_id INTEGER,
+        next_id INTEGER        
         )
         """
     create_table(db_path=database_file, table_name='programmer_week', fields=fields_db)
