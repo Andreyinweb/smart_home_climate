@@ -9,7 +9,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import AppEnv, settings
 import app.services.logs_service as logs_service
-import app.db.repository as db
+import app.db.repository as db_old # TODO УДАЛИТЬ после рефакторинга.
+import app.db.crud as db
+from app.db import queries
 from app.db.connection import get_db_connection
 from app.dependencies import (
     get_relay_controller,
@@ -18,6 +20,7 @@ from app.dependencies import (
     get_programmer,
 )
 from app.core.db_start_config import init_db_start_data
+from app.core.db_settings import get_settings_db, update_settings
 from app.routers import (
     dashboard_router,
     debug_router,
@@ -64,10 +67,10 @@ async def lifespan(app: FastAPI):
             try:
                 timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                sys_settings = await db.get_settings_db(log_to_api=False)
+                sys_settings = await get_settings_db()
 
-                latest = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-                now_id = (latest["id"] + 1) if latest and "id" in latest else 1
+                latest = await db.get("table_sensor_data")
+                now_id = (latest[0]["id"] + 1) if latest else 1
                 logs_service.set_current_cycle_id(now_id)
 
                 work_log.info("[Цикл] Опрос BLE-датчиков...")
@@ -82,13 +85,15 @@ async def lifespan(app: FastAPI):
                         ble_data["street_humi"] = c_rh
                         ble_data["sensor_or_calc_street"] = c_flag
 
-                    avg_diff_temp = await db.get_aggregate("table_sensor_data", "difference_temp", "AVG") or 0.0
+                    avg_rows = await db.query(queries.AVG_DIFFERENCE_TEMP)
+                    avg_res = avg_rows[0]["res"] if avg_rows else None
+                    avg_diff_temp = round(avg_res, 2) if avg_res is not None else 0.0
                     sensor_record = build_sensor_record(ble_data, sys_settings, avg_diff_temp)
                     sensor_record["id"] = now_id
-                    await db.upsert_record("table_sensor_data", sensor_record, pk_col="id", log_to_api=False)
+                    await db.upsert("table_sensor_data", [sensor_record])
 
                     api_record = build_api_record(sensor_record, now_id, sys_settings)
-                    await db.upsert_record("api_table", api_record, pk_col="id", log_to_api=False)
+                    await db.upsert("api_table", [api_record])
 
                     asyncio.create_task(weather_service.record_site_weather(timestamp_str, now_id))
 
@@ -107,8 +112,8 @@ async def lifespan(app: FastAPI):
 
                 await relay_ctrl.verification_relay()
 
-                coeff_hour = await db.get_record_by_id("hourly_coefficients_table", int(timestamp_str[11:13]), pk_col="hour", log_to_api=False)
-                updated_at_str = coeff_hour.get("updated_at") if coeff_hour else None
+                coeff_rows = await db.get("hourly_coefficients_table", pk=int(timestamp_str[11:13]), pk_col="hour")
+                updated_at_str = coeff_rows[0].get("updated_at") if coeff_rows else None
 
                 if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
                     asyncio.create_task(weather_service.calibrate_hourly_coefficients())
@@ -122,7 +127,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 work_log.error(f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True)
 
-            sys_settings = await db.get_settings_db(log_to_api=False)
+            sys_settings = await get_settings_db()
             interval_settings = getattr(sys_settings, "interval_seconds", settings.interval_seconds)
             delta_time = round((datetime.now() - datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")).total_seconds())
             interval = 60 if (interval_settings - delta_time) < 60 else interval_settings - delta_time
