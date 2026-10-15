@@ -4,7 +4,8 @@ import asyncio
 import logging
 from typing import Any, Dict, Optional
 
-from app.db.repository import BaseRepository
+import app.db.crud as db
+from app.core.db_settings import get_settings_db
 from app.services.relay_service import RelayController
 
 logger = logging.getLogger("climat_app.heating_controller")
@@ -16,8 +17,7 @@ class HeatingController:
     Защищен от одновременного выполнения операций управления через асинхронную блокировку.
     """
 
-    def __init__(self, repo: BaseRepository, relay: RelayController) -> None:
-        self.repo = repo
+    def __init__(self, relay: RelayController) -> None:
         self.relay = relay
         self._lock = asyncio.Lock()
 
@@ -31,12 +31,14 @@ class HeatingController:
             return None
 
         async with self._lock:
-            latest_on = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            rows_heating = await db.get("heating_table", order_col="id", log_to_api=False)
+            latest_on = rows_heating[0] if rows_heating else None
             if latest_on and latest_on.get("status_heating") is True:
                 logger.info("[start] Отопление уже запущено. Запуск пропущен.")
                 return False
 
-            latest_sensor = await self.repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+            rows_sensor = await db.get("table_sensor_data", order_col="id", log_to_api=False)
+            latest_sensor = rows_sensor[0] if rows_sensor else None
             if not latest_sensor or "id" not in latest_sensor or "timestamp" not in latest_sensor:
                 logger.warning("[start] Отсутствуют корректные данные в table_sensor_data. Запуск отопления отменен.")
                 return False
@@ -65,8 +67,8 @@ class HeatingController:
                 "status_heating": True
             }
 
-            await self.repo.upsert_record("heating_table", data_to_heating_table, pk_col="id", log_to_api=False)
-            await self.repo.upsert_record("history_of_heating", data_to_history, pk_col="id", log_to_api=False)  
+            await db.upsert("heating_table", [data_to_heating_table], pk_col="id", log_to_api=False)
+            await db.upsert("history_of_heating", [data_to_history], pk_col="id", log_to_api=False)  
             
             logger.info(
                 f"[start] Успешный запуск отопления зафиксирован в БД: sensor_id={latest_sensor['id']}"
@@ -83,19 +85,22 @@ class HeatingController:
             return None
 
         async with self._lock:
-            latest_off = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            rows_heating = await db.get("heating_table", order_col="id", log_to_api=False)
+            latest_off = rows_heating[0] if rows_heating else None
             if not latest_off or not latest_off.get("status_heating"):
                 logger.info("[stop] Отопление выключено. Остановка пропущена.")
                 return False
 
-            latest_heat = await self.repo.get_latest_record("history_of_heating", order_by_col="id", log_to_api=False)
+            rows_history = await db.get("history_of_heating", order_col="id", log_to_api=False)
+            latest_heat = rows_history[0] if rows_history else None
             if not latest_heat:
                 logger.warning("[stop] Запись о старте в history_of_heating не найдена.")
-                await self.repo.upsert_record("heating_table", {"id": 1, "status_heating": False}, pk_col="id", log_to_api=False)
+                await db.upsert("heating_table", [{"id": 1, "status_heating": False}], pk_col="id", log_to_api=False)
                 await self.relay.turn_off(stop_programm=stop_forcibly)
                 return True
 
-            latest_sensor = await self.repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+            rows_sensor = await db.get("table_sensor_data", order_col="id", log_to_api=False)
+            latest_sensor = rows_sensor[0] if rows_sensor else None
             current_sensor_id = latest_sensor["id"] if (latest_sensor and "id" in latest_sensor) else latest_heat["id"]
             heat_start_id = latest_heat["id"]
             stop_heat_plus = max(0, current_sensor_id - heat_start_id)
@@ -116,11 +121,11 @@ class HeatingController:
                 "id": 1,
                 "status_heating": False
             }
-            await self.repo.upsert_record("heating_table", data_to_heating_table, pk_col="id", log_to_api=False)
+            await db.upsert("heating_table", [data_to_heating_table], pk_col="id", log_to_api=False)
 
             # 2. Удаление записи при нулевой длительности или фиксация завершенного цикла
             if stop_heat_plus == 0:
-                await self.repo.delete_record_by_id("history_of_heating", heat_start_id, pk_col="id", log_to_api=False)
+                await db.delete("history_of_heating", pk=heat_start_id, pk_col="id", log_to_api=False)
                 logger.info(f"[stop] Нулевой цикл отопления удален (stop_heat_plus=0): id={heat_start_id}")
             else:
                 data_to_history: Dict[str, Any] = {
@@ -131,7 +136,7 @@ class HeatingController:
                     "automation_start": latest_heat.get("automation_start", False),
                     "automation_stop": is_automation,
                 }
-                await self.repo.upsert_record("history_of_heating", data_to_history, pk_col="id", log_to_api=False)
+                await db.upsert("history_of_heating", [data_to_history], pk_col="id", log_to_api=False)
                 logger.info(
                     f"[stop] Зафиксирована остановка отопления: start_id={heat_start_id}, "
                     f"current_id={current_sensor_id}, diff={stop_heat_plus}"
@@ -139,9 +144,9 @@ class HeatingController:
 
             return True
 
-
     async def check_temperature(self, temperature: float) -> Optional[bool]:
-        latest_heating = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        rows_heating = await db.get("heating_table", order_col="id", log_to_api=False)
+        latest_heating = rows_heating[0] if rows_heating else None
         if not latest_heating or not latest_heating.get("temperature_start") or not latest_heating.get("temperature_stop"):
             logger.warning("[check_temperature] Нет записей в heating_table")
             return False
@@ -182,11 +187,12 @@ class HeatingController:
         if basement_temp is None:
             return
 
-        sys_settings = await self.repo.get_settings_db(log_to_api=False)
+        sys_settings = await get_settings_db()
         minimum_temperature = getattr(sys_settings, "minimum_temperature", None)
         maximum_temperature = getattr(sys_settings, "maximum_temperature", None)
 
-        latest_heat = await self.repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+        rows_heating = await db.get("heating_table", order_col="id", log_to_api=False)
+        latest_heat = rows_heating[0] if rows_heating else None
         is_heating_active = bool(latest_heat and latest_heat.get("status_heating"))
 
         if not is_heating_active:
@@ -201,4 +207,3 @@ class HeatingController:
                     f"[min_max_temperature] Превышен критический максимум температуры ({basement_temp}°C >= {maximum_temperature}°C). Аварийная автоостановка."
                 )
                 await self.stop(is_automation=True)
-

@@ -8,8 +8,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings as config_settings
-from app.db.repository import BaseRepository
-from app.dependencies import get_repository, get_template_path, get_templates
+from app.core.db_settings import get_settings_db
+import app.db.crud as db
+from app.dependencies import get_template_path, get_templates
 
 api_log = logging.getLogger("api_app.routers.settings")
 
@@ -22,13 +23,13 @@ router = APIRouter(
 async def get_settings_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
-    repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """HTML-страница просмотра и редактирования настроек системы."""
     api_log.info("GET /settings -> открытие страницы настроек")
 
-    sys_settings = await repo.get_settings_db(log_to_api=False)
-    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    sys_settings = await get_settings_db()
+    rows_sensor = await db.get("table_sensor_data", order_col="id", limit=1, log_to_api=False)
+    latest_sensor = rows_sensor[0] if rows_sensor else None
 
     average_temp = "—"
     if latest_sensor and latest_sensor.get("average_temp") is not None:
@@ -52,7 +53,6 @@ async def get_settings_page(
 @router.post("/api/settings/update")
 async def update_settings(
     request: Request,
-    repo: BaseRepository = Depends(get_repository),
 ):
     """Обработка формы обновления настроек с последующим редиректом на /settings."""
     form_data = await request.form()
@@ -66,8 +66,9 @@ async def update_settings(
                 pass
         return default
 
-    current_settings = await repo.get_settings_db(log_to_api=False)
-    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+    current_settings = await get_settings_db()
+    rows_sensor = await db.get("table_sensor_data", order_col="id", limit=1, log_to_api=False)
+    latest_sensor = rows_sensor[0] if rows_sensor else None
 
     last_sensor_timestamp = latest_sensor.get("timestamp", "—") if latest_sensor else "—"
     default_programmer_mode = config_settings.programmer_mode.value if hasattr(config_settings.programmer_mode, "value") else str(config_settings.programmer_mode)
@@ -94,5 +95,5 @@ async def update_settings(
         "programmer_mode": parse_field("programmer_mode", getattr(current_settings, "programmer_mode", default_programmer_mode), str),
     }
 
-    await repo.upsert_record("settings_table", settings_to_write, pk_col="id", log_to_api=True)
+    await db.upsert("settings_table", [settings_to_write], pk_col="id", log_to_api=True)
     return RedirectResponse(url="/settings", status_code=status.HTTP_303_SEE_OTHER)

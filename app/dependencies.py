@@ -5,7 +5,6 @@ from typing import Optional
 from fastapi import Depends, Request
 from fastapi.templating import Jinja2Templates
 
-from app.db.repository import BaseRepository
 from app.services.heating_service import HeatingController
 from app.services.programmer_service import Programmer
 from app.services.logs_service import get_current_cycle_logs
@@ -37,11 +36,6 @@ def get_template_path(template_name: str, request: Request) -> str:
     return f"legacy/{template_name}"
 
 
-def get_repository() -> BaseRepository:
-    """Провайдер экземпляра репозитория для работы с БД."""
-    return BaseRepository()
-
-
 def get_relay_controller() -> RelayController:
     """Провайдер синглтона контроллера USB-реле."""
     global _relay_controller
@@ -51,19 +45,17 @@ def get_relay_controller() -> RelayController:
 
 
 def get_heating_controller(
-    repo: BaseRepository = Depends(get_repository),
     relay: RelayController = Depends(get_relay_controller),
 ) -> HeatingController:
     """Провайдер сервиса управления отоплением."""
-    return HeatingController(repo=repo, relay=relay)
+    return HeatingController(relay=relay)
 
 
 def get_programmer(
-    repo: BaseRepository = Depends(get_repository),
     heating_controller: HeatingController = Depends(get_heating_controller),
 ) -> Programmer:
     """Провайдер сервиса программатора."""
-    return Programmer(repo=repo, heating_controller=heating_controller)
+    return Programmer(heating_controller=heating_controller)
 
 
 
@@ -76,7 +68,8 @@ def get_programmer(
 # from fastapi.templating import Jinja2Templates
 
 # from app.db.repository import BaseRepository
-# from app.services.heating_service import HeatingController, Programmer
+# from app.services.heating_service import HeatingController
+# from app.services.programmer_service import Programmer
 # from app.services.logs_service import get_current_cycle_logs
 # from app.services.relay_service import RelayController
 
@@ -133,4 +126,5 @@ def get_programmer(
 # ) -> Programmer:
 #     """Провайдер сервиса программатора."""
 #     return Programmer(repo=repo, heating_controller=heating_controller)
+
 

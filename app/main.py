@@ -14,12 +14,11 @@ from app.db import queries
 from app.db.connection import get_db_connection
 from app.dependencies import (
     get_relay_controller,
-    get_repository,
     get_heating_controller,
-    get_programmer,
+    get_programmer
 )
 from app.core.db_start_config import init_db_start_data
-from app.core.db_settings import get_settings_db, update_settings
+from app.core.db_settings import get_settings_db
 from app.routers import (
     dashboard_router,
     debug_router,
@@ -54,10 +53,11 @@ async def lifespan(app: FastAPI):
 
     # Стартовые установки. Объекты создаются один раз и используются
     # и в фоновом цикле, и при остановке приложения.
+    # Стартовые установки. Объекты создаются один раз и используются
+    # и в фоновом цикле, и при остановке приложения.
     relay_ctrl = get_relay_controller()
-    repo = get_repository()
-    heating_ctrl = get_heating_controller(repo=repo, relay=relay_ctrl)
-    programmer = get_programmer(repo=repo, heating_controller=heating_ctrl)
+    heating_ctrl = get_heating_controller(relay=relay_ctrl)
+    programmer = get_programmer(heating_controller=heating_ctrl)
 
     await init_db_start_data()
 

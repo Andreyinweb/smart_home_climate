@@ -10,8 +10,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import AppEnv, settings
-from app.db.repository import BaseRepository
-from app.dependencies import get_repository, get_template_path, get_templates
+from app.core.db_settings import get_settings_db
+from app.dependencies import get_template_path, get_templates
 
 api_log = logging.getLogger("api_app.routers.debug_router")
 
@@ -46,12 +46,11 @@ def read_last_lines(file_path: Path, max_lines: int = 300) -> List[str]:
 async def get_work_log(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
-    repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Отображение последних 100 строк файла work_log.log."""
     api_log.info("GET /debug/work-log -> просмотр лога основной логики")
 
-    sys_settings = await repo.get_settings_db(log_to_api=True)
+    sys_settings = await get_settings_db()
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
     log_lines = read_last_lines(settings.work_log, max_lines=100)
@@ -76,12 +75,11 @@ async def get_work_log(
 async def get_api_log(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
-    repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Отображение последних 100 строк файла api_log.log."""
     api_log.info("GET /debug/api-log -> просмотр лога веб-сервера")
 
-    sys_settings = await repo.get_settings_db(log_to_api=True)
+    sys_settings = await get_settings_db()
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
     log_lines = read_last_lines(settings.api_log, max_lines=100)
