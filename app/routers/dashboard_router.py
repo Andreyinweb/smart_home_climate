@@ -9,8 +9,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
-from app.db.repository import BaseRepository
-from app.dependencies import get_repository, get_template_path, get_templates
+from app.core.db_settings import get_settings_db, update_settings
+from app.db import crud as db
+from app.dependencies import get_template_path, get_templates
 from app.schemas.settings_schema import SystemSettingsUpdate
 
 api_log = logging.getLogger("api_app.routers.dashboard_router")
@@ -50,12 +51,14 @@ def _merge_sensor_api(sensor: Any, api: Any) -> dict:
     return data
 
 
-async def _load_merged_by_id(repo: BaseRepository, record_id: Optional[int]) -> Optional[dict]:
+async def _load_merged_by_id(record_id: Optional[int]) -> Optional[dict]:
     """Собирает sensor + api по id. Если любой из записей нет — возвращает None."""
     if record_id is None:
         return None
-    sensor = await repo.get_record_by_id("table_sensor_data", record_id, log_to_api=False)
-    api = await repo.get_record_by_id("api_table", record_id, log_to_api=False)
+    sensor_rows = await db.get("table_sensor_data", pk=record_id, pk_col="id", log_to_api=False)
+    api_rows = await db.get("api_table", pk=record_id, pk_col="id", log_to_api=False)
+    sensor = sensor_rows[0] if sensor_rows else None
+    api = api_rows[0] if api_rows else None
     if not sensor or not api:
         return None
     return _merge_sensor_api(sensor, api)
@@ -111,20 +114,22 @@ router = APIRouter(
 async def get_index(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
-    repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Главная страница климат-контроля со сводкой показателей."""
     api_log.info("GET / -> открытие главной страницы дашборда")
+    sys_settings = None
 
     try:
-        sys_settings = await repo.get_settings_db(log_to_api=True)
+        sys_settings = await get_settings_db()
         website_return_time = getattr(sys_settings, "website_return_time", 60)
         target_rh = getattr(sys_settings, "target_rh", 60.0)
         abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)
         app_env = settings.app_env.value
 
-        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=True)
-        latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=True)
+        latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=True)
+        latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=True)
+        latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
+        latest_api = latest_api_rows[0] if latest_api_rows else None
 
         if not latest_sensor or not latest_api:
             api_log.warning("На сервер не приходят значения из базы данных")
@@ -173,14 +178,16 @@ async def get_index(
 
         active_modes = []
         try:
-            latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+            latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+            latest_vent = latest_vent_rows[0] if latest_vent_rows else None
             if latest_vent and latest_vent.get("status_ventilation"):
                 active_modes.append("Проветривание")
         except Exception:
             pass
 
         try:
-            latest_heat = await repo.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            latest_heat_rows = await db.get("heating_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+            latest_heat = latest_heat_rows[0] if latest_heat_rows else None
             if latest_heat and latest_heat.get("status_heating"):
                 active_modes.append("Отопление")
         except Exception:
@@ -212,7 +219,7 @@ async def get_index(
 
     except Exception as e:
         api_log.error(f"Ошибка при формировании главной страницы: {e}", exc_info=True)
-        return_time = getattr(sys_settings, "website_return_time", 60) if 'sys_settings' in locals() and sys_settings else 60
+        return_time = getattr(sys_settings, "website_return_time", 60) if sys_settings else 60
         return templates.TemplateResponse(
             request=request,
             name=get_template_path("no_data.html", request),
@@ -225,14 +232,15 @@ async def get_index(
 async def get_ventilation_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
-    repo: BaseRepository = Depends(get_repository),
 ) -> Any:
     """Страница ручного управления проветриванием: текущий цикл или история последнего."""
-    sys_settings = await repo.get_settings_db(log_to_api=False)
+    sys_settings = await get_settings_db()
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
-    latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-    latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
+    latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
+    latest_api = latest_api_rows[0] if latest_api_rows else None
 
     if not latest_sensor or not latest_api:
         return templates.TemplateResponse(
@@ -246,7 +254,8 @@ async def get_ventilation_page(
 
     latest_vent = None
     try:
-        latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+        latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_vent = latest_vent_rows[0] if latest_vent_rows else None
     except Exception:
         pass
 
@@ -257,7 +266,7 @@ async def get_ventilation_page(
     if latest_vent and latest_vent.get("status_ventilation"):
         # Проветривание идёт: сравниваем момент пуска с текущими данными.
         vent_active = True
-        vent_before = await _load_merged_by_id(repo, latest_vent.get("id"))
+        vent_before = await _load_merged_by_id(latest_vent.get("id"))
         vent_after = current_data
         card_title = "📊 Сравнение показателей цикла"
 
@@ -267,8 +276,8 @@ async def get_ventilation_page(
         start_id = latest_vent.get("id")
         stop_plus = latest_vent.get("stop_vent_plus") or 0
         stop_id = (start_id + stop_plus) if start_id is not None else None
-        vent_before = await _load_merged_by_id(repo, start_id)
-        vent_after = await _load_merged_by_id(repo, stop_id)
+        vent_before = await _load_merged_by_id(start_id)
+        vent_after = await _load_merged_by_id(stop_id)
         start_label = (
             vent_before.get("timestamp") if vent_before else latest_vent.get("timestamp", "—")
         )
@@ -332,17 +341,19 @@ async def get_ventilation_page(
 
 
 @router.post("/api/ventilation/start")
-async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
+async def start_ventilation():
     """Запуск проветривания."""
-    sys_settings = await repo.get_settings_db(log_to_api=False)
-    latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+    sys_settings = await get_settings_db()
+    latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_vent = latest_vent_rows[0] if latest_vent_rows else None
 
     can_start = True
     if latest_vent and latest_vent.get("status_ventilation"):
         can_start = False
 
     if can_start:
-        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+        latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
         if latest_sensor:
             data_to_write = {
                 "id": latest_sensor["id"],
@@ -350,10 +361,11 @@ async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
                 "status_ventilation": True,
                 "stop_vent_plus": 0,
             }
-            await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
+            await db.upsert("ventilation_table", [data_to_write], pk_col="id", log_to_api=False)
             api_log.info(f"Успешный старт проветривания: sensor_id={latest_sensor['id']}")
 
-        latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
+        latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_api = latest_api_rows[0] if latest_api_rows else None
         if latest_api:
             vent_time_val = latest_api.get("vent_time_val") or 0
             reduced_interval_in_seconds = max(int(vent_time_val / 3 * 60), 60)
@@ -361,23 +373,25 @@ async def start_ventilation(repo: BaseRepository = Depends(get_repository)):
                 interval_seconds=reduced_interval_in_seconds,
                 previous_interval_in_seconds=sys_settings.interval_seconds,
             )
-            await repo.update_settings(update_dto=dto)
+            await update_settings(update_dto=dto)
 
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/api/ventilation/stop")
-async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
+async def stop_ventilation():
     """Остановка проветривания."""
-    sys_settings = await repo.get_settings_db(log_to_api=False)
-    latest_vent = await repo.get_latest_record("ventilation_table", order_by_col="id", log_to_api=False)
+    sys_settings = await get_settings_db()
+    latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_vent = latest_vent_rows[0] if latest_vent_rows else None
     if latest_vent and latest_vent.get("status_ventilation"):
-        latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
+        latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
         if latest_sensor:
             stop_vent_plus = latest_sensor["id"] - latest_vent["id"]
 
             if stop_vent_plus == 0:
-                await repo.delete_record_by_id("ventilation_table", latest_vent["id"], pk_col="id", log_to_api=False)
+                await db.delete("ventilation_table", pk=latest_vent["id"], pk_col="id", log_to_api=False)
                 api_log.info(f"Удаление записи проветривания (stop_vent_plus=0): id={latest_vent['id']}")
             else:
                 data_to_write = {
@@ -386,16 +400,17 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
                     "status_ventilation": False,
                     "stop_vent_plus": stop_vent_plus,
                 }
-                await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
+                await db.upsert("ventilation_table", [data_to_write], pk_col="id", log_to_api=False)
                 api_log.info(
                     f"Успешный стоп проветривания: start_id={latest_vent['id']}, "
                     f"stop_id={latest_sensor['id']}, diff={stop_vent_plus}"
                 )
 
-            latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
+            latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+            latest_api = latest_api_rows[0] if latest_api_rows else None
             if latest_api:
                 dto = SystemSettingsUpdate(interval_seconds=sys_settings.previous_interval_in_seconds)
-                await repo.update_settings(update_dto=dto)
+                await update_settings(update_dto=dto)
 
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -407,7 +422,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 
 # from datetime import datetime
 # import logging
-# from typing import Any
+# from typing import Any, Optional
 
 # from fastapi import APIRouter, Depends, Request, status
 # from fastapi.responses import HTMLResponse, RedirectResponse
@@ -446,6 +461,67 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #         return "—"
 
 
+# def _merge_sensor_api(sensor: Any, api: Any) -> dict:
+#     """Объединяет запись датчиков и запись api_table (timestamp берётся из датчиков)."""
+#     data = dict(sensor)
+#     api_data = dict(api)
+#     api_data.pop("timestamp", None)
+#     data.update(api_data)
+#     return data
+
+
+# async def _load_merged_by_id(repo: BaseRepository, record_id: Optional[int]) -> Optional[dict]:
+#     """Собирает sensor + api по id. Если любой из записей нет — возвращает None."""
+#     if record_id is None:
+#         return None
+#     sensor = await repo.get_record_by_id("table_sensor_data", record_id, log_to_api=False)
+#     api = await repo.get_record_by_id("api_table", record_id, log_to_api=False)
+#     if not sensor or not api:
+#         return None
+#     return _merge_sensor_api(sensor, api)
+
+
+# def _hhmm(ts: Any) -> str:
+#     """Возвращает HH:MM из строки 'YYYY-MM-DD HH:MM:SS', иначе исходную строку."""
+#     s = str(ts)
+#     return s[11:16] if len(s) >= 16 else s
+
+
+# def _diff_or_none(after: Optional[dict], before: Optional[dict], key: str) -> Optional[float]:
+#     """Разница after - before или None, если данных для сравнения нет."""
+#     if not after or not before:
+#         return None
+#     a, b = after.get(key), before.get(key)
+#     if a is None or b is None:
+#         return None
+#     return safe_diff(a, b)
+
+
+# def _vent_class(val: Optional[float], kind: str) -> str:
+#     """CSS-класс дельты: temp — синий при изменении; rh/ah — зелёный при снижении влажности."""
+#     if val is None:
+#         return "text-gray"
+#     if kind == "temp":
+#         return "text-blue" if abs(val) > 0.1 else "text-gray"
+#     threshold = 0.5 if kind == "rh" else 0.1
+#     if val < -threshold:
+#         return "text-green"
+#     if val > threshold:
+#         return "text-red"
+#     return "text-gray"
+
+
+# # (поле, тип для раскраски)
+# _VENT_DIFF_FIELDS = (
+#     ("basement_temp", "temp"),
+#     ("basement_humi", "rh"),
+#     ("a_basement_humi", "ah"),
+#     ("floor_temp", "temp"),
+#     ("floor_humi", "rh"),
+#     ("a_floor_humi", "ah"),
+# )
+
+
 # router = APIRouter(
 #     tags=["Dashboard & Web UI"],
 # )
@@ -464,7 +540,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #         sys_settings = await repo.get_settings_db(log_to_api=True)
 #         website_return_time = getattr(sys_settings, "website_return_time", 60)
 #         target_rh = getattr(sys_settings, "target_rh", 60.0)
-#         abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)        
+#         abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)
 #         app_env = settings.app_env.value
 
 #         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=True)
@@ -479,11 +555,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
 #             )
 
-#         db_data = dict(latest_sensor)
-#         api_data = dict(latest_api)
-#         if "timestamp" in api_data:
-#             del api_data["timestamp"]
-#         db_data.update(api_data)
+#         db_data = _merge_sensor_api(latest_sensor, latest_api)
 
 #         vent_status = db_data.get("vent_status")
 #         vent_time_val = db_data.get("vent_time_val")
@@ -549,7 +621,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #             "heat_display_class": heat_display_class,
 #             "active_mode": active_mode,
 #             "app_env": app_env,
-#             **db_data
+#             **db_data,
 #         }
 
 #         return templates.TemplateResponse(
@@ -575,7 +647,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #     templates: Jinja2Templates = Depends(get_templates),
 #     repo: BaseRepository = Depends(get_repository),
 # ) -> Any:
-#     """Страница ручного управления проветриванием и таблицы сравнения."""
+#     """Страница ручного управления проветриванием: текущий цикл или история последнего."""
 #     sys_settings = await repo.get_settings_db(log_to_api=False)
 #     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
@@ -590,11 +662,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
 #         )
 
-#     db_data = dict(latest_sensor)
-#     api_data = dict(latest_api)
-#     if "timestamp" in api_data:
-#         del api_data["timestamp"]
-#     db_data.update(api_data)
+#     current_data = _merge_sensor_api(latest_sensor, latest_api)
 
 #     latest_vent = None
 #     try:
@@ -602,45 +670,52 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #     except Exception:
 #         pass
 
+#     latest_vent_exists = latest_vent is not None
+#     vent_before: Optional[dict] = None
+#     vent_after: Optional[dict] = None
+
 #     if latest_vent and latest_vent.get("status_ventilation"):
-#         vent_start_id = latest_vent.get("id")
-#         sensor_before = await repo.get_record_by_id("table_sensor_data", vent_start_id, log_to_api=False) if vent_start_id else None
-#         api_before = await repo.get_record_by_id("api_table", vent_start_id, log_to_api=False) if vent_start_id else None
-
-#         if sensor_before and api_before:
-#             vent_before = dict(sensor_before)
-#             a_before = dict(api_before)
-#             if "timestamp" in a_before:
-#                 del a_before["timestamp"]
-#             vent_before.update(a_before)
-#         else:
-#             vent_before = dict(db_data)
-
+#         # Проветривание идёт: сравниваем момент пуска с текущими данными.
 #         vent_active = True
-#     else:
-#         vent_active = False
-#         vent_before = dict(db_data)
+#         vent_before = await _load_merged_by_id(repo, latest_vent.get("id"))
+#         vent_after = current_data
+#         card_title = "📊 Сравнение показателей цикла"
 
-#     vent_start_time = vent_before.get("timestamp", db_data.get("timestamp", "—"))
-#     vent_now_time = db_data.get("timestamp", "—")
-#     vent_difference_time = get_time_difference_str(str(vent_start_time)[11:16], str(vent_now_time)[11:16])
+#     elif latest_vent:
+#         # Проветривание остановлено: показываем историю последнего цикла.
+#         vent_active = False
+#         start_id = latest_vent.get("id")
+#         stop_plus = latest_vent.get("stop_vent_plus") or 0
+#         stop_id = (start_id + stop_plus) if start_id is not None else None
+#         vent_before = await _load_merged_by_id(repo, start_id)
+#         vent_after = await _load_merged_by_id(repo, stop_id)
+#         start_label = (
+#             vent_before.get("timestamp") if vent_before else latest_vent.get("timestamp", "—")
+#         )
+#         card_title = f"История {start_label}, проветривания"
+
+#     else:
+#         # Проветривания ещё не было.
+#         vent_active = False
+#         vent_after = current_data
+#         card_title = "Проветривание не включалось"
+
+#     if vent_before and vent_after and vent_before.get("timestamp") and vent_after.get("timestamp"):
+#         vent_start_str = _hhmm(vent_before["timestamp"])
+#         vent_now_str = _hhmm(vent_after["timestamp"])
+#         vent_difference_time = get_time_difference_str(vent_start_str, vent_now_str)
+#     else:
+#         vent_start_str = _hhmm(vent_before["timestamp"]) if vent_before and vent_before.get("timestamp") else "—"
+#         vent_now_str = _hhmm(vent_after["timestamp"]) if vent_after and vent_after.get("timestamp") and latest_vent_exists else "—"
+#         vent_difference_time = "—"
 
 #     diffs = {
-#         "diff_basement_temp": safe_diff(db_data.get("basement_temp"), vent_before.get("basement_temp")),
-#         "diff_basement_humi": safe_diff(db_data.get("basement_humi"), vent_before.get("basement_humi")),
-#         "diff_a_basement_humi": safe_diff(db_data.get("a_basement_humi"), vent_before.get("a_basement_humi")),
-#         "diff_floor_temp": safe_diff(db_data.get("floor_temp"), vent_before.get("floor_temp")),
-#         "diff_floor_humi": safe_diff(db_data.get("floor_humi"), vent_before.get("floor_humi")),
-#         "diff_a_floor_humi": safe_diff(db_data.get("a_floor_humi"), vent_before.get("a_floor_humi")),
+#         f"diff_{field}": _diff_or_none(vent_after, vent_before, field)
+#         for field, _kind in _VENT_DIFF_FIELDS
 #     }
-
 #     style_classes = {
-#         "diff_basement_temp_class": "text-blue" if abs(diffs["diff_basement_temp"]) > 0.1 else "text-gray",
-#         "diff_basement_humi_class": "text-green" if diffs["diff_basement_humi"] < -0.5 else "text-red" if diffs["diff_basement_humi"] > 0.5 else "text-gray",
-#         "diff_a_basement_humi_class": "text-green" if diffs["diff_a_basement_humi"] < -0.1 else "text-red" if diffs["diff_a_basement_humi"] > 0.1 else "text-gray",
-#         "diff_floor_temp_class": "text-blue" if abs(diffs["diff_floor_temp"]) > 0.1 else "text-gray",
-#         "diff_floor_humi_class": "text-green" if diffs["diff_floor_humi"] < -0.5 else "text-red" if diffs["diff_floor_humi"] > 0.5 else "text-gray",
-#         "diff_a_floor_humi_class": "text-green" if diffs["diff_a_floor_humi"] < -0.1 else "text-red" if diffs["diff_a_floor_humi"] > 0.1 else "text-gray",
+#         f"diff_{field}_class": _vent_class(diffs[f"diff_{field}"], kind)
+#         for field, kind in _VENT_DIFF_FIELDS
 #     }
 
 #     if vent_active:
@@ -650,9 +725,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #         btn_start_class, btn_stop_class = "btn-start", "btn-disabled"
 #         btn_start_disabled, btn_stop_disabled = "", "disabled"
 
-#     before_data = {f"before_{k}": v for k, v in vent_before.items()}
-#     vent_start_str = str(vent_start_time)[11:16] if len(str(vent_start_time)) >= 16 else str(vent_start_time)
-#     vent_now_str = str(vent_now_time)[11:16] if len(str(vent_now_time)) >= 16 else str(vent_now_time)
+#     before_data = {f"before_{k}": v for k, v in (vent_before or {}).items()}
 
 #     context = {
 #         "website_return_time": website_return_time,
@@ -660,10 +733,14 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #         "btn_stop_class": btn_stop_class,
 #         "btn_start_disabled": btn_start_disabled,
 #         "btn_stop_disabled": btn_stop_disabled,
+#         "vent_active": vent_active,
+#         "latest_vent_exists": latest_vent_exists,
+#         "card_title": card_title,
+#         "is_history_title": (not vent_active and latest_vent_exists),
 #         "vent_start_time": vent_start_str,
 #         "vent_now_time": vent_now_str,
 #         "vent_difference_time": vent_difference_time,
-#         **db_data,
+#         **(vent_after or {}),
 #         **before_data,
 #         **diffs,
 #         **style_classes,
@@ -698,10 +775,12 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 
 #         latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
 #         if latest_api:
-#             reduced_interval_in_seconds = int(latest_api["vent_time_val"] / 3 * 60)
-#             if reduced_interval_in_seconds < 60:
-#                 reduced_interval_in_seconds = 60
-#             dto = SystemSettingsUpdate(interval_seconds=reduced_interval_in_seconds, previous_interval_in_seconds=sys_settings.interval_seconds)
+#             vent_time_val = latest_api.get("vent_time_val") or 0
+#             reduced_interval_in_seconds = max(int(vent_time_val / 3 * 60), 60)
+#             dto = SystemSettingsUpdate(
+#                 interval_seconds=reduced_interval_in_seconds,
+#                 previous_interval_in_seconds=sys_settings.interval_seconds,
+#             )
 #             await repo.update_settings(update_dto=dto)
 
 #     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)
@@ -716,7 +795,7 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #         latest_sensor = await repo.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
 #         if latest_sensor:
 #             stop_vent_plus = latest_sensor["id"] - latest_vent["id"]
-            
+
 #             if stop_vent_plus == 0:
 #                 await repo.delete_record_by_id("ventilation_table", latest_vent["id"], pk_col="id", log_to_api=False)
 #                 api_log.info(f"Удаление записи проветривания (stop_vent_plus=0): id={latest_vent['id']}")
@@ -728,7 +807,10 @@ async def stop_ventilation(repo: BaseRepository = Depends(get_repository)):
 #                     "stop_vent_plus": stop_vent_plus,
 #                 }
 #                 await repo.upsert_record("ventilation_table", data_to_write, pk_col="id", log_to_api=False)
-#                 api_log.info(f"Успешный стоп проветривания: start_id={latest_vent['id']}, stop_id={latest_sensor['id']}, diff={stop_vent_plus}")
+#                 api_log.info(
+#                     f"Успешный стоп проветривания: start_id={latest_vent['id']}, "
+#                     f"stop_id={latest_sensor['id']}, diff={stop_vent_plus}"
+#                 )
 
 #             latest_api = await repo.get_latest_record("api_table", order_by_col="id", log_to_api=False)
 #             if latest_api:

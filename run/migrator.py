@@ -2,9 +2,20 @@
 
 from pathlib import Path
 import sqlite3
-from typing import Any, Dict, List, Set
+import math
+from typing import Any, Dict, List, Set, Optional
 
 import run_program
+
+# Переключатель для включения/выключения расчета абсолютной влажности при миграции
+CALCULATE_ABS_HUMI_ON_MIGRATE = True
+
+
+def calculate_absolute_humidity(temp: float, humi: float) -> float:
+    """Расчет абсолютной влажности (г/м³)."""
+    es = 6.112 * math.exp((17.67 * temp) / (temp + 243.5))
+    e = es * (humi / 100.0)
+    return round((216.7 * e) / (temp + 273.15), 2)
 
 
 # Таблицы, которые не участвуют в хронологической миграции по timestamp.
@@ -12,9 +23,6 @@ not_magrate_tables = {
     "table_sensor_data",
     "settings_table",
     "sqlite_sequence",
-    # "api_table",
-    # "ventilation_table",
-    # "history_of_heating",
     "hourly_coefficients_table",
     "relay_table",
     "programmer_const",
@@ -41,7 +49,6 @@ replacing_tables = {
 
 
 # Поля table_sensor_data, которые обязаны быть REAL (float).
-# Если хотя бы в одном из них не REAL (NULL, текст, BLOB) - строка в новую таблицу не переносится.
 REAL_CHECK_COLUMNS = (
     "street_temp",
     "basement_temp",
@@ -99,17 +106,9 @@ def copy_latest_config_tables(
     copy_tables: Set[str],
     replace_tables: Set[str],
 ) -> None:
-    """Копирует данные конфигурационных таблиц из самого свежего бэкапа.
-
-    - Таблицы из copy_tables: копируются, только если таблица в целевой БД пуста.
-    - Таблицы из replace_tables: копируются всегда (строки с тем же первичным ключом
-      заменяются), так как при создании БД они заполняются значениями по умолчанию.
-      Данные в целевой таблице меняются только после того, как в бэкапе найдены
-      подходящие строки, поэтому значения по умолчанию не теряются.
-    """
+    """Копирует данные конфигурационных таблиц из самого свежего бэкапа."""
     print("\n--- [Конфигурационные таблицы] Проверка и копирование настроек ---")
 
-    # Сортировка бэкапов от самых свежих к старым по названию файла
     sorted_backups = sorted(backup_files, key=lambda p: p.name, reverse=True)
     cursor = target_conn.cursor()
 
@@ -203,6 +202,8 @@ def migrate_primary_table(
     total_skipped = 0
     total_invalid = 0
 
+    abs_humi_cols = {"a_street_humi", "a_basement_humi", "a_floor_humi"}
+
     for backup_path in backup_files:
         try:
             with get_db_connection(backup_path) as backup_conn:
@@ -212,15 +213,16 @@ def migrate_primary_table(
 
                 common_columns = [
                     col for col in target_columns
-                    if col in backup_columns and col.lower() != "id"
+                    if col in backup_columns and col.lower() != "id" and col not in abs_humi_cols
                 ]
-                cols_str = ", ".join(common_columns)
-                placeholders = ", ".join(["?"] * len(common_columns))
 
-                # Проверяем только те поля, которые есть и в целевой таблице, и в этом бэкапе.
+                active_columns = common_columns + [c for c in abs_humi_cols if c in target_columns]
+                select_query_cols = ", ".join(common_columns)
+                placeholders = ", ".join(["?"] * len(active_columns))
+
                 check_columns = [c for c in REAL_CHECK_COLUMNS if c in common_columns]
 
-                query = f"SELECT {cols_str} FROM {table_name} WHERE {date_col} IS NOT NULL ORDER BY {date_col} ASC"
+                query = f"SELECT {select_query_cols} FROM {table_name} WHERE {date_col} IS NOT NULL ORDER BY {date_col} ASC"
                 cursor = backup_conn.cursor()
                 cursor.execute(query)
                 rows = cursor.fetchall()
@@ -232,16 +234,28 @@ def migrate_primary_table(
 
                     if row_date in existing_dates:
                         total_skipped += 1
-                    elif not all(isinstance(row_dict[c], float) for c in check_columns):
-                        # Не добавляем дату в existing_dates: валидная копия этой строки
-                        # из другого бэкапа всё ещё может быть перенесена.
+                    elif check_columns and not all(isinstance(row_dict.get(c), float) for c in check_columns):
                         total_invalid += 1
                     else:
-                        rows_to_insert.append(tuple(row_dict[col] for col in common_columns))
+                        if CALCULATE_ABS_HUMI_ON_MIGRATE:
+                            for prefix in ("street", "basement", "floor"):
+                                ah_col = f"a_{prefix}_humi"
+                                temp_col = f"{prefix}_temp"
+                                humi_col = f"{prefix}_humi"
+                                if ah_col in target_columns:
+                                    t = row_dict.get(temp_col)
+                                    h = row_dict.get(humi_col)
+                                    if t is not None and h is not None:
+                                        row_dict[ah_col] = calculate_absolute_humidity(t, h)
+                                    else:
+                                        row_dict[ah_col] = None
+
+                        rows_to_insert.append(tuple(row_dict.get(col) for col in active_columns))
                         existing_dates.add(row_date)
 
                 if rows_to_insert:
-                    insert_query = f"INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders})"
+                    insert_cols_str = ", ".join(active_columns)
+                    insert_query = f"INSERT INTO {table_name} ({insert_cols_str}) VALUES ({placeholders})"
                     target_conn.executemany(insert_query, rows_to_insert)
                     target_conn.commit()
                     inserted_count = len(rows_to_insert)
@@ -401,3 +415,412 @@ def main(not_migrate: Set[str], copy_tables: Set[str], replace_tables: Set[str])
 
 if __name__ == "__main__":
     main(not_magrate_tables, copying_tables, replacing_tables)
+
+
+
+
+
+
+# # python3.12 run/migrator.py
+
+# from pathlib import Path
+# import sqlite3
+# from typing import Any, Dict, List, Set
+
+# import run_program
+
+
+# # Таблицы, которые не участвуют в хронологической миграции по timestamp.
+# not_magrate_tables = {
+#     "table_sensor_data",
+#     "settings_table",
+#     "sqlite_sequence",
+#     # "api_table",
+#     # "ventilation_table",
+#     # "history_of_heating",
+#     "hourly_coefficients_table",
+#     "relay_table",
+#     "programmer_const",
+#     "programmer_temporarily",
+#     "programmer_week",
+# }
+
+# # Конфигурационные таблицы: копируются из самого свежего бэкапа,
+# # только если в целевой БД они пусты.
+# copying_tables = {
+#     "settings_table",
+#     "relay_table",
+#     "heating_table",
+#     "programmer_const",
+#     "programmer_temporarily",
+#     "programmer_week",
+# }
+
+# # Таблицы, которые заполняются при создании БД (run_program.py), поэтому никогда не пусты.
+# # Копируются из самого свежего непустого бэкапа ВСЕГДА, заменяя текущие строки по первичному ключу.
+# replacing_tables = {
+#     "hourly_coefficients_table",
+# }
+
+
+# # Поля table_sensor_data, которые обязаны быть REAL (float).
+# # Если хотя бы в одном из них не REAL (NULL, текст, BLOB) - строка в новую таблицу не переносится.
+# REAL_CHECK_COLUMNS = (
+#     "street_temp",
+#     "basement_temp",
+#     "floor_temp",
+#     "street_humi",
+#     "basement_humi",
+#     "floor_humi",
+# )
+
+
+# def get_db_connection(path_db: str | Path) -> sqlite3.Connection:
+#     """Создает и возвращает подключение к базе данных SQLite с включенной поддержкой Foreign Keys."""
+#     conn = sqlite3.connect(path_db)
+#     conn.execute("PRAGMA foreign_keys = ON;")
+#     conn.row_factory = sqlite3.Row
+#     return conn
+
+
+# def get_table_columns(conn: sqlite3.Connection, table_name: str) -> List[str]:
+#     """Возвращает список имен всех столбцов указанной таблицы."""
+#     try:
+#         cursor = conn.cursor()
+#         cursor.execute(f"PRAGMA table_info('{table_name}');")
+#         return [row[1] for row in cursor.fetchall()]
+#     except sqlite3.Error as e:
+#         print(f"[Ошибка] Не удалось получить структуру таблицы {table_name}: {e}")
+#         return []
+
+
+# def get_existing_dates(conn: sqlite3.Connection, table_name: str, date_col: str = "timestamp") -> Set[Any]:
+#     """Извлекает все существующие значения даты/времени из целевой таблицы для O(1) проверки дубликатов."""
+#     try:
+#         cursor = conn.cursor()
+#         cursor.execute(f"SELECT {date_col} FROM {table_name} WHERE {date_col} IS NOT NULL")
+#         return {row[0] for row in cursor.fetchall()}
+#     except sqlite3.Error as e:
+#         print(f"[Ошибка] Не удалось получить существующие даты из {table_name}: {e}")
+#         return set()
+
+
+# def get_timestamp_to_id_map(conn: sqlite3.Connection) -> Dict[str, int]:
+#     """Строит словарь соответствий timestamp -> id на основе главной таблицы table_sensor_data."""
+#     try:
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT timestamp, id FROM table_sensor_data WHERE timestamp IS NOT NULL")
+#         return {row[0]: row[1] for row in cursor.fetchall()}
+#     except sqlite3.Error as e:
+#         print(f"[Ошибка] Не удалось построить карту timestamp -> id: {e}")
+#         return {}
+
+
+# def copy_latest_config_tables(
+#     target_conn: sqlite3.Connection,
+#     backup_files: List[Path],
+#     copy_tables: Set[str],
+#     replace_tables: Set[str],
+# ) -> None:
+#     """Копирует данные конфигурационных таблиц из самого свежего бэкапа.
+
+#     - Таблицы из copy_tables: копируются, только если таблица в целевой БД пуста.
+#     - Таблицы из replace_tables: копируются всегда (строки с тем же первичным ключом
+#       заменяются), так как при создании БД они заполняются значениями по умолчанию.
+#       Данные в целевой таблице меняются только после того, как в бэкапе найдены
+#       подходящие строки, поэтому значения по умолчанию не теряются.
+#     """
+#     print("\n--- [Конфигурационные таблицы] Проверка и копирование настроек ---")
+
+#     # Сортировка бэкапов от самых свежих к старым по названию файла
+#     sorted_backups = sorted(backup_files, key=lambda p: p.name, reverse=True)
+#     cursor = target_conn.cursor()
+
+#     for table_name in copy_tables | replace_tables:
+#         is_replace = table_name in replace_tables
+
+#         target_columns = get_table_columns(target_conn, table_name)
+#         if not target_columns:
+#             print(f"[Пропуск] Таблица {table_name} отсутствует в целевой БД.")
+#             continue
+
+#         if not is_replace:
+#             try:
+#                 cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+#                 target_count = cursor.fetchone()[0]
+#             except sqlite3.Error as e:
+#                 print(f"[Ошибка] Не удалось проверить количество записей в целевой таблице {table_name}: {e}")
+#                 continue
+
+#             if target_count > 0:
+#                 print(f"[Пропуск] Таблица {table_name} уже содержит записи ({target_count} шт.). Копирование не требуется.")
+#                 continue
+
+#         copied = False
+#         for backup_path in sorted_backups:
+#             try:
+#                 with get_db_connection(backup_path) as backup_conn:
+#                     backup_columns = get_table_columns(backup_conn, table_name)
+#                     if not backup_columns:
+#                         continue
+
+#                     b_cursor = backup_conn.cursor()
+#                     b_cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+#                     backup_count = b_cursor.fetchone()[0]
+
+#                     if backup_count == 0:
+#                         continue
+
+#                     common_columns = [col for col in target_columns if col in backup_columns]
+#                     if not common_columns:
+#                         continue
+
+#                     cols_str = ", ".join(common_columns)
+#                     placeholders = ", ".join(["?"] * len(common_columns))
+
+#                     b_cursor.execute(f"SELECT {cols_str} FROM {table_name};")
+#                     rows = b_cursor.fetchall()
+
+#                     if rows:
+#                         insert_cmd = "INSERT OR REPLACE" if is_replace else "INSERT"
+#                         insert_query = f"{insert_cmd} INTO {table_name} ({cols_str}) VALUES ({placeholders})"
+#                         target_conn.executemany(insert_query, [tuple(row) for row in rows])
+#                         target_conn.commit()
+#                         action = "заменено/записано" if is_replace else "скопировано"
+#                         print(f"  [+] {table_name}: {action} {len(rows)} записей из самого свежего бэкапа {backup_path.name}.")
+#                         copied = True
+#                         break
+
+#             except sqlite3.Error as e:
+#                 target_conn.rollback()
+#                 print(f"  [Ошибка] Чтение таблицы {table_name} из бэкапа {backup_path.name}: {e}")
+
+#         if not copied:
+#             if is_replace:
+#                 print(f"  [-] {table_name}: подходящих данных в бэкапах не найдено, оставлены текущие значения.")
+#             else:
+#                 print(f"  [-] {table_name}: целевая таблица пуста, но подходящих данных в бэкапах не найдено.")
+
+
+# def migrate_primary_table(
+#     target_conn: sqlite3.Connection,
+#     backup_files: List[Path],
+#     table_name: str = "table_sensor_data",
+# ) -> None:
+#     """Мигрирует основную таблицу сенсоров (table_sensor_data) из бэкапов."""
+#     print(f"\n--- [Главная таблица] Миграция: {table_name} ---")
+#     target_columns = get_table_columns(target_conn, table_name)
+#     if not target_columns:
+#         print(f"[Пропуск] Таблица {table_name} отсутствует в целевой БД.")
+#         return
+
+#     date_col = "timestamp"
+#     if date_col not in target_columns:
+#         print(f"[Предупреждение] Колонка '{date_col}' не найдена в {table_name}.")
+#         return
+
+#     existing_dates = get_existing_dates(target_conn, table_name, date_col)
+#     print(f"[Инфо] Существующих записей в основной БД: {len(existing_dates)}")
+
+#     total_inserted = 0
+#     total_skipped = 0
+#     total_invalid = 0
+
+#     for backup_path in backup_files:
+#         try:
+#             with get_db_connection(backup_path) as backup_conn:
+#                 backup_columns = get_table_columns(backup_conn, table_name)
+#                 if not backup_columns or date_col not in backup_columns:
+#                     continue
+
+#                 common_columns = [
+#                     col for col in target_columns
+#                     if col in backup_columns and col.lower() != "id"
+#                 ]
+#                 cols_str = ", ".join(common_columns)
+#                 placeholders = ", ".join(["?"] * len(common_columns))
+
+#                 # Проверяем только те поля, которые есть и в целевой таблице, и в этом бэкапе.
+#                 check_columns = [c for c in REAL_CHECK_COLUMNS if c in common_columns]
+
+#                 query = f"SELECT {cols_str} FROM {table_name} WHERE {date_col} IS NOT NULL ORDER BY {date_col} ASC"
+#                 cursor = backup_conn.cursor()
+#                 cursor.execute(query)
+#                 rows = cursor.fetchall()
+
+#                 rows_to_insert = []
+#                 for row in rows:
+#                     row_dict = dict(row)
+#                     row_date = row_dict[date_col]
+
+#                     if row_date in existing_dates:
+#                         total_skipped += 1
+#                     elif not all(isinstance(row_dict[c], float) for c in check_columns):
+#                         # Не добавляем дату в existing_dates: валидная копия этой строки
+#                         # из другого бэкапа всё ещё может быть перенесена.
+#                         total_invalid += 1
+#                     else:
+#                         rows_to_insert.append(tuple(row_dict[col] for col in common_columns))
+#                         existing_dates.add(row_date)
+
+#                 if rows_to_insert:
+#                     insert_query = f"INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders})"
+#                     target_conn.executemany(insert_query, rows_to_insert)
+#                     target_conn.commit()
+#                     inserted_count = len(rows_to_insert)
+#                     total_inserted += inserted_count
+#                     print(f"  [+] {backup_path.name}: добавлено {inserted_count} новых записей.")
+
+#         except sqlite3.Error as e:
+#             print(f"  [Ошибка] Чтение/запись файла {backup_path.name}: {e}")
+
+#     print(
+#         f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов: {total_skipped}, "
+#         f"Отброшено (не-REAL в полях датчиков): {total_invalid}"
+#     )
+
+
+# def migrate_dependent_table(
+#     target_conn: sqlite3.Connection,
+#     backup_files: List[Path],
+#     table_name: str,
+#     ts_to_id: Dict[str, int],
+# ) -> None:
+#     """Мигрирует вторичные таблицы, связывая 'id' с ID из table_sensor_data по timestamp."""
+#     print(f"\n--- [Зависимая таблица] Миграция: {table_name} ---")
+#     target_columns = get_table_columns(target_conn, table_name)
+#     if not target_columns:
+#         print(f"[Пропуск] Таблица {table_name} отсутствует в целевой БД.")
+#         return
+
+#     date_col = "timestamp"
+#     if date_col not in target_columns:
+#         print(f"[Пропуск] Колонка '{date_col}' отсутствует в {table_name}.")
+#         return
+
+#     existing_dates = get_existing_dates(target_conn, table_name, date_col)
+#     print(f"[Инфо] Существующих записей в {table_name}: {len(existing_dates)}")
+
+#     has_id_col = "id" in target_columns
+#     total_inserted = 0
+#     total_skipped = 0
+
+#     for backup_path in backup_files:
+#         try:
+#             with get_db_connection(backup_path) as backup_conn:
+#                 backup_columns = get_table_columns(backup_conn, table_name)
+#                 if not backup_columns or date_col not in backup_columns:
+#                     continue
+
+#                 common_non_id = [
+#                     col for col in target_columns
+#                     if col in backup_columns and col.lower() != "id"
+#                 ]
+#                 if not common_non_id:
+#                     continue
+
+#                 insert_columns = ["id"] + common_non_id if has_id_col else common_non_id
+#                 select_cols_str = ", ".join(common_non_id)
+#                 insert_cols_str = ", ".join(insert_columns)
+#                 placeholders = ", ".join(["?"] * len(insert_columns))
+
+#                 query = f"SELECT {select_cols_str} FROM {table_name} WHERE {date_col} IS NOT NULL ORDER BY {date_col} ASC"
+#                 cursor = backup_conn.cursor()
+#                 cursor.execute(query)
+#                 rows = cursor.fetchall()
+
+#                 rows_to_insert = []
+#                 for row in rows:
+#                     row_dict = dict(row)
+#                     row_date = row_dict[date_col]
+
+#                     if row_date in existing_dates:
+#                         total_skipped += 1
+#                     else:
+#                         if has_id_col:
+#                             row_id = ts_to_id.get(row_date)
+#                             if row_id is None:
+#                                 total_skipped += 1
+#                                 continue
+#                             row_tuple = (row_id,) + tuple(row_dict[col] for col in common_non_id)
+#                         else:
+#                             row_tuple = tuple(row_dict[col] for col in common_non_id)
+
+#                         rows_to_insert.append(row_tuple)
+#                         existing_dates.add(row_date)
+
+#                 if rows_to_insert:
+#                     insert_query = f"INSERT INTO {table_name} ({insert_cols_str}) VALUES ({placeholders})"
+#                     target_conn.executemany(insert_query, rows_to_insert)
+#                     target_conn.commit()
+#                     inserted_count = len(rows_to_insert)
+#                     total_inserted += inserted_count
+#                     print(f"  [+] {backup_path.name}: добавлено {inserted_count} новых записей.")
+
+#         except sqlite3.Error as e:
+#             print(f"  [Ошибка] Чтение/запись файла {backup_path.name}: {e}")
+
+#     print(f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов/без ID: {total_skipped}")
+
+
+# def main(not_migrate: Set[str], copy_tables: Set[str], replace_tables: Set[str]) -> None:
+#     print("=" * 80)
+#     print(" ЗАПУСК ПРОЦЕССА МИГРАЦИИ И ОБЪЕДИНЕНИЯ ДАННЫХ")
+#     print("=" * 80)
+
+#     backup_dir = Path(run_program.backup_dir)
+#     target_db_path = run_program.database_file
+
+#     if not backup_dir.exists():
+#         print(f"[Ошибка] Директория с резервными копиями не найдена: {backup_dir}")
+#         return
+
+#     backup_files = sorted(
+#         [
+#             f for f in backup_dir.iterdir()
+#             if f.is_file() and f.suffix in (".sqlite3", ".db")
+#         ]
+#     )
+
+#     if not backup_files:
+#         print("[Инфо] В директории резервных копий нет файлов для миграции.")
+#         return
+
+#     print(f"[Инфо] Найдено файлов резервных копий: {len(backup_files)}")
+
+#     try:
+#         with get_db_connection(target_db_path) as target_conn:
+#             cursor = target_conn.cursor()
+#             cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+#             target_tables = [row[0] for row in cursor.fetchall()]
+
+#             now_db_tables = [
+#                 t for t in target_tables
+#                 if t not in not_migrate and t not in copy_tables and t not in replace_tables
+#             ]
+#             print(f"[Инфо] Таблицы логов для хронологической миграции ({len(now_db_tables)}): {now_db_tables}")
+
+#             # 1. Копирование/замена конфигурационных таблиц
+#             copy_latest_config_tables(target_conn, backup_files, copy_tables, replace_tables)
+
+#             # 2. Миграция главной таблицы датчиков (table_sensor_data)
+#             migrate_primary_table(target_conn, backup_files, "table_sensor_data")
+
+#             # 3. Формирование единой карты timestamp -> id
+#             ts_to_id = get_timestamp_to_id_map(target_conn)
+#             print(f"[Инфо] Кэш timestamp -> ID сформирован ({len(ts_to_id)} записей в карте).")
+
+#             # 4. Миграция остальных зависимых таблиц логов
+#             for table_name in now_db_tables:
+#                 migrate_dependent_table(target_conn, backup_files, table_name, ts_to_id)
+
+#     except sqlite3.Error as e:
+#         print(f"[Критическая ошибка] Ошибка подключения к основной базе данных: {e}")
+
+#     print("\n" + "=" * 80)
+#     print(" МИГРАЦИЯ УСПЕШНО ЗАВЕРШЕНА")
+#     print("=" * 80)
+
+
+# if __name__ == "__main__":
+#     main(not_magrate_tables, copying_tables, replacing_tables)

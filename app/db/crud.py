@@ -192,7 +192,7 @@ def get_sync(
 
     with _use_conn(conn) as c:
         rows = [dict(r) for r in c.execute(sql, tuple(params)).fetchall()]
-    logger.debug(f"get '{table}': {len(rows)} строк.")
+    # logger.debug(f"get '{table}': {len(rows)} строк.")
     return rows
 
 

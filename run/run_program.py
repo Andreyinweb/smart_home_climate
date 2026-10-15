@@ -130,14 +130,15 @@ if __name__ == "__main__":
 
 
     # Создаём таблицу table_sensor_data
+        # Удалил
+        # difference_temp REAL,
+        # average_temp REAL,
     fields_db = """ (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp TEXT NOT NULL,
         street_temp REAL,
         basement_temp REAL,
         floor_temp REAL,
-        difference_temp REAL,
-        average_temp REAL,
         street_humi REAL,
         basement_humi REAL,
         floor_humi REAL,
@@ -180,14 +181,16 @@ if __name__ == "__main__":
 
 
     # Создаём таблицу api_table
+        # Удалил
+        # a_floor_humi REAL,
+        # a_street_humi REAL,
+        # a_basement_humi REAL,
+
     fields_db = """ (
         id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
-        timestamp TEXT,    
-        a_floor_humi REAL,
+        timestamp TEXT,
         dp_floor REAL,
-        a_street_humi REAL,
-        dp_street REAL,
-        a_basement_humi REAL,
+        dp_street REAL,        
         dp_basement REAL,
         humidity_difference REAL,
         vent_status BOOLEAN,

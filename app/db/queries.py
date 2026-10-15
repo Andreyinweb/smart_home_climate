@@ -51,8 +51,8 @@ JOIN weather_site_table w
 WHERE s.sensor_or_calc_street = 1 AND s.street_temp IS NOT NULL AND s.street_humi IS NOT NULL;
 """
 
-# TODO УДАЛИТЬ после рефакторинга.
-# Среднее значение разницы температур по всей таблице датчиков.
-# Параметры: нет.
-# Возвращает: одну строку с колонкой res (None, если таблица пуста).
-AVG_DIFFERENCE_TEMP = "SELECT AVG(difference_temp) AS res FROM table_sensor_data;"
+
+GAS_RECORDS_BY_MONTH = "SELECT * FROM gas_table WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
+MONTHLY_AVG_STREET_TEMP = "SELECT AVG(street_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
+MONTHLY_AVG_BASEMENT_TEMP = "SELECT AVG(basement_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
+

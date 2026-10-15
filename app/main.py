@@ -9,7 +9,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import AppEnv, settings
 import app.services.logs_service as logs_service
-import app.db.repository as db_old # TODO УДАЛИТЬ после рефакторинга.
 import app.db.crud as db
 from app.db import queries
 from app.db.connection import get_db_connection
