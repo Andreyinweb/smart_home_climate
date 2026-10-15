@@ -130,6 +130,10 @@ def build_sensor_record(
             data["sensor_or_calc_basement"] = True
             data["sensor_or_calc_floor"] = False
 
+    data["a_street_humi"] = calculate_absolute_humidity(data["street_temp"], data["street_humi"])
+    data["a_basement_humi"] = calculate_absolute_humidity(data["basement_temp"], data["basement_humi"])
+    data["a_floor_humi"] = calculate_absolute_humidity(data["floor_temp"], data["floor_humi"])
+
     return data
 
 
@@ -149,6 +153,7 @@ def build_api_record(
     f_temp = sensor_data.get("floor_temp", 0.0) or 0.0
     f_humi = sensor_data.get("floor_humi", 0.0) or 0.0
 
+    # TODO Удали после рефакторинга
     a_street = calculate_absolute_humidity(s_temp, s_humi)
     a_basement = calculate_absolute_humidity(b_temp, b_humi)
     a_floor = calculate_absolute_humidity(f_temp, f_humi)
