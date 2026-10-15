@@ -214,7 +214,13 @@ if __name__ == "__main__":
         id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT,
         status_ventilation BOOLEAN,
-        stop_vent_plus INTEGER   
+        stop_vent_plus INTEGER,
+        diff_before REAL,
+        diff_median REAL,
+        diff_end REAL,
+        real_pairs INTEGER,
+        basement_street_start REAL,
+        ah_ratio_median REAL
         )
         """
     create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
@@ -226,7 +232,14 @@ if __name__ == "__main__":
         status_heating BOOLEAN,
         stop_heat_plus INTEGER,
         automation_start BOOLEAN,
-        automation_stop BOOLEAN
+        automation_stop BOOLEAN,
+        diff_before REAL,
+        diff_median REAL,
+        diff_end REAL,
+        real_pairs INTEGER,
+        basement_street_start REAL,
+        ah_ratio_median REAL,
+        floor_temp_rise REAL
         )
         """
     create_table(db_path=database_file, table_name='history_of_heating', fields=fields_db)

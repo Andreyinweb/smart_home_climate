@@ -85,10 +85,7 @@ async def lifespan(app: FastAPI):
                         ble_data["street_humi"] = c_rh
                         ble_data["sensor_or_calc_street"] = c_flag
 
-                    avg_rows = await db.query(queries.AVG_DIFFERENCE_TEMP)
-                    avg_res = avg_rows[0]["res"] if avg_rows else None
-                    avg_diff_temp = round(avg_res, 2) if avg_res is not None else 0.0
-                    sensor_record = build_sensor_record(ble_data, sys_settings, avg_diff_temp)
+                    sensor_record = build_sensor_record(ble_data, sys_settings)
                     sensor_record["id"] = now_id
                     await db.upsert("table_sensor_data", [sensor_record])
 
