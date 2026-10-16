@@ -9,11 +9,15 @@ exec 3>&1 4>&2
 
 DIR_PATH="$PWD"
 SERVER_MODE=false
+PREVIOUS_MODE=false
 CONFIG_FILE=""
 
 # Разбор аргументов командной строки
 for arg in "$@"; do
     if [ "$arg" = "-server" ]; then
+        SERVER_MODE=true
+    elif [ "$arg" = "-previous" ]; then
+        PREVIOUS_MODE=true
         SERVER_MODE=true
     elif [ -z "$CONFIG_FILE" ] && [ "$arg" != "-server" ]; then
         CONFIG_FILE="$arg"
@@ -21,7 +25,11 @@ for arg in "$@"; do
 done
 
 if [ "$SERVER_MODE" = true ]; then
-    ENV_FILE="/etc/smart_home_climate/config.env"
+    if [ "$PREVIOUS_MODE" = true ]; then
+        ENV_FILE="/etc/smart_home_climate/previous.env"
+    else
+        ENV_FILE="/etc/smart_home_climate/config.env"
+    fi
 else
     if [ -n "$CONFIG_FILE" ]; then
         ENV_FILE="$CONFIG_FILE"
