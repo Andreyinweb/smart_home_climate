@@ -1,14 +1,17 @@
 # app/routers/graphs_router.py
 
 import logging
-from typing import Any
+import os
+from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.dependencies import get_template_path, get_templates
 from app.services.graph_service import (
+    update_abs_humidity_graph_cache_if_needed,
+    update_gas_graph_cache_if_needed,
     update_humidity_graph_cache_if_needed,
     update_temperature_graph_cache_if_needed,
 )
@@ -20,33 +23,52 @@ router = APIRouter(
 )
 
 
-@router.get("/graphs/temperature", response_class=HTMLResponse, summary="График температуры")
-async def get_temperature_page(
+@router.get("/graphs", response_class=HTMLResponse, summary="Графики климата и газа")
+async def get_graphs_page(
     request: Request,
     background_tasks: BackgroundTasks,
+    graph_type: str = Query("temperature", description="Тип графика: temperature, humidity, abs_humidity, gas"),
+    target_date: Optional[str] = Query(None, description="Дата в формате YYYY-MM-DD"),
+    target_month: Optional[str] = Query(None, description="Месяц в формате YYYY-MM"),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> Any:
-    """Страница с графиком температуры."""
-    api_log.debug("GET /graphs/temperature -> открытие страницы графика температуры")
-    background_tasks.add_task(update_temperature_graph_cache_if_needed)
+    """Единая страница для просмотра всех графиков с выбором периода."""
+    api_log.debug(f"GET /graphs -> тип: {graph_type}, дата: {target_date}, месяц: {target_month}")
+
+    # Определяем имя базового файла и вызываем соответствующую задачу
+    if graph_type == "humidity":
+        filename = "humidity.png"
+        background_tasks.add_task(update_humidity_graph_cache_if_needed, target_date=target_date, target_month=target_month)
+    elif graph_type == "abs_humidity":
+        filename = "abs_humidity.png"
+        background_tasks.add_task(update_abs_humidity_graph_cache_if_needed, target_date=target_date, target_month=target_month)
+    elif graph_type == "gas":
+        filename = "gas.png"
+        background_tasks.add_task(update_gas_graph_cache_if_needed, target_date=target_date, target_month=target_month)
+    else:
+        graph_type = "temperature"
+        filename = "temperature.png"
+        background_tasks.add_task(update_temperature_graph_cache_if_needed, target_date=target_date, target_month=target_month)
+
+    # Формируем имя файла с учетом кэша за сутки или месяц (как сохраняет graph_service)
+    if target_date:
+        base, ext = os.path.splitext(filename)
+        display_filename = f"{base}_{target_date}{ext}"
+    elif target_month:
+        base, ext = os.path.splitext(filename)
+        display_filename = f"{base}_{target_month}{ext}"
+    else:
+        display_filename = filename
+
+    graph_url = f"/static/graphs/{display_filename}"
+
     return templates.TemplateResponse(
         request=request,
-        name=get_template_path("temperature.html", request),
-        context={"graph_url": "/static/graphs/temperature.png"},
-    )
-
-
-@router.get("/graphs/humidity", response_class=HTMLResponse, summary="График влажности")
-async def get_humidity_page(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    templates: Jinja2Templates = Depends(get_templates),
-) -> Any:
-    """Страница с графиком влажности."""
-    api_log.debug("GET /graphs/humidity -> открытие страницы графика влажности")
-    background_tasks.add_task(update_humidity_graph_cache_if_needed)
-    return templates.TemplateResponse(
-        request=request,
-        name=get_template_path("humidity.html", request),
-        context={"graph_url": "/static/graphs/humidity.png"},
+        name=get_template_path("graph.html", request),
+        context={
+            "graph_url": graph_url,
+            "graph_type": graph_type,
+            "target_date": target_date or "",
+            "target_month": target_month or "",
+        },
     )

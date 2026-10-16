@@ -8,7 +8,8 @@ import subprocess
 from typing import Optional
 
 from app.core.config import settings
-import app.db.repository as db
+from app.core.db_settings import get_settings_db
+import app.db.crud as db
 
 logger = logging.getLogger("climat_app.relay_service")
 
@@ -180,7 +181,8 @@ class RelayController:
         Включает котел с проверкой минимального времени простоя (по умолчанию 180 сек / 3 мин).
         При успешном включении записывает timestamp_start в relay_table (id=1).
         """
-        record = await db.get_record_by_id("relay_table", 1, pk_col="id")
+        rows = await db.get("relay_table", pk=1, pk_col="id")
+        record = rows[0] if rows else None
         now = datetime.now()
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -206,7 +208,7 @@ class RelayController:
                 "timestamp_start": now_str,
                 "timestamp_stop": stop_ts,
             }
-            await db.upsert_record("relay_table", relay_data, pk_col="id")
+            await db.upsert("relay_table", [relay_data], pk_col="id")
             logger.info(f"[turn_on] Зафиксирован запуск котла в relay_table (id=1): timestamp_start={now_str}")
         return success
 
@@ -219,7 +221,8 @@ class RelayController:
         """
         now = datetime.now()
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-        record = await db.get_record_by_id("relay_table", 1, pk_col="id")
+        rows = await db.get("relay_table", pk=1, pk_col="id")
+        record = rows[0] if rows else None
 
         if stop_programm == 0:
             if record and record.get("timestamp_start"):
@@ -244,17 +247,19 @@ class RelayController:
                 "timestamp_start": start_ts,
                 "timestamp_stop": now_str,
             }
-            await db.upsert_record("relay_table", relay_data, pk_col="id")
+            await db.upsert("relay_table", [relay_data], pk_col="id")
             logger.info(
                 f"[turn_off] Зафиксирована остановка котла в relay_table (id=1): "
                 f"timestamp_stop={now_str} (stop_programm={stop_programm})"
             )
             return True
         return False
+
     async def verification_relay(self):
         # Сверка и синхронизация фактического состояния USB-реле с heating_table
         try:
-            latest_heat = await db.get_latest_record("heating_table", order_by_col="id", log_to_api=False)
+            rows = await db.get("heating_table", order_col="id", limit=1)
+            latest_heat = rows[0] if rows else None
             target_heat_status = bool(latest_heat.get("status_heating")) if latest_heat else False
 
             actual_relay_state = await self.get_state()
@@ -274,4 +279,3 @@ class RelayController:
                         logger.info(f"[verification_relay] Состояние реле приведено к status_heating={target_heat_status}.")
         except Exception as e:
             logger.error(f"[verification_relay] Ошибка при сверке состояния реле котла: {e}")
-        

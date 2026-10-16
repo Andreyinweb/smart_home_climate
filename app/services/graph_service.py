@@ -7,17 +7,18 @@ import os
 from typing import Any, Dict, List, Optional
 
 import matplotlib
-matplotlib.use("Agg")  # Фоновый режим без GUI
+matplotlib.use("Agg")
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-import app.db.repository as db
+import app.db.crud as db
+from app.core.db_settings import get_settings_db
+from app.db import queries
 
 work_log = logging.getLogger("climat_app.services.graph_service")
 api_log = logging.getLogger("api_app.services.graph_service")
 
-_temp_graph_lock = asyncio.Lock()
-_hum_graph_lock = asyncio.Lock()
+_graph_lock = asyncio.Lock()
 
 
 def sample_points_to_target(
@@ -27,22 +28,11 @@ def sample_points_to_target(
     target_min: int = 48,
     target_max: int = 50,
 ) -> List[Dict[str, Any]]:
-    """Отбирает из списка замеров от 48 до 50 ключевых и равномерно распределенных точек с сохранением пиков."""
     if not data_rows:
-        work_log.debug("[sample_points_to_target] Передан пустой список data_rows.")
         return []
 
     total = len(data_rows)
-    work_log.debug(
-        f"[sample_points_to_target] Старт сэмплирования. Всего записей: {total}, "
-        f"целевой диапазон: [{target_min}..{target_max}]"
-    )
-
     if total <= target_min:
-        work_log.debug(
-            f"[sample_points_to_target] Размер данных ({total}) <= target_min ({target_min}). "
-            f"Сэмплирование не требуется."
-        )
         return data_rows
 
     id_to_idx = {
@@ -51,11 +41,8 @@ def sample_points_to_target(
         if "id" in row and row["id"] is not None
     }
 
-    mandatory = set()
-    mandatory.add(0)
-    mandatory.add(total - 1)
+    mandatory = {0, total - 1}
 
-    # 1. Точки переключения статусов (начало/конец процессов)
     prev_v = None
     prev_h = None
     for idx, row in enumerate(data_rows):
@@ -70,15 +57,14 @@ def sample_points_to_target(
         prev_v = v
         prev_h = h
 
-    # 2. Точки из таблиц событий
     if vent_events:
         for ve in vent_events:
             v_start = ve.get("id")
             v_plus = ve.get("stop_vent_plus", 0) or 0
             v_stop = (v_start + v_plus) if (v_start is not None and v_plus > 0) else None
-            if v_start is not None and v_start in id_to_idx:
+            if v_start in id_to_idx:
                 mandatory.add(id_to_idx[v_start])
-            if v_stop is not None and v_stop in id_to_idx:
+            if v_stop in id_to_idx:
                 mandatory.add(id_to_idx[v_stop])
 
     if heat_events:
@@ -86,25 +72,27 @@ def sample_points_to_target(
             h_start = he.get("id")
             h_plus = he.get("stop_heat_plus", 0) or 0
             h_stop = (h_start + h_plus) if (h_start is not None and h_plus > 0) else None
-            if h_start is not None and h_start in id_to_idx:
+            if h_start in id_to_idx:
                 mandatory.add(id_to_idx[h_start])
-            if h_stop is not None and h_stop in id_to_idx:
+            if h_stop in id_to_idx:
                 mandatory.add(id_to_idx[h_stop])
 
-    # 3. Поиск пиков (min/max) внутри интервалов отопления и проветривания
     sensor_keys = [
         "street_temp", "basement_temp", "floor_temp",
-        "street_humi", "basement_humi", "floor_humi"
+        "street_humi", "basement_humi", "floor_humi",
+        "a_street_humi", "a_basement_humi", "a_floor_humi",
+        "gas_per_hour", "coefficient_gas"
     ]
 
     def add_span_extrema(span_indices: List[int]):
         if not span_indices:
             return
         for key in sensor_keys:
-            min_i = min(span_indices, key=lambda i: data_rows[i].get(key, 0.0))
-            max_i = max(span_indices, key=lambda i: data_rows[i].get(key, 0.0))
-            mandatory.add(min_i)
-            mandatory.add(max_i)
+            if any(key in data_rows[i] for i in span_indices):
+                min_i = min(span_indices, key=lambda i: data_rows[i].get(key, 0.0) or 0.0)
+                max_i = max(span_indices, key=lambda i: data_rows[i].get(key, 0.0) or 0.0)
+                mandatory.add(min_i)
+                mandatory.add(max_i)
 
     current_span = []
     for idx, row in enumerate(data_rows):
@@ -120,32 +108,19 @@ def sample_points_to_target(
         add_span_extrema(current_span)
 
     mandatory_indices = sorted(list(mandatory))
-    work_log.debug(f"[sample_points_to_target] Обязательных точек для сохранения: {len(mandatory_indices)}")
 
-    # 4. Если обязательных точек больше target_max — прореживаем их
     if len(mandatory_indices) > target_max:
-        work_log.debug(
-            f"[sample_points_to_target] Число обязательных точек ({len(mandatory_indices)}) "
-            f"> target_max ({target_max}). Прореживаем."
-        )
         first = mandatory_indices[0]
         last = mandatory_indices[-1]
         middle = mandatory_indices[1:-1]
-        step = len(middle) / (target_max - 2)
+        step = len(middle) / (target_max - 2) if len(middle) > 0 else 1
         pruned_middle = [middle[int(i * step)] for i in range(target_max - 2)]
-        selected_indices = sorted(list(set([first] + pruned_middle + [last])))
-        work_log.debug(f"[sample_points_to_target] Итог прореживания: {len(selected_indices)} точек.")
-        return [data_rows[i] for i in selected_indices]
+        return [data_rows[i] for i in sorted(list(set([first] + pruned_middle + [last])))]
 
-    # 5. Добор промежуточных точек до target_min
     selected_indices = set(mandatory_indices)
     needed = target_min - len(selected_indices)
 
     if needed > 0:
-        work_log.debug(
-            f"[sample_points_to_target] Добираем {needed} промежуточных точек "
-            f"для достижения target_min ({target_min})."
-        )
         candidates = [i for i in range(total) if i not in selected_indices]
         if candidates:
             step = len(candidates) / needed
@@ -155,22 +130,12 @@ def sample_points_to_target(
 
     final_indices = sorted(list(selected_indices))
 
-    if len(final_indices) < target_min and len(final_indices) < total:
-        for i in range(total):
-            if i not in selected_indices:
-                selected_indices.add(i)
-                if len(selected_indices) >= target_min or len(selected_indices) >= total:
-                    break
-        final_indices = sorted(list(selected_indices))
-
     if len(final_indices) > target_max:
-        work_log.debug(f"[sample_points_to_target] Корректируем выборку под target_max ({target_max}).")
         middle_candidates = [i for i in final_indices if i not in mandatory]
         while len(final_indices) > target_max and middle_candidates:
             rem = middle_candidates.pop(len(middle_candidates) // 2)
             final_indices.remove(rem)
 
-    work_log.debug(f"[sample_points_to_target] Итоговое количество точек: {len(final_indices)}")
     return [data_rows[i] for i in final_indices]
 
 
@@ -180,12 +145,9 @@ def get_event_spans(
     start_key: str = "id",
     plus_key: str = "stop_vent_plus",
 ) -> List[tuple]:
-    """Формирует список интервалов (dt_start, dt_end) для подсветки активностей."""
-    if not data_rows:
-        work_log.debug(f"[get_event_spans] [{start_key}] data_rows пуст.")
+    """Формирует список интервалов (dt_start, dt_end) с устойчивым поиском по ID."""
+    if not data_rows or not events:
         return []
-
-    work_log.debug(f"[get_event_spans] Анализ событий ({start_key} -> {plus_key}). Событий: {len(events or [])}")
 
     def parse_dt(ts: Any) -> datetime:
         if isinstance(ts, datetime):
@@ -205,7 +167,6 @@ def get_event_spans(
             id_to_dt[r_id] = parse_dt(r_ts)
 
     if not id_to_dt:
-        work_log.debug(f"[get_event_spans] [{start_key}] Не удалось составить карту id -> timestamp.")
         return []
 
     sorted_ids = sorted(id_to_dt.keys())
@@ -214,63 +175,59 @@ def get_event_spans(
     min_dt = id_to_dt[min_id]
     max_dt = id_to_dt[max_id]
 
+    def get_dt(target_id: int) -> datetime:
+        if target_id in id_to_dt:
+            return id_to_dt[target_id]
+        if target_id <= min_id:
+            return min_dt
+        if target_id >= max_id:
+            return max_dt
+        # Находим ближайший ID в словаре
+        closest_id = min(sorted_ids, key=lambda x: abs(x - target_id))
+        return id_to_dt[closest_id]
+
     spans = []
-    if events:
-        for ev in events:
-            start_id = ev.get(start_key)
-            plus_val = ev.get(plus_key, 0) or 0
-            stop_id = (start_id + plus_val) if (start_id is not None and plus_val > 0) else 0
+    for ev in events:
+        start_id = ev.get(start_key)
+        plus_val = ev.get(plus_key, 0) or 0
+        stop_id = (start_id + plus_val) if (start_id is not None and plus_val > 0) else 0
 
-            if not start_id:
-                continue
+        if start_id is None:
+            continue
 
-            if stop_id and stop_id != 0 and stop_id < min_id:
-                continue
-            if start_id > max_id:
-                continue
+        if stop_id and stop_id < min_id:
+            continue
+        if start_id > max_id:
+            continue
 
-            if start_id in id_to_dt:
-                dt_start = id_to_dt[start_id]
-            elif start_id < min_id:
-                dt_start = min_dt
-            else:
-                continue
+        dt_start = get_dt(start_id)
+        dt_end = get_dt(stop_id) if stop_id else max_dt
 
-            if stop_id and stop_id in id_to_dt:
-                dt_end = id_to_dt[stop_id]
-            elif stop_id == 0 or stop_id > max_id or not stop_id:
-                dt_end = max_dt
-            else:
-                continue
+        if dt_start < dt_end:
+            spans.append((dt_start, dt_end))
 
-            if dt_start < dt_end:
-                spans.append((dt_start, dt_end))
-
-    work_log.debug(f"[get_event_spans] [{start_key}] Сформировано временных интервалов: {len(spans)}")
     return spans
 
 
-def render_temperature_graph(
+def render_metric_graph(
     data_rows: List[Dict[str, Any]],
-    output_dir: str = "static/graphs",
+    metrics_config: List[Dict[str, Any]],
+    title_main: str,
+    output_path: str,
     vent_events: Optional[List[Dict[str, Any]]] = None,
     heat_events: Optional[List[Dict[str, Any]]] = None,
+    target_lines: Optional[Dict[str, float]] = None,
 ) -> None:
-    """Отрисовка и сохранение PNG-графика температуры."""
     if not data_rows:
-        work_log.warning("[render_temperature_graph] Отмена отрисовки: передан пустой список data_rows.")
+        work_log.warning(f"[render_metric_graph] Отмена отрисовки '{title_main}': передан пустой список данных.")
         return
-
-    work_log.debug(f"[render_temperature_graph] Старт отрисовки. Строк: {len(data_rows)}, Директория: {output_dir}")
 
     sampled_rows = sample_points_to_target(
         data_rows, vent_events, heat_events, target_min=200, target_max=210
     )
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     timestamps = []
-    st_temps, bs_temps, fl_temps = [], [], []
-
     for row in sampled_rows:
         ts = row.get("timestamp")
         if isinstance(ts, str):
@@ -282,11 +239,7 @@ def render_temperature_graph(
             dt = ts
         else:
             dt = datetime.now()
-
         timestamps.append(dt)
-        st_temps.append(row.get("street_temp", 0.0))
-        bs_temps.append(row.get("basement_temp", 0.0))
-        fl_temps.append(row.get("floor_temp", 0.0))
 
     vent_spans = get_event_spans(vent_events or [], data_rows, "id", "stop_vent_plus")
     heat_spans = get_event_spans(heat_events or [], data_rows, "id", "stop_heat_plus")
@@ -294,42 +247,54 @@ def render_temperature_graph(
     start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
     end_str = timestamps[-1].strftime("%d.%m.%Y %H:%M")
 
-    date_fmt = mdates.DateFormatter("%d.%m\n%H:%M")
-    locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
-
-    fig_temp, (ax_st_t, ax_bs_t, ax_fl_t) = plt.subplots(
-        3, 1, figsize=(11, 9), sharex=True, gridspec_kw={"hspace": 0.45}
+    n_panels = len(metrics_config)
+    fig, axes = plt.subplots(
+        n_panels, 1, figsize=(11, 3 * n_panels), sharex=True, gridspec_kw={"hspace": 0.45}
     )
-    fig_temp.suptitle(
-        f"График температуры (°C) [{len(sampled_rows)} точек]\nПериод: {start_str} — {end_str}",
+    if n_panels == 1:
+        axes = [axes]
+
+    fig.suptitle(
+        f"{title_main} [{len(sampled_rows)} точек]\nПериод: {start_str} — {end_str}",
         fontsize=12,
         fontweight="bold",
     )
 
-    ax_st_t.plot(timestamps, st_temps, color="#2ecc71", linewidth=1.8, label="Улица", marker="o", markersize=3)
-    ax_st_t.set_title("Датчик: Улица", fontsize=10, loc="left", color="#27ae60", fontweight="bold")
-    ax_st_t.set_ylabel("°C")
+    date_fmt = mdates.DateFormatter("%d.%m\n%H:%M")
+    locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
 
-    ax_bs_t.plot(timestamps, bs_temps, color="#2980b9", linewidth=1.8, label="Подвал", marker="o", markersize=3)
-    ax_bs_t.set_title("Датчик: Подвал", fontsize=10, loc="left", color="#1f618d", fontweight="bold")
-    ax_bs_t.set_ylabel("°C")
+    for ax, config in zip(axes, metrics_config):
+        key = config.get("key")
+        label = config.get("label", key)
+        color = config.get("color", "#2980b9")
+        unit = config.get("unit", "")
 
-    ax_fl_t.plot(timestamps, fl_temps, color="#e74c3c", linewidth=1.8, label="Пол", marker="o", markersize=3)
-    ax_fl_t.set_title("Датчик: Пол", fontsize=10, loc="left", color="#c0392b", fontweight="bold")
-    ax_fl_t.set_ylabel("°C")
+        values = [row.get(key, 0.0) or 0.0 for row in sampled_rows]
+        ax.plot(timestamps, values, color=color, linewidth=1.8, label=label, marker="o", markersize=3)
+        ax.set_title(f"Метрика: {label}", fontsize=10, loc="left", color=color, fontweight="bold")
+        if unit:
+            ax.set_ylabel(unit)
 
-    for ax, vals in zip((ax_st_t, ax_bs_t, ax_fl_t), (st_temps, bs_temps, fl_temps)):
+        if target_lines and key in target_lines:
+            ax.axhline(
+                y=target_lines[key],
+                color="#8e44ad",
+                linestyle="--",
+                linewidth=1.8,
+                zorder=5,
+            )
+
         for i, (v_start, v_end) in enumerate(vent_spans):
             ax.axvspan(v_start, v_end, color="#3498db", alpha=0.2, label="Проветривание" if i == 0 else "")
 
         for i, (h_start, h_end) in enumerate(heat_spans):
             ax.axvspan(h_start, h_end, color="#e67e22", alpha=0.22, label="Отопление" if i == 0 else "")
 
-        if vals:
-            latest_val = vals[-1]
-            ax.plot(timestamps[-1], latest_val, marker="*", markersize=9, color="#c0392b", zorder=6)
+        if values:
+            latest_val = values[-1]
+            ax.plot(timestamps[-1], latest_val, marker="*", markersize=9, color=color, zorder=6)
             ax.annotate(
-                f"{latest_val:.1f}°C",
+                f"{latest_val:.1f}{unit}",
                 xy=(timestamps[-1], latest_val),
                 xytext=(-15, 8),
                 textcoords="offset points",
@@ -344,303 +309,174 @@ def render_temperature_graph(
         ax.grid(True, linestyle=":", alpha=0.6)
         ax.tick_params(axis="x", rotation=0, labelsize=8)
 
-    temp_path = os.path.join(output_dir, "temperature.png")
-    temp_tmp = temp_path + ".tmp"
-    fig_temp.savefig(temp_tmp, format="png", dpi=110, bbox_inches="tight")
-    plt.close(fig_temp)
-    os.replace(temp_tmp, temp_path)
-    work_log.info(f"[render_temperature_graph] Сохранен файл графика температуры: {temp_path}")
+    tmp_path = output_path + ".tmp"
+    fig.savefig(tmp_path, format="png", dpi=110, bbox_inches="tight")
+    plt.close(fig)
+    os.replace(tmp_path, output_path)
+    work_log.info(f"[render_metric_graph] Сохранен график: {output_path}")
 
 
-def render_humidity_graph(
-    data_rows: List[Dict[str, Any]],
-    output_dir: str = "static/graphs",
-    vent_events: Optional[List[Dict[str, Any]]] = None,
-    heat_events: Optional[List[Dict[str, Any]]] = None,
-    target_floor_humi: Optional[float] = None,
-) -> None:
-    """Отрисовка и сохранение PNG-графика влажности."""
-    if not data_rows:
-        work_log.warning("[render_humidity_graph] Отмена отрисовки: передан пустой список data_rows.")
-        return
-
-    work_log.debug(f"[render_humidity_graph] Старт отрисовки. Строк: {len(data_rows)}, Директория: {output_dir}")
-
-    sampled_rows = sample_points_to_target(
-        data_rows, vent_events, heat_events, target_min=200, target_max=210
-    )
-    os.makedirs(output_dir, exist_ok=True)
-
-    timestamps = []
-    st_hums, bs_hums, fl_hums = [], [], []
-
-    for row in sampled_rows:
-        ts = row.get("timestamp")
-        if isinstance(ts, str):
-            try:
-                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M")
-        elif isinstance(ts, datetime):
-            dt = ts
-        else:
-            dt = datetime.now()
-
-        timestamps.append(dt)
-        st_hums.append(row.get("street_humi", 0.0))
-        bs_hums.append(row.get("basement_humi", 0.0))
-        fl_hums.append(row.get("floor_humi", 0.0))
-
-    vent_spans = get_event_spans(vent_events or [], data_rows, "id", "stop_vent_plus")
-    heat_spans = get_event_spans(heat_events or [], data_rows, "id", "stop_heat_plus")
-
-    start_str = timestamps[0].strftime("%d.%m.%Y %H:%M")
-    end_str = timestamps[-1].strftime("%d.%m.%Y %H:%M")
-
-    date_fmt = mdates.DateFormatter("%d.%m\n%H:%M")
-    locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
-
-    fig_hum, (ax_st_h, ax_bs_h, ax_fl_h) = plt.subplots(
-        3, 1, figsize=(11, 9), sharex=True, gridspec_kw={"hspace": 0.45}
-    )
-    fig_hum.suptitle(
-        f"График влажности (%) [{len(sampled_rows)} точек]\nПериод: {start_str} — {end_str}",
-        fontsize=12,
-        fontweight="bold",
-    )
-
-    ax_st_h.plot(timestamps, st_hums, color="#27ae60", linewidth=1.8, label="Улица", marker="o", markersize=3)
-    ax_st_h.set_title("Датчик: Улица", fontsize=10, loc="left", color="#27ae60", fontweight="bold")
-    ax_st_h.set_ylabel("%")
-
-    ax_bs_h.plot(timestamps, bs_hums, color="#2980b9", linewidth=1.8, label="Подвал", marker="o", markersize=3)
-    ax_bs_h.set_title("Датчик: Подвал", fontsize=10, loc="left", color="#1f618d", fontweight="bold")
-    ax_bs_h.set_ylabel("%")
-
-    ax_fl_h.plot(timestamps, fl_hums, color="#e74c3c", linewidth=1.8, label="Пол", marker="o", markersize=3)
-    ax_fl_h.set_title("Датчик: Пол", fontsize=10, loc="left", color="#c0392b", fontweight="bold")
-    ax_fl_h.set_ylabel("%")
-
-    if target_floor_humi is not None and target_floor_humi > 0:
-        ax_fl_h.axhline(
-            y=target_floor_humi,
-            color="#8e44ad",
-            linestyle="--",
-            linewidth=1.8,
-            zorder=5,
-        )
-
-    for ax, vals in zip((ax_st_h, ax_bs_h, ax_fl_h), (st_hums, bs_hums, fl_hums)):
-        for i, (v_start, v_end) in enumerate(vent_spans):
-            ax.axvspan(v_start, v_end, color="#3498db", alpha=0.2, label="Проветривание" if i == 0 else "")
-
-        for i, (h_start, h_end) in enumerate(heat_spans):
-            ax.axvspan(h_start, h_end, color="#e67e22", alpha=0.22, label="Отопление" if i == 0 else "")
-
-        if vals:
-            latest_val = vals[-1]
-            ax.plot(timestamps[-1], latest_val, marker="*", markersize=9, color="#2980b9", zorder=6)
-            ax.annotate(
-                f"{latest_val:.1f}%",
-                xy=(timestamps[-1], latest_val),
-                xytext=(-15, 8),
-                textcoords="offset points",
-                fontsize=8,
-                fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.2", fc="#ffffff", ec="#7f8c8d", alpha=0.9),
-            )
-
-        ax.tick_params(labelbottom=True)
-        ax.xaxis.set_major_formatter(date_fmt)
-        ax.xaxis.set_major_locator(locator)
-        ax.grid(True, linestyle=":", alpha=0.6)
-        ax.tick_params(axis="x", rotation=0, labelsize=8)
-
-    hum_path = os.path.join(output_dir, "humidity.png")
-    hum_tmp = hum_path + ".tmp"
-    fig_hum.savefig(hum_tmp, format="png", dpi=110, bbox_inches="tight")
-    plt.close(fig_hum)
-    os.replace(hum_tmp, hum_path)
-    work_log.info(f"[render_humidity_graph] Сохранен файл графика влажности: {hum_path}")
-
-
-async def update_temperature_graph_cache_if_needed() -> Optional[bool]:
-    """Асинхронная проверка появления новых данных или отсутствия файла и перерисовка графика температуры."""
-    if _temp_graph_lock.locked():
-        work_log.debug("[update_temperature_graph_cache_if_needed] Расчет графика температуры уже выполняется. Запрос отклонен.")
+async def update_graph_cache_if_needed(
+    graph_type: str,
+    output_filename: str,
+    title: str,
+    metrics_config: List[Dict[str, Any]],
+    id_field: Optional[str] = None,
+    target_date: Optional[str] = None,
+    target_month: Optional[str] = None,
+) -> Optional[bool]:
+    if _graph_lock.locked():
         return None
 
-    async with _temp_graph_lock:
+    async with _graph_lock:
         try:
-            work_log.debug("[update_temperature_graph_cache_if_needed] Проверка необходимости обновления графика температуры...")
-            latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-            if not latest_sensor or "id" not in latest_sensor:
-                work_log.debug("[update_temperature_graph_cache_if_needed] Таблица table_sensor_data пуста.")
-                return False
-
-            max_sensor_id = latest_sensor["id"]
-
-            latest_api = await db.get_latest_record("api_table", order_by_col="id", log_to_api=False)
-            
-            # Безопасное извлечение с поддержкой None / NULL
-            raw_id = latest_api.get("last_graph_temperature_id") if latest_api else None
-            last_processed_id = raw_id if raw_id is not None else 0
-
-            temp_file_exists = os.path.exists("static/graphs/temperature.png")
-
-            if max_sensor_id > last_processed_id or not temp_file_exists:
-                work_log.info(
-                    f"[update_temperature_graph_cache_if_needed] Запуск генерации графика температуры "
-                    f"(новые данные: {max_sensor_id > last_processed_id}, отсутствует файл: {not temp_file_exists})..."
-                )
-
-                sensor_data = (
-                    await asyncio.to_thread(db._get_sensor_data_for_graphs_sync, 24)
-                    if hasattr(db, "_get_sensor_data_for_graphs_sync")
-                    else []
-                )
-
-                if not sensor_data:
-                    work_log.debug("[update_temperature_graph_cache_if_needed] _get_sensor_data_for_graphs_sync вернул пустой результат, пробуем get_sensor_graph_points...")
-                    points = await db.get_sensor_graph_points(hours=24, log_to_api=False)
-                    sensor_data = [p.model_dump() for p in points]
-
-                vent_events = await db.fetch_range("ventilation_table", order_asc=True, log_to_api=False)
-                heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
-
-                if sensor_data:
-                    await asyncio.to_thread(
-                        render_temperature_graph,
-                        sensor_data,
-                        "static/graphs",
-                        vent_events,
-                        heat_events,
-                    )
-
-                    if latest_api and "id" in latest_api:
-                        api_record = dict(latest_api)
-                        api_record["last_graph_temperature_id"] = max_sensor_id
-                    else:
-                        api_record = {
-                            "id": max_sensor_id,
-                            "last_graph_temperature_id": max_sensor_id,
-                        }
-
-                    await db.upsert_record(
-                        "api_table",
-                        api_record,
-                        pk_col="id",
-                        log_to_api=False,
-                    )
-                    work_log.info(f"График температуры успешно обновлен для sensor_id={max_sensor_id}")
-                    return True
-                else:
-                    work_log.warning("[update_temperature_graph_cache_if_needed] Данные за 24 часа отсутствуют. Отрисовка пропущена.")
+            if target_date:
+                base_name, ext = os.path.splitext(output_filename)
+                current_filename = f"{base_name}_{target_date}{ext}"
+            elif target_month:
+                base_name, ext = os.path.splitext(output_filename)
+                current_filename = f"{base_name}_{target_month}{ext}"
             else:
-                work_log.debug("[update_temperature_graph_cache_if_needed] Актуальный график температуры уже сформирован. Изменений нет.")
+                current_filename = output_filename
 
-            return False
-        except Exception as e:
-            work_log.exception(f"[update_temperature_graph_cache_if_needed] Ошибка в процессе обновления графика температуры: {e}")
-            return False
+            file_path = os.path.join("static/graphs", current_filename)
+            file_exists = os.path.exists(file_path)
 
-
-async def update_humidity_graph_cache_if_needed() -> Optional[bool]:
-    """Асинхронная проверка появления новых данных или отсутствия файла и перерисовка графика влажности."""
-    if _hum_graph_lock.locked():
-        work_log.debug("[update_humidity_graph_cache_if_needed] Расчет графика влажности уже выполняется. Запрос отклонен.")
-        return None
-
-    async with _hum_graph_lock:
-        try:
-            work_log.debug("[update_humidity_graph_cache_if_needed] Проверка необходимости обновления графика влажности...")
-            latest_sensor = await db.get_latest_record("table_sensor_data", order_by_col="id", log_to_api=False)
-            if not latest_sensor or "id" not in latest_sensor:
-                work_log.debug("[update_humidity_graph_cache_if_needed] Таблица table_sensor_data пуста.")
+            if (target_date or target_month) and file_exists:
                 return False
 
-            max_sensor_id = latest_sensor["id"]
+            latest_sensor_rows = await db.get("table_sensor_data", order_col="id", limit=1, log_to_api=False)
+            if not latest_sensor_rows:
+                return False
+            max_sensor_id = latest_sensor_rows[0]["id"]
 
-            latest_api = await db.get_latest_record("api_table", order_by_col="id", log_to_api=False)
-            
-            # Безопасное извлечение с поддержкой None / NULL
-            raw_id = latest_api.get("last_graph_humidity_id") if latest_api else None
-            last_processed_id = raw_id if raw_id is not None else 0
+            last_processed_id = 0
+            latest_api = None
+            if id_field:
+                latest_api_rows = await db.get("api_table", order_col="id", limit=1, log_to_api=False)
+                if latest_api_rows and id_field in latest_api_rows[0]:
+                    latest_api = latest_api_rows[0]
+                    raw_id = latest_api.get(id_field)
+                    last_processed_id = raw_id if raw_id is not None else 0
 
-            hum_file_exists = os.path.exists("static/graphs/humidity.png")
+            if max_sensor_id > last_processed_id or not file_exists or target_date or target_month:
+                if target_date:
+                    sensor_rows = await db.query(queries.SENSOR_RECORDS_BY_DATE, (f"{target_date}%",), log_to_api=False)
+                elif target_month:
+                    sensor_rows = await db.query(queries.SENSOR_RECORDS_BY_DATE, (f"{target_month}%",), log_to_api=False)
+                else:
+                    sensor_rows = await db.query(queries.SENSOR_GRAPH_POINTS, ("-24 hours",), log_to_api=False)
 
-            if max_sensor_id > last_processed_id or not hum_file_exists:
-                work_log.info(
-                    f"[update_humidity_graph_cache_if_needed] Запуск генерации графика влажности "
-                    f"(новые данные: {max_sensor_id > last_processed_id}, отсутствует файл: {not hum_file_exists})..."
-                )
-
-                sensor_data = (
-                    await asyncio.to_thread(db._get_sensor_data_for_graphs_sync, 24)
-                    if hasattr(db, "_get_sensor_data_for_graphs_sync")
-                    else []
-                )
-
-                if not sensor_data:
-                    work_log.debug("[update_humidity_graph_cache_if_needed] _get_sensor_data_for_graphs_sync вернул пустой результат, пробуем get_sensor_graph_points...")
+                if not sensor_rows and not target_date and not target_month and hasattr(db, "get_sensor_graph_points"):
                     points = await db.get_sensor_graph_points(hours=24, log_to_api=False)
-                    sensor_data = [p.model_dump() for p in points]
+                    sensor_rows = [p.model_dump() for p in points]
 
-                vent_events = await db.fetch_range("ventilation_table", order_asc=True, log_to_api=False)
-                heat_events = await db.fetch_range("history_of_heating", order_asc=True, log_to_api=False)
+                # Получение событий вентиляции и отопления по диапазону ID (от и до)
+                if sensor_rows:
+                    min_id = sensor_rows[0]["id"]
+                    max_id = sensor_rows[-1]["id"]
+                    vent_events = await db.get("ventilation_table", start=min_id - 1000, stop=max_id, order_col="id", order_asc=True, log_to_api=False)
+                    heat_events = await db.get("history_of_heating", start=min_id - 1000, stop=max_id, order_col="id", order_asc=True, log_to_api=False)
+                else:
+                    vent_events = []
+                    heat_events = []
 
-                sys_settings = await db.get_settings_db(log_to_api=False)
-                target_floor_humi = None
-
-                if sys_settings:
-                    if hasattr(sys_settings, "target_rh"):
-                        val = getattr(sys_settings, "target_rh")
+                target_lines = {}
+                if graph_type == "humidity":
+                    sys_settings = await get_settings_db()
+                    if sys_settings:
+                        val = getattr(sys_settings, "target_rh", None) or (sys_settings.get("target_rh") if isinstance(sys_settings, dict) else None)
                         if val is not None:
                             try:
-                                target_floor_humi = float(val)
-                            except (ValueError, TypeError):
-                                pass
-                    elif isinstance(sys_settings, dict) and "target_rh" in sys_settings:
-                        val = sys_settings["target_rh"]
-                        if val is not None:
-                            try:
-                                target_floor_humi = float(val)
+                                target_lines["floor_humi"] = float(val)
                             except (ValueError, TypeError):
                                 pass
 
-                if sensor_data:
+                if sensor_rows:
                     await asyncio.to_thread(
-                        render_humidity_graph,
-                        sensor_data,
-                        "static/graphs",
+                        render_metric_graph,
+                        sensor_rows,
+                        metrics_config,
+                        title,
+                        file_path,
                         vent_events,
                         heat_events,
-                        target_floor_humi,
+                        target_lines,
                     )
 
-                    if latest_api and "id" in latest_api:
+                    if not target_date and not target_month and id_field and latest_api:
                         api_record = dict(latest_api)
-                        api_record["last_graph_humidity_id"] = max_sensor_id
-                    else:
-                        api_record = {
-                            "id": max_sensor_id,
-                            "last_graph_humidity_id": max_sensor_id,
-                        }
+                        api_record[id_field] = max_sensor_id
+                        await db.upsert("api_table", [api_record], pk_col="id", log_to_api=False)
 
-                    await db.upsert_record(
-                        "api_table",
-                        api_record,
-                        pk_col="id",
-                        log_to_api=False,
-                    )
-                    work_log.info(f"График влажности успешно обновлен для sensor_id={max_sensor_id}")
                     return True
-                else:
-                    work_log.warning("[update_humidity_graph_cache_if_needed] Данные за 24 часа отсутствуют. Отрисовка пропущена.")
-            else:
-                work_log.debug("[update_humidity_graph_cache_if_needed] Актуальный график влажности уже сформирован. Изменений нет.")
-
             return False
         except Exception as e:
-            work_log.exception(f"[update_humidity_graph_cache_if_needed] Ошибка в процессе обновления графика влажности: {e}")
+            work_log.exception(f"[update_graph_cache_if_needed] Ошибка для {graph_type}: {e}")
             return False
+
+
+async def update_temperature_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+    metrics = [
+        {"key": "street_temp", "label": "Улица", "color": "#2ecc71", "unit": "°C"},
+        {"key": "basement_temp", "label": "Подвал", "color": "#2980b9", "unit": "°C"},
+        {"key": "floor_temp", "label": "Пол", "color": "#e74c3c", "unit": "°C"},
+    ]
+    return await update_graph_cache_if_needed("temperature", "temperature.png", "График температуры (°C)", metrics, "last_graph_temperature_id", target_date, target_month)
+
+
+async def update_humidity_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+    metrics = [
+        {"key": "street_humi", "label": "Улица (отн.)", "color": "#27ae60", "unit": "%"},
+        {"key": "basement_humi", "label": "Подвал (отн.)", "color": "#2980b9", "unit": "%"},
+        {"key": "floor_humi", "label": "Пол (отн.)", "color": "#e74c3c", "unit": "%"},
+    ]
+    return await update_graph_cache_if_needed("humidity", "humidity.png", "График влажности (%)", metrics, "last_graph_humidity_id", target_date, target_month)
+
+
+async def update_abs_humidity_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+    metrics = [
+        {"key": "a_street_humi", "label": "Улица (абс.)", "color": "#16a085", "unit": "г/м³"},
+        {"key": "a_basement_humi", "label": "Подвал (абс.)", "color": "#2980b9", "unit": "г/м³"},
+        {"key": "a_floor_humi", "label": "Пол (абс.)", "color": "#d35400", "unit": "г/м³"},
+    ]
+    return await update_graph_cache_if_needed("abs_humidity", "abs_humidity.png", "График абсолютной влажности (г/м³)", metrics, None, target_date, target_month)
+
+
+async def update_gas_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+    """Генерация графика потребления газа (расход в час и коэффициент) из gas_table с кэшированием."""
+    if target_date:
+        file_path = os.path.join("static/graphs", f"gas_{target_date}.png")
+    elif target_month:
+        file_path = os.path.join("static/graphs", f"gas_{target_month}.png")
+    else:
+        file_path = os.path.join("static/graphs", "gas.png")
+
+    os.makedirs("static/graphs", exist_ok=True)
+
+    if (target_date or target_month) and os.path.exists(file_path):
+        return False
+
+    if target_date:
+        rows = await db.query(queries.GAS_RECORDS_BY_MONTH, (f"{target_date}%",), log_to_api=False)
+    elif target_month:
+        rows = await db.query(queries.GAS_RECORDS_BY_MONTH, (f"{target_month}%",), log_to_api=False)
+    else:
+        rows = await db.get("gas_table", limit=100, order_col="id", order_asc=False, log_to_api=False)
+        rows.reverse()
+
+    if not rows:
+        return False
+
+    metrics = [
+        {"key": "gas_per_hour", "label": "Расход газа в час", "color": "#e67e22", "unit": "м³/ч"},
+        {"key": "coefficient_gas", "label": "Коэффициент газа", "color": "#2980b9", "unit": ""},
+    ]
+    await asyncio.to_thread(
+        render_metric_graph,
+        rows,
+        metrics,
+        "Графики расхода и коэффициента газа",
+        file_path,
+    )
+    return True

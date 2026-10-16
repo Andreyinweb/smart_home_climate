@@ -1,0 +1,58 @@
+{% extends "legacy/base.html" %}
+
+{% block content %}
+<div class="container my-4 text-center">
+    <h2 class="mb-4">Графики системы</h2>
+    
+    <!-- Универсальная форма выбора -->
+    <form method="get" action="/graphs" class="row justify-content-center mb-4 g-3 align-items-center">
+        <div class="col-auto">
+            <label for="graph_type" class="col-form-label">График:</label>
+        </div>
+        <div class="col-auto">
+            <select id="graph_type" name="graph_type" class="form-select" onchange="this.form.submit()">
+                <option value="temperature" {% if graph_type == 'temperature' %}selected{% endif %}>Температура</option>
+                <option value="humidity" {% if graph_type == 'humidity' %}selected{% endif %}>Влажность (отн.)</option>
+                <option value="abs_humidity" {% if graph_type == 'abs_humidity' %}selected{% endif %}>Влажность (абс.)</option>
+                <option value="gas" {% if graph_type == 'gas' %}selected{% endif %}>Газ</option>
+            </select>
+        </div>
+
+        <div class="col-auto">
+            <label for="target_date" class="col-form-label">Сутки:</label>
+        </div>
+        <div class="col-auto">
+            <input type="date" id="target_date" name="target_date" class="form-control" value="{{ target_date }}">
+        </div>
+
+        <div class="col-auto">
+            <label for="target_month" class="col-form-label">Месяц:</label>
+        </div>
+        <div class="col-auto">
+            <input type="month" id="target_month" name="target_month" class="form-control" value="{{ target_month }}">
+        </div>
+
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Показать</button>
+            <a href="/graphs?graph_type={{ graph_type }}" class="btn btn-outline-secondary">Сбросить</a>
+        </div>
+    </form>
+
+    <div class="card shadow-sm p-3 bg-white rounded">
+        <img id="graph-image" src="{{ graph_url }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" class="img-fluid rounded mx-auto d-block" alt="График">
+    </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      const img = document.getElementById('graph-image');
+      if (img) {
+        const currentSrc = img.src;
+        const separator = currentSrc.includes('?') ? '&' : '?';
+        img.src = currentSrc + separator + 't=' + new Date().getTime();
+      }
+    }, 10000);
+  });
+</script>
+{% endblock %}

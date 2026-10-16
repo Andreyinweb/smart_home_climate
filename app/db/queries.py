@@ -19,10 +19,12 @@
 #            например "-24 hours".
 # Возвращает: id, timestamp, street_temp, basement_temp, floor_temp,
 #             street_humi, basement_humi, floor_humi, vent_status (0/1), heat_status (0/1).
+
 SENSOR_GRAPH_POINTS = """
 SELECT
     s.id, s.timestamp, s.street_temp, s.basement_temp, s.floor_temp,
     s.street_humi, s.basement_humi, s.floor_humi,
+    s.a_street_humi, s.a_basement_humi, s.a_floor_humi,
     CASE WHEN EXISTS (
         SELECT 1 FROM ventilation_table v
         WHERE v.id > 0 AND s.id >= v.id
@@ -51,8 +53,9 @@ JOIN weather_site_table w
 WHERE s.sensor_or_calc_street = 1 AND s.street_temp IS NOT NULL AND s.street_humi IS NOT NULL;
 """
 
+# Выборка показаний датчиков по шаблону даты/месяца (например, YYYY-MM-DD% или YYYY-MM%)
+SENSOR_RECORDS_BY_DATE = "SELECT * FROM table_sensor_data WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
 
 GAS_RECORDS_BY_MONTH = "SELECT * FROM gas_table WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
 MONTHLY_AVG_STREET_TEMP = "SELECT AVG(street_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
 MONTHLY_AVG_BASEMENT_TEMP = "SELECT AVG(basement_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
-
