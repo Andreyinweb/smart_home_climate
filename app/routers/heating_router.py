@@ -92,7 +92,7 @@ async def get_heating_page(
             context={"website_return_time": website_return_time},
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
-
+    now_temperature = latest_sensor["basement_temp"]
     current_db_data = _merge_sensor_api(latest_sensor, latest_api)
 
     latest_heat = None
@@ -181,6 +181,7 @@ async def get_heating_page(
     context = {
         "website_return_time": website_return_time,
         "minimum_temperature": minimum_temperature,
+        "now_temperature": now_temperature,
         "maximum_temperature": maximum_temperature,
         "btn_start_class": btn_start_class,
         "btn_stop_class": btn_stop_class,

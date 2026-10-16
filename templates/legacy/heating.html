@@ -33,6 +33,9 @@
                 <strong>Мин. Т:</strong> <span class="text-blue val-bold">{{ "%.1f"|format(minimum_temperature) if minimum_temperature is defined and minimum_temperature is not none else '—' }} °C</span>
             </div>
             <div>
+                <strong>Сейчас. Т:</strong> <span class="text-black val-bold">{{ "%.1f"|format(now_temperature) if now_temperature is defined and now_temperature is not none else '—' }} °C</span>
+            </div>
+            <div>
                 <strong>Макс. Т:</strong> <span class="text-red val-bold">{{ "%.1f"|format(maximum_temperature) if maximum_temperature is defined and maximum_temperature is not none else '—' }} °C</span>
             </div>
         </div>
