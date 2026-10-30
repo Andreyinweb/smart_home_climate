@@ -14,14 +14,23 @@ CONFIG_FILE=""
 
 # Разбор аргументов командной строки
 for arg in "$@"; do
-    if [ "$arg" = "-server" ]; then
-        SERVER_MODE=true
-    elif [ "$arg" = "-previous" ]; then
-        PREVIOUS_MODE=true
-        SERVER_MODE=true
-    elif [ -z "$CONFIG_FILE" ] && [ "$arg" != "-server" ]; then
-        CONFIG_FILE="$arg"
-    fi
+    case "$arg" in
+        -server)
+            SERVER_MODE=true
+            ;;
+        -previous)
+            PREVIOUS_MODE=true
+            SERVER_MODE=true
+            ;;
+        -*)
+            # Игнорируем прочие флаги, чтобы они не попадали в CONFIG_FILE
+            ;;
+        *)
+            if [ -z "$CONFIG_FILE" ]; then
+                CONFIG_FILE="$arg"
+            fi
+            ;;
+    esac
 done
 
 if [ "$SERVER_MODE" = true ]; then
@@ -152,7 +161,7 @@ check_or_create_file() {
     local text_in_file="$2"
     local mode="$3" # "check_only"
     local log_dir
-    log_dir=$(dirname "$file_path")
+    log_dir=$(dirname -- "$file_path")
     
     if [ ! -d "$log_dir" ]; then
         echo "✗ Директория '$log_dir' не существует — файл не может быть создан" >&2
@@ -364,7 +373,7 @@ check_or_create_file "$API_LOG" "run/log.txt"
 check_or_create_dir "$DB_DIR" 
 check_or_create_dir "$BACKUP"
 
-#################################################################################### Проверка Python 3.12 #########################################################
+################################---------------------------------------------------- Проверка Python 3.12 #########################################################
 if command -v python3.12 &>/dev/null; then
     echo "✅ Python 3.12 уже установлен."
 else
@@ -381,11 +390,11 @@ else
     fi
 fi
 
-####################################################### Проверка пакетов #######################################################
+################################----------------------- Проверка пакетов #######################################################
 install_package "python3-pip" "pip3 --version"
 install_package "python3-venv python3-dev" "python3.12 -m venv --help"
 
-####################################################### Виртуальное окружение #######################################################
+################################----------------------- Виртуальное окружение #######################################################
 check_or_create_dir "$VENV_DIR" 
 if [ -d "$VENV_DIR" ]; then
     if [ ! -d "$VENV_PATH" ]; then
@@ -405,17 +414,17 @@ if [ -d "$VENV_DIR" ]; then
     fi
 fi
 
-################################################# Запуск приложения #######################################################
+################################--------------------------------- Запуск приложения #######################################################
 if [ -f "$VENV_PATH/bin/activate" ]; then
     source "$VENV_PATH/bin/activate"
 fi
 
 echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ run_program.py"
-echo "########################################### Запуск run_program.py #############################"
+echo "################################----------- Запуск run_program.py #############################"
 python3.12 run/run_program.py
 
 echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ migrator.py"
-echo "########################################### Запуск run_migrator.py #############################"
+echo "################################----------- Запуск run_migrator.py #############################"
 python3.12 run/migrator.py
 
 echo "$(date '+%Y-%m-%d %H:%M:%S'): СТАРТ main.py"
