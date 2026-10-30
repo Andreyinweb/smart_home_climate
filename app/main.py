@@ -67,7 +67,6 @@ async def lifespan(app: FastAPI):
                 timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 sys_settings = await get_settings_db()
-
                 latest = await db.get("table_sensor_data")
                 now_id = (latest[0]["id"] + 1) if latest else 1
                 logs_service.set_current_cycle_id(now_id)
@@ -114,6 +113,9 @@ async def lifespan(app: FastAPI):
                 if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
                     asyncio.create_task(weather_service.calibrate_hourly_coefficients())
                     await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100, max_daily_backups=1)
+
+                if settings.app_env.value == "PREVIOUS":
+                    work_log.warning("[Цикл] Работает резервная копия программы. РЕЖИМ: PREVIOUS")
 
             except asyncio.TimeoutError:
                 work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
@@ -185,7 +187,7 @@ app.include_router(settings_router.router)
 app.include_router(heating_router.router)
 app.include_router(programmer_router.router)
 
-if settings.app_env == AppEnv.DEVELOPMENT:
+if settings.app_env == AppEnv.DEVELOPMENT or settings.app_env == AppEnv.PREVIOUS:
     app.include_router(debug_router.router)
 
 

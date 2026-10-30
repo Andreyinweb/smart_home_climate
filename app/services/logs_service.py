@@ -55,7 +55,7 @@ def get_current_cycle_logs() -> Dict[str, Any]:
 
 
 def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
-    log_level = logging.DEBUG if config.app_env == AppEnv.DEVELOPMENT else logging.INFO
+    log_level = logging.DEBUG if config.app_env == AppEnv.DEVELOPMENT or config.app_env == AppEnv.PREVIOUS else logging.INFO
 
     formatter = logging.Formatter(
         "%(asctime)s:%(levelname)s:%(name)s:%(message)s",

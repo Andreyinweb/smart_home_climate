@@ -32,6 +32,7 @@ class AppEnv(str, Enum):
     PRODUCTION = "PRODUCTION"
     STAGING = "STAGING"
     DEVELOPMENT = "DEVELOPMENT"
+    PREVIOUS = "PREVIOUS"
 
 
 class ClimatePhysicsDefaults(BaseModel):
