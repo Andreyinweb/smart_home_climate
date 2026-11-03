@@ -50,7 +50,8 @@ SELECT
 FROM table_sensor_data s
 JOIN weather_site_table w
     ON ABS(strftime('%s', s.timestamp) - strftime('%s', w.timestamp)) <= ?
-WHERE s.sensor_or_calc_street = 1 AND s.street_temp IS NOT NULL AND s.street_humi IS NOT NULL;
+WHERE s.sensor_or_calc_street = 1 AND s.street_temp IS NOT NULL AND s.street_humi IS NOT NULL
+  AND s.timestamp >= datetime('now', 'localtime', ?);
 """
 
 # Выборка показаний датчиков по шаблону даты/месяца (например, YYYY-MM-DD% или YYYY-MM%)

@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 from app.core.config import WeatherProvider, settings
-from app.core.db_settings import get_settings_db
 import app.db.crud as db
 from app.db import queries
 from app.services.climate_service import (
@@ -23,71 +22,99 @@ work_log = logging.getLogger("climat_app.weather_service")
 # Блокировка для предотвращения параллельного выполнения калибровки
 _calibration_lock = asyncio.Lock()
 
+_TS_FORMAT = "%Y-%m-%d %H:%M:%S"
+# MET Norway требует осмысленный User-Agent с контактом. ЗАМЕНИТЬ email на свой.
+_USER_AGENT = "ClimatApp/1.0 your@email.com"
+_KEYLESS = (WeatherProvider.OPEN_METEO, WeatherProvider.MET_NO)
+
+
+def _build_url(provider: WeatherProvider, key: str) -> Optional[str]:
+    lat, lon = settings.location_lat, settings.location_lon
+    if provider == WeatherProvider.OPENWEATHERMAP:
+        return (
+            f"https://api.openweathermap.org/data/2.5/weather?"
+            f"lat={lat}&lon={lon}&appid={key}&units=metric"
+        )
+    if provider == WeatherProvider.TOMORROW:
+        return f"https://api.tomorrow.io/v4/weather/realtime?location={lat},{lon}&apikey={key}"
+    if provider == WeatherProvider.OPEN_METEO:
+        return (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m"
+        )
+    if provider == WeatherProvider.MET_NO:
+        # MET Norway: не более 4 знаков после запятой, иначе 403.
+        return f"https://api.met.no/weatherapi/locationforecast/2.0/compact?lat={lat:.4f}&lon={lon:.4f}"
+    return None
+
+
+def _extract(provider: WeatherProvider, data: Dict[str, Any]) -> Tuple[float, float]:
+    """Возвращает (температура °C, относительная влажность %)."""
+    if provider == WeatherProvider.OPENWEATHERMAP:
+        return float(data["main"]["temp"]), float(data["main"]["humidity"])
+    if provider == WeatherProvider.TOMORROW:
+        v = data["data"]["values"]
+        return float(v["temperature"]), float(v["humidity"])
+    if provider == WeatherProvider.OPEN_METEO:
+        c = data["current"]
+        return float(c["temperature_2m"]), float(c["relative_humidity_2m"])
+    d = data["properties"]["timeseries"][0]["data"]["instant"]["details"]
+    return float(d["air_temperature"]), float(d["relative_humidity"])
+
+
+def _http_get_json(url: str) -> Any:
+    """Синхронный запрос. Вызывается через asyncio.to_thread, чтобы не вешать event loop."""
+    req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
 
 async def fetch_site_weather_data() -> Optional[Dict[str, float]]:
-    """Запрашивает данные о погоде с OpenWeatherMap или Tomorrow.io."""
+    """Запрашивает данные о погоде у выбранного провайдера."""
+    provider = settings.site_weather
     api_key = settings.active_weather_api_key
-    if not api_key:
-        work_log.warning("SITE_WEATHER_API_KEY не установлен.")
+    key_str = api_key.get_secret_value() if api_key else ""
+
+    if not key_str and provider not in _KEYLESS:
+        work_log.warning("API-ключ погоды не установлен.")
         return None
 
-    key_str = api_key.get_secret_value()
-
-    if settings.site_weather == WeatherProvider.OPENWEATHERMAP:
-        url = (
-            f"https://api.openweathermap.org/data/2.5/weather?"
-            f"lat={settings.location_lat}&lon={settings.location_lon}"
-            f"&appid={key_str}&units=metric"
-        )
-    elif settings.site_weather == WeatherProvider.TOMORROW:
-        url = (
-            f"https://api.tomorrow.io/v4/weather/realtime?"
-            f"location={settings.location_lat},{settings.location_lon}"
-            f"&apikey={key_str}"
-        )
-    else:
-        work_log.warning(f"Неизвестный провайдер погоды: {settings.site_weather}")
+    url = _build_url(provider, key_str)
+    if url is None:
+        work_log.warning(f"Неизвестный провайдер погоды: {provider}")
         return None
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "ClimatApp/1.0"})
-        with urllib.request.urlopen(req, timeout=10) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode("utf-8"))
-                if settings.site_weather == WeatherProvider.OPENWEATHERMAP:
-                    temp = float(data["main"]["temp"])
-                    humi = float(data["main"]["humidity"])
-                else:
-                    values = data["data"]["values"]
-                    temp = float(values["temperature"])
-                    humi = float(values["humidity"])
-                return {"temp": temp, "humi": humi}
-            work_log.error(f"[{settings.site_weather.value}] Код ответа сервера: {response.status}")
+        data = await asyncio.to_thread(_http_get_json, url)
+        temp, humi = _extract(provider, data)
+        return {"temp": temp, "humi": humi}
     except urllib.error.URLError as e:
-        work_log.error(f"[{settings.site_weather.value}] Ошибка подключения: {e}")
+        work_log.error(f"[{provider.value}] Ошибка подключения: {e}")
     except Exception as e:
-        work_log.error(f"[{settings.site_weather.value}] Ошибка при запросе погоды: {e}")
+        work_log.error(f"[{provider.value}] Ошибка при запросе погоды: {e}")
 
     return None
 
 
-async def record_site_weather(timestamp: Optional[str] = None, row_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
-    """Запрашивает погоду с сайта и записывает её ТОЛЬКО после подтверждения записи сенсоров с row_id."""
+async def record_site_weather(
+    timestamp: Optional[str] = None,
+    row_id: Optional[int] = None,
+    cache_seconds: int = 240,
+) -> Optional[Dict[str, Any]]:
+    """
+    Записывает погоду ТОЛЬКО после подтверждения записи сенсоров с row_id.
+    Если последняя запись weather_site_table того же провайдера младше cache_seconds
+    (по timestamp цикла), запрос к сайту не делается: значения копируются из неё.
+    """
     if row_id is None:
         work_log.warning("Не передан row_id для записи погоды.")
         return None
 
-    weather_data = await fetch_site_weather_data()
-    if not weather_data:
-        work_log.warning(f"Не удалось получить данные с {settings.site_weather.value}.")
-        return None
-
-    # Ожидание сохранения записи с row_id в table_sensor_data
+    # Ожидание сохранения записи с row_id в table_sensor_data (внешний ключ)
     sensor_record_exists = False
     for _ in range(10):
         rows = await db.get("table_sensor_data", pk=row_id, pk_col="id")
-        sensor_rec = rows[0] if rows else None
-        if sensor_rec:
+        if rows:
             sensor_record_exists = True
             break
         await asyncio.sleep(0.5)
@@ -96,12 +123,37 @@ async def record_site_weather(timestamp: Optional[str] = None, row_id: Optional[
         work_log.warning(f"Запись сенсоров ID={row_id} не найдена в table_sensor_data. Погода не сохранена.")
         return None
 
-    site_temp = weather_data["temp"]
-    site_humi = weather_data["humi"]
-    site_ah = calculate_absolute_humidity(site_temp, site_humi)
-
     if not timestamp:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime(_TS_FORMAT)
+
+    provider_name = settings.site_weather.value
+
+    # Проверка кэша: последняя запись того же провайдера и не старше cache_seconds
+    site_temp = site_humi = site_ah = None
+    rows = await db.get("weather_site_table", order_col="id", limit=1)
+    last = rows[0] if rows else None
+    if last and last.get("name_site") == provider_name:
+        try:
+            age = (
+                datetime.strptime(timestamp, _TS_FORMAT)
+                - datetime.strptime(last["timestamp"], _TS_FORMAT)
+            ).total_seconds()
+            if 0 <= age < cache_seconds:
+                site_temp = float(last["site_temp"])
+                site_humi = float(last["site_humi"])
+                site_ah = float(last["site_ah"])
+        except (ValueError, TypeError, KeyError):
+            pass
+
+    from_cache = site_temp is not None
+    if not from_cache:
+        weather_data = await fetch_site_weather_data()
+        if not weather_data:
+            work_log.warning(f"Не удалось получить данные с {provider_name}.")
+            return None
+        site_temp = weather_data["temp"]
+        site_humi = weather_data["humi"]
+        site_ah = calculate_absolute_humidity(site_temp, site_humi)
 
     data_to_write = {
         "id": row_id,
@@ -109,26 +161,26 @@ async def record_site_weather(timestamp: Optional[str] = None, row_id: Optional[
         "site_temp": site_temp,
         "site_humi": site_humi,
         "site_ah": site_ah,
-        "name_site": settings.site_weather.value if hasattr(settings.site_weather, "value") else str(settings.site_weather)
+        "name_site": provider_name,
     }
 
     await db.upsert("weather_site_table", [data_to_write], pk_col="id")
     work_log.info(
-        f"[{settings.site_weather.value}] Записаны данные с сайта ({timestamp}): "
-        f"T={site_temp}°C, RH={site_humi}%, AH={site_ah}г/м³"
+        f"[{provider_name}] {'Скопированы предыдущие данные' if from_cache else 'Записаны данные с сайта'} "
+        f"({timestamp}): T={site_temp}°C, RH={site_humi}%, AH={site_ah}г/м³"
     )
     return data_to_write
 
 
-async def calibrate_hourly_coefficients(max_time_diff_seconds: int = 600) -> None:
-    """Расчет часовых калибровочных коэффициентов delta_temp и delta_ah по медианам."""
+async def calibrate_hourly_coefficients(max_time_diff_seconds: int = 600, days: int = 30) -> None:
+    """Расчет часовых калибровочных коэффициентов delta_temp и delta_ah по медианам за последние days дней."""
     if _calibration_lock.locked():
         work_log.info("[Калибровка] Пропуск: процесс калибровки уже выполняется.")
         return
 
     async with _calibration_lock:
-        work_log.info("[Калибровка] Старт калибровки часовых коэффициентов...")
-        rows = await db.query(queries.CALIBRATION_DATA, (max_time_diff_seconds,))
+        work_log.info(f"[Калибровка] Старт калибровки часовых коэффициентов (за {days} дн.)...")
+        rows = await db.query(queries.CALIBRATION_DATA, (max_time_diff_seconds, f"-{days} days"))
         if not rows:
             work_log.warning("[Калибровка] Данные для калибровки не найдены.")
             return
@@ -147,7 +199,7 @@ async def calibrate_hourly_coefficients(max_time_diff_seconds: int = 600) -> Non
             hourly_temp_deltas[hour].append(s_temp - w_temp)
             hourly_ah_deltas[hour].append(s_ah - w_ah)
 
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.now().strftime(_TS_FORMAT)
         for h in range(24):
             t_list = hourly_temp_deltas[h]
             ah_list = hourly_ah_deltas[h]
@@ -192,6 +244,4 @@ async def get_calculated_street_climate(current_hour: int) -> Tuple[float, float
         f"dT={delta_temp}, dAH={delta_ah} -> Расчет T={calc_temp}°C, RH={calc_rh}%"
     )
 
-    result_settings = await get_settings_db()
-    
     return calc_temp, calc_rh, False

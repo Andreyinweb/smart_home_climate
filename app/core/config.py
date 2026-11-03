@@ -12,6 +12,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class WeatherProvider(str, Enum):
     TOMORROW = "TOMORROW"
     OPENWEATHERMAP = "OPENWEATHERMAP"
+    OPEN_METEO = "OPEN_METEO"
+    MET_NO = "MET_NO"
 
 
 class SensorMode(str, Enum):
@@ -166,12 +168,14 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
         elif not self.api_log.is_absolute():
             self.api_log = self.project_dir / self.api_log
 
-        active_key = self.active_weather_api_key
-        if not active_key or not active_key.get_secret_value().strip():
-            raise ValueError(
-                f"Для выбранного провайдера SITE_WEATHER='{self.site_weather.value}' "
-                f"не задан валидный API-ключ."
-            )
+        # API-ключ нужен только провайдерам с ключом (OPEN_METEO и MET_NO работают без него)
+        if self.site_weather in (WeatherProvider.TOMORROW, WeatherProvider.OPENWEATHERMAP):
+            active_key = self.active_weather_api_key
+            if not active_key or not active_key.get_secret_value().strip():
+                raise ValueError(
+                    f"Для выбранного провайдера SITE_WEATHER='{self.site_weather.value}' "
+                    f"не задан валидный API-ключ."
+                )
 
         required_sensors = [s.lower() for s in self.sensor_mode.value.split("_")]
         for sensor_name in required_sensors:
@@ -182,7 +186,7 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
                     f"Для режима SENSOR_MODE='{self.sensor_mode.value}' не задан MAC-адрес '{sensor_name.upper()}_MAC' в конфигурационном файле. "
                     f"Заполните адрес или измените SENSOR_MODE."
                 )
-        
+
         return self
 
     def create_required_directories(self) -> None:

@@ -201,7 +201,7 @@ load_envf() {
 #################################### Необязательные переменные и значения по умолчанию ####################################
 # Строки на «#» — комментарии для .env, остальные — имена переменных (порядок = порядок в .env)
 OPT_SPEC=(
-    "# Сайт погоды (OPENWEATHERMAP или TOMORROW)"
+    "# Сайт погоды (OPENWEATHERMAP, TOMORROW, OPEN_METEO или MET_NO)"
     SITE_WEATHER
     "# Координаты города для сайта погоды:"
     LOCATION_LAT LOCATION_LON
@@ -339,6 +339,9 @@ if [ "${#env_missing[@]}" -gt 0 ]; then
             FINAL["$n"]="${TXT_VAL[$n]}"
             from_txt=$((from_txt + 1))
             note "$n взята из $ENV_TXT"
+        elif [[ $n == *_API_KEY ]]; then
+            # Ключ погоды может быть пустым: его наличие проверяется в шаге 8 по выбранному SITE_WEATHER
+            FINAL["$n"]=""
         else
             still+=("$n")
         fi
@@ -421,25 +424,33 @@ if ! [[ ${FINAL[PYTHON_VERSION]} =~ $re_py ]]; then
 fi
 
 # 8. Сайт погоды и его ключ
+#    OPENWEATHERMAP и TOMORROW требуют ключ; OPEN_METEO и MET_NO работают без ключа.
 site="${FINAL[SITE_WEATHER]^^}"
 case "$site" in
-    OPENWEATHERMAP|TOMORROW)
+    OPENWEATHERMAP|TOMORROW|OPEN_METEO|MET_NO)
         if [ "$site" != "${FINAL[SITE_WEATHER]}" ]; then FINAL[SITE_WEATHER]="$site"; FIXED=true; fi
         ;;
     *)
-        note "SITE_WEATHER='${FINAL[SITE_WEATHER]}' неизвестен (допустимо: OPENWEATHERMAP, TOMORROW)"
+        note "SITE_WEATHER='${FINAL[SITE_WEATHER]}' неизвестен (допустимо: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)"
         if ask_confirm "SITE_WEATHER='${FINAL[SITE_WEATHER]}' неизвестен. Заменить на OPENWEATHERMAP?"; then
             FINAL[SITE_WEATHER]="OPENWEATHERMAP"
             FIXED=true
         else
-            die "Неизвестный SITE_WEATHER='${FINAL[SITE_WEATHER]}' (допустимо: OPENWEATHERMAP, TOMORROW)."
+            die "Неизвестный SITE_WEATHER='${FINAL[SITE_WEATHER]}' (допустимо: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)."
         fi
         ;;
 esac
-key_name="${FINAL[SITE_WEATHER]}_API_KEY"
-if [ -z "${!key_name:-}" ]; then
-    die "Для SITE_WEATHER=${FINAL[SITE_WEATHER]} не заполнен $key_name (заполните его или смените SITE_WEATHER)."
-fi
+case "${FINAL[SITE_WEATHER]}" in
+    OPENWEATHERMAP|TOMORROW)
+        key_name="${FINAL[SITE_WEATHER]}_API_KEY"
+        if [ -z "${!key_name:-}" ]; then
+            die "Для SITE_WEATHER=${FINAL[SITE_WEATHER]} не заполнен $key_name (заполните его или смените SITE_WEATHER)."
+        fi
+        ;;
+    *)
+        note "SITE_WEATHER=${FINAL[SITE_WEATHER]}: API-ключ не требуется"
+        ;;
+esac
 
 # 9. Экспорт
 for n in "${OPT_NAMES[@]}"; do export "$n=${FINAL[$n]}"; done
