@@ -14,10 +14,7 @@ from app.dependencies import (
     get_template_path,
     get_templates,
 )
-from app.routers.dashboard_router import (
-    get_time_difference_str,
-    safe_diff,
-)
+from app.services.climate_service import safe_diff, get_time_difference_str
 from app.services.heating_service import HeatingController
 
 api_log = logging.getLogger("api_app.routers.heating")

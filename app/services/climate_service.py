@@ -734,3 +734,27 @@ def build_api_record(
         "floor_humi_heated": floor_humi_heated,
         "a_floor_humi_heated": a_floor_humi_heated
     }
+
+def safe_diff(val1: Any, val2: Any) -> float:
+    """Безопасное вычисление разницы между двумя значениями."""
+    if val1 is not None and val2 is not None:
+        try:
+            return round(float(val1) - float(val2), 2)
+        except (ValueError, TypeError):
+            pass
+    return 0.0
+
+
+def get_time_difference_str(start_str: str, now_str: str) -> str:
+    """Расчет текстовой разницы времени между двумя строками формата HH:MM."""
+    try:
+        t1 = datetime.strptime(start_str, "%H:%M")
+        t2 = datetime.strptime(now_str, "%H:%M")
+        diff = int((t2 - t1).total_seconds() // 60)
+        if diff < 0:
+            diff += 1440
+        hours = diff // 60
+        minutes = diff % 60
+        return f"{hours} ч {minutes} мин" if hours > 0 else f"{minutes} мин"
+    except Exception:
+        return "—"

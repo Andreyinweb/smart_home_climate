@@ -161,7 +161,7 @@
             <span class="badge badge-gray">🔋 Батарея Пол: {{ "%.3f"|format(floor_voltage) if floor_voltage is defined and floor_voltage is not none else '0.000' }} В</span>
         </div>
     </div>
-    {% if app_env is defined and app_env == "DEVELOPMENT" %}
+    {% if app_env is defined and app_env in ["DEVELOPMENT", "STAGING", "PREVIOUS"] %}
     <div class="card"></div>
         <a href="/debug/work-log" class="nav-link">📝 Work Log</a>
         <a href="/debug/api-log" class="nav-link">🌐 API Log</a>
