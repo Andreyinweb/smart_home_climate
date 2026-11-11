@@ -33,6 +33,7 @@ from app.services.ble_service import fetch_all_ble_sensors
 from app.services.climate_service import build_sensor_record, build_api_record
 from app.services import weather_service
 from app.services import backup_service
+from app.error_handlers import register_error_handlers
 
 # Таймаут штатной остановки отопления при завершении приложения (сек).
 SHUTDOWN_STOP_TIMEOUT = 10.0
@@ -179,6 +180,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+register_error_handlers(app)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(dashboard_router.router)
 app.include_router(gas_router.router)

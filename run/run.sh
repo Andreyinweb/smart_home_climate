@@ -9,6 +9,15 @@
 #   Все вопросы получают «да», .env существующий не трогается, python/pip не ставятся (вместо этого стоп).
 # Обычный режим (разработка): любое действие только с согласия в терминале.
 #   Нет терминала — на вопросы отвечается «нет».
+#
+# Реле usbrelay (/usr/local/bin/usbrelay):
+#   Заглушка run/stub.txt ставится только в обычном режиме и только при APP_ENV=DEVELOPMENT.
+#   В режиме AUTO или при любом другом APP_ENV наша заглушка удаляется (файл без маркера не трогается).
+#   APP_ENV по умолчанию: DEVELOPMENT в обычном режиме, STAGING в режиме AUTO.
+#   Если при APP_ENV=DEVELOPMENT из .env по адресу лежит реальный usbrelay (не заглушка),
+#   APP_ENV заменяется на STAGING (в .env тоже) с предупреждением в журнале.
+#   Если APP_ENV=DEVELOPMENT взят по умолчанию (первый запуск), заглушка при реальном реле не ставится,
+#   а замена на STAGING произойдёт при следующем запуске.
 
 set -Eeo pipefail
 
@@ -20,6 +29,14 @@ ENV_FILE="$DIR_PATH/.env"
 ENV_TXT="$DIR_PATH/run/env.txt"
 SEP_LINE='########################## Не обязательные переменные  ########################################'
 RE_SEP='^[[:space:]]*#{10,}'
+
+# Заглушка usbrelay
+RELAY_BIN="/usr/local/bin/usbrelay"
+STUB_SRC="$DIR_PATH/run/stub.txt"
+STUB_MARK="usbrelay_mock_state"             # строка-маркер: есть в stub.txt, по ней узнаём свою заглушку
+STUB_STATE="/tmp/usbrelay_mock_state.json"  # файл состояния заглушки (см. stub.txt)
+APP_ENV_DEFAULTED=false
+APP_ENV_DOWNGRADED=false
 
 #################################### Журнал ####################################
 # До загрузки конфигурации LOG_DIR неизвестен, поэтому сообщения копятся в LOG_BUF
@@ -89,6 +106,17 @@ ask_confirm() {
     done
 }
 
+# Команда с правами root: root — напрямую; AUTO — sudo без пароля (-n, чтобы не зависнуть); иначе обычный sudo
+run_sudo() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif [ "$AUTO" = true ]; then
+        sudo -n "$@"
+    else
+        sudo "$@"
+    fi
+}
+
 install_package() {
     local package_name="$1" test_command="$2"
     if eval "$test_command" &>/dev/null; then
@@ -147,6 +175,74 @@ check_or_create_file() {
     fi
     echo "  > Создание файла отменено"
     return 1
+}
+
+#################################### Заглушка usbrelay ####################################
+# Состояние файла $RELAY_BIN → REPLY:
+#   none    — файла нет
+#   stub    — наша заглушка (обычный файл с маркером $STUB_MARK)
+#   foreign — любой другой файл (реальный usbrelay, ссылка и т.п.): его не трогаем
+relay_state() {
+    if [ ! -e "$RELAY_BIN" ] && [ ! -L "$RELAY_BIN" ]; then
+        REPLY="none"
+    elif [ -f "$RELAY_BIN" ] && [ ! -L "$RELAY_BIN" ] && grep -qaF -- "$STUB_MARK" "$RELAY_BIN" 2>/dev/null; then
+        REPLY="stub"
+    else
+        REPLY="foreign"
+    fi
+}
+
+# Установка/удаление заглушки по итоговому APP_ENV и режиму
+manage_relay_stub() {
+    local st tmp
+    relay_state
+    st="$REPLY"
+
+    # Заглушка не нужна: сервер (AUTO) или APP_ENV не DEVELOPMENT
+    if [ "$AUTO" = true ] || [ "${FINAL[APP_ENV]}" != "DEVELOPMENT" ]; then
+        if [ "$st" = stub ]; then
+            note "APP_ENV=${FINAL[APP_ENV]} (AUTO=$AUTO): найдена заглушка $RELAY_BIN — удаляю"
+            run_sudo rm -f -- "$RELAY_BIN" || die "Не удалось удалить заглушку $RELAY_BIN (нужны права sudo). Удалите её вручную."
+            rm -f -- "$STUB_STATE" 2>/dev/null || note "Предупреждение: не удалось удалить $STUB_STATE"
+            note "Заглушка $RELAY_BIN удалена"
+        fi
+        return 0
+    fi
+
+    # APP_ENV=DEVELOPMENT, обычный режим
+    if [ "$st" = foreign ]; then
+        note "APP_ENV=DEVELOPMENT, но $RELAY_BIN — не заглушка (реальный usbrelay): заглушка не ставится"
+        return 0
+    fi
+
+    [ -f "$STUB_SRC" ] || die "Не найден $STUB_SRC — он нужен при APP_ENV=DEVELOPMENT."
+    grep -qF -- "$STUB_MARK" "$STUB_SRC" || die "В $STUB_SRC нет маркера '$STUB_MARK': такую заглушку потом нельзя безопасно удалить."
+
+    tmp="$(mktemp)" || die "Не удалось создать временный файл для заглушки."
+    tr -d '\r' < "$STUB_SRC" > "$tmp"   # на случай CRLF (иначе «bad interpreter»)
+
+    if [ "$st" = stub ] && [ -x "$RELAY_BIN" ] && cmp -s "$tmp" "$RELAY_BIN"; then
+        rm -f -- "$tmp"
+        note "Заглушка $RELAY_BIN уже установлена и актуальна"
+        return 0
+    fi
+
+    if [ "$st" = none ]; then
+        if ! ask_confirm "APP_ENV=DEVELOPMENT: установить заглушку usbrelay в $RELAY_BIN (sudo)?"; then
+            rm -f -- "$tmp"
+            note "Установка заглушки отклонена: приложение будет работать без usbrelay"
+            return 0
+        fi
+    else
+        note "Заглушка $RELAY_BIN отличается от $STUB_SRC — обновляю"
+    fi
+
+    if ! run_sudo install -m 755 -- "$tmp" "$RELAY_BIN"; then
+        rm -f -- "$tmp"
+        die "Не удалось установить заглушку в $RELAY_BIN (нужны права sudo)."
+    fi
+    rm -f -- "$tmp"
+    note "Заглушка usbrelay установлена: $RELAY_BIN (APP_ENV=DEVELOPMENT)"
 }
 
 #################################### Разбор env-файлов ####################################
@@ -217,7 +313,7 @@ OPT_SPEC=(
     SERVER_HOST SERVER_PORT
     "# Версия Python, которую нужно установить"
     PYTHON_VERSION
-    "# Режимы приложения и железа"
+    "# Режим приложения: DEVELOPMENT — разработка (заглушка usbrelay), иначе (STAGING и т.д.) — реальное реле"
     APP_ENV
     "# Местоположение проекта, для теста файла env"
     PROJECT_DIR
@@ -250,7 +346,7 @@ get_default() {
         SERVER_HOST)       REPLY="0.0.0.0" ;;
         SERVER_PORT)       REPLY="8000" ;;
         PYTHON_VERSION)    REPLY="3.12" ;;
-        APP_ENV)           REPLY="DEVELOPMENT" ;;
+        APP_ENV)           if [ "$AUTO" = true ]; then REPLY="STAGING"; else REPLY="DEVELOPMENT"; fi ;;
         PROJECT_DIR)       REPLY="$DIR_PATH" ;;
         RELAY_ID)          REPLY="959BI_1" ;;
         RELAY_INVERTED)    REPLY="false" ;;
@@ -286,6 +382,28 @@ write_env_file() {
             done
         } > "$tmp"
     ) || return 1
+    mv -f -- "$tmp" "$ENV_FILE"
+}
+
+# Точечная замена APP_ENV в существующем .env (остальное содержимое не меняется, права сохраняются)
+set_app_env_in_file() {
+    local new="$1" tmp="$ENV_FILE.tmp"
+    (
+        umask 077
+        found=false
+        {
+            while IFS= read -r line || [ -n "$line" ]; do
+                if parse_assign "$line" && [ "$P_NAME" = "APP_ENV" ]; then
+                    printf "APP_ENV = '%s'%s\n" "$new" "$P_TAIL"
+                    found=true
+                else
+                    printf '%s\n' "${line%$'\r'}"
+                fi
+            done < "$ENV_FILE"
+            if [ "$found" = false ]; then printf "APP_ENV = '%s'\n" "$new"; fi
+        } > "$tmp"
+    ) || return 1
+    chmod --reference="$ENV_FILE" -- "$tmp" 2>/dev/null || true
     mv -f -- "$tmp" "$ENV_FILE"
 }
 
@@ -452,6 +570,27 @@ case "${FINAL[SITE_WEATHER]}" in
         ;;
 esac
 
+# 8a. APP_ENV: регистр; DEVELOPMENT при реальном usbrelay → STAGING
+#     (в режиме AUTO ничего не меняем: заглушка там не ставится, а наша заглушка удаляется)
+FINAL[APP_ENV]="${FINAL[APP_ENV]^^}"
+for n in "${defaulted[@]}"; do
+    if [ "$n" = "APP_ENV" ]; then APP_ENV_DEFAULTED=true; fi
+done
+if [ "${FINAL[APP_ENV]}" = "DEVELOPMENT" ] && [ "$AUTO" != true ]; then
+    relay_state
+    if [ "$REPLY" = foreign ]; then
+        if [ "$APP_ENV_DEFAULTED" = true ]; then
+            note "APP_ENV по умолчанию DEVELOPMENT (первый запуск), но $RELAY_BIN — реальный usbrelay: заглушка не ставится, при следующем запуске APP_ENV станет STAGING"
+        else
+            note "Предупреждение: APP_ENV=DEVELOPMENT, но $RELAY_BIN — реальный usbrelay. APP_ENV заменён на STAGING"
+            FINAL[APP_ENV]="STAGING"
+            APP_ENV_DOWNGRADED=true
+        fi
+    elif [ "$APP_ENV_DEFAULTED" = true ]; then
+        note "APP_ENV не задан: по умолчанию DEVELOPMENT (обычный режим), будет предложена заглушка usbrelay"
+    fi
+fi
+
 # 9. Экспорт
 for n in "${OPT_NAMES[@]}"; do export "$n=${FINAL[$n]}"; done
 export VERSION
@@ -482,6 +621,15 @@ if [ "$SOURCE" != "окружение" ]; then
             fi
         fi
     fi
+
+    # APP_ENV DEVELOPMENT → STAGING: точечно, без вопросов (остальной .env не трогаем)
+    if [ "$APP_ENV_DOWNGRADED" = true ] && [ -f "$ENV_FILE" ]; then
+        if set_app_env_in_file "STAGING"; then
+            note "В $ENV_FILE APP_ENV заменён на STAGING"
+        else
+            note "Предупреждение: не удалось обновить APP_ENV в $ENV_FILE"
+        fi
+    fi
 fi
 
 ################################ Журнал и вывод ################################
@@ -497,6 +645,9 @@ check_or_create_file "$WORK_LOG" "run/log.txt" || die "Файл $WORK_LOG не �
 check_or_create_file "$API_LOG"  "run/log.txt" || die "Файл $API_LOG не создан"
 check_or_create_dir "$DB_DIR"   || die "Папка БД $DB_DIR не создана"
 check_or_create_dir "$BACKUP"   || die "Папка backup $BACKUP не создана"
+
+############################ Реле usbrelay ############################
+manage_relay_stub
 
 ########################### Проверка Python ###########################
 if command -v "$PY" &>/dev/null; then
