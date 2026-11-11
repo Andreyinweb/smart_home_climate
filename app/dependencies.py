@@ -8,10 +8,12 @@ from fastapi.templating import Jinja2Templates
 from app.services.heating_service import HeatingController
 from app.services.programmer_service import Programmer
 from app.services.logs_service import get_current_cycle_logs
+from app.services.header_service import get_header_info
 from app.services.relay_service import RelayController
 
 _templates = Jinja2Templates(directory="templates")
 _templates.env.globals["get_cycle_logs"] = get_current_cycle_logs
+_templates.env.globals["get_header_info"] = get_header_info
 _relay_controller: Optional[RelayController] = None
 
 
@@ -56,4 +58,3 @@ def get_programmer(
 ) -> Programmer:
     """Провайдер сервиса программатора."""
     return Programmer(heating_controller=heating_controller)
-

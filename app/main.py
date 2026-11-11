@@ -4,7 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import AppEnv, settings
@@ -31,6 +31,7 @@ from app.routers import (
 
 from app.services.ble_service import fetch_all_ble_sensors
 from app.services.climate_service import build_sensor_record, build_api_record
+from app.services.header_service import refresh_header
 from app.services import weather_service
 from app.services import backup_service
 from app.error_handlers import register_error_handlers
@@ -61,6 +62,9 @@ async def lifespan(app: FastAPI):
     programmer = get_programmer(heating_controller=heating_ctrl)
 
     await init_db_start_data()
+
+    # Первичное заполнение кэша шапки, чтобы она не была пустой до первого опроса.
+    await refresh_header()
 
     async def ble_polling_loop():
         while True:
@@ -103,6 +107,8 @@ async def lifespan(app: FastAPI):
                     await heating_ctrl.check_temperature(sensor_record["basement_temp"])
                     # 3. Защитная проверка пределов (минимум и максимум)
                     await heating_ctrl.min_max_temperature(sensor_record)
+                    # 4. Обновление кэша шапки (после программатора, чтобы пороги и статусы были актуальны)
+                    await refresh_header()
                 else:
                     work_log.warning("[Цикл] Данные с BLE-датчиков не получены.")
 
@@ -179,6 +185,17 @@ app = FastAPI(
     description="Сервер управления климатом",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def refresh_header_after_post(request: Request, call_next):
+    """После любого POST на /api/* (старт/стоп отопления, проветривания и т.п.)
+    обновляет кэш шапки, чтобы редирект на страницу уже показал новый статус."""
+    response = await call_next(request)
+    if request.method == "POST" and request.url.path.startswith("/api/"):
+        await refresh_header()
+    return response
+
 
 register_error_handlers(app)
 app.mount("/static", StaticFiles(directory="static"), name="static")
