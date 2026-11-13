@@ -59,7 +59,8 @@ copying_tables = {
 
 # Таблицы, которые заполняются при создании БД (run_program.py), поэтому никогда не пусты.
 # Копируются из самого свежего непустого бэкапа ВСЕГДА, заменяя текущие строки по первичному ключу.
-replacing_tables: Set[str] = set()
+# replacing_tables: Set[str] = set()
+replacing_tables = {"hourly_coefficients_table"}
 # Для замены добавлять так: replacing_tables = {"hourly_coefficients_table"}
 
 

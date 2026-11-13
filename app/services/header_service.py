@@ -1,6 +1,7 @@
 # app/services/header_service.py
 
 import logging
+from datetime import datetime
 from typing import Any, Dict
 
 from app.db import crud as db
@@ -8,6 +9,19 @@ from app.db import crud as db
 work_log = logging.getLogger("climat_app.header_service")
 
 _EMPTY = "—"
+_WEEKDAYS = ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
+
+
+def _fmt_time(timestamp: Any) -> str:
+    """'2026-11-13 01:40:33' -> 'Fr 01:40:33'. При ошибке разбора — только время или «—»."""
+    if not timestamp:
+        return _EMPTY
+    text = str(timestamp)
+    try:
+        day = _WEEKDAYS[datetime.strptime(text[:19], "%Y-%m-%d %H:%M:%S").weekday()]
+        return f"{day} {text[11:19]}"
+    except ValueError:
+        return text[11:19] or _EMPTY
 
 # Кэш шапки. Значения хранятся уже готовыми строками, шаблон ничего не форматирует.
 _header: Dict[str, Any] = {
@@ -51,7 +65,7 @@ async def refresh_header() -> None:
     timestamp = sensor.get("timestamp")
     _header.update(
         {
-            "time": str(timestamp)[11:19] if timestamp else _EMPTY,
+            "time": _fmt_time(timestamp),
             "t_min": _fmt(heat.get("temperature_start")),
             "t_now": _fmt(sensor.get("basement_temp")),
             "t_max": _fmt(heat.get("temperature_stop")),
