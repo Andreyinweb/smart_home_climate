@@ -153,7 +153,7 @@ if __name__ == "__main__":
     create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
 
 
-    # Создаём таблицу gas_table
+    # Создаём таблицу gas_table # coefficient_gas_hour REAL,
     fields_db = """ (
         id INTEGER PRIMARY KEY REFERENCES table_sensor_data(id) ON DELETE CASCADE,
         timestamp TEXT NOT NULL,        
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         gas_per_hour REAL,
         gas_per_month REAL,
         hot_water_per_month REAL,
-        hot_water_per_hour REAL,
+        hot_water_per_hour REAL,        
         coefficient_gas REAL,
         price_gas REAL,
         cost_of_gas REAL,

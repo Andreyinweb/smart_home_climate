@@ -206,7 +206,7 @@ app.include_router(settings_router.router)
 app.include_router(heating_router.router)
 app.include_router(programmer_router.router)
 
-if settings.app_env == AppEnv.DEVELOPMENT or settings.app_env == AppEnv.PREVIOUS:
+if settings.app_env == AppEnv.DEVELOPMENT or settings.app_env == AppEnv.PREVIOUS or settings.app_env == AppEnv.STAGING:
     app.include_router(debug_router.router)
 
 

@@ -23,7 +23,7 @@ router = APIRouter(
 
 def verify_development_mode() -> None:
     """Проверка работы приложения исключительно в режиме DEVELOPMENT."""
-    if settings.app_env != AppEnv.DEVELOPMENT:
+    if settings.app_env == AppEnv.PRODUCTION:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Страница не найдена",
