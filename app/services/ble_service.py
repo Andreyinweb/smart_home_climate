@@ -48,6 +48,9 @@ async def read_single_sensor(
     Returns:
         Dict с ключами 'temp', 'humi', 'voltage'.
     """
+    # Заглушка датчиков
+    # return {"temp": 21.5, "humi":65.0, "voltage": 2.935}
+
     data_received = asyncio.Event()
     result: Dict[str, float] = {}
     mac = str(mac_address).strip()
