@@ -81,7 +81,7 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
 
     # --- Режимы приложения и железа ---
     app_env: AppEnv = Field(default=AppEnv.DEVELOPMENT, alias="APP_ENV")
-    sensor_mode: SensorMode = Field(default=SensorMode.BASEMENT_STREET_FLOOR, alias="SENSOR_MODE")
+    sensor_mode: SensorMode = Field(default=SensorMode.BASEMENT, alias="SENSOR_MODE")
 
     # --- Пути (AppConfig & DatabaseConfig) ---
     project_dir: Path = Field(default_factory=Path.cwd)

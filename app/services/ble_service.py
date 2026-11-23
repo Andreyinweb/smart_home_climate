@@ -4,6 +4,7 @@ import asyncio
 import logging
 import struct
 from typing import Any, Dict, Optional, Tuple
+import random
 
 from bleak import BleakClient
 
@@ -15,6 +16,22 @@ work_log = logging.getLogger("climat_app.ble_service")
 # UUID характеристики получения показаний в реальном времени Xiaomi LYWSD03MMC
 REALTIME_DATA_CHAR = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6"
 
+def fake_sensor_data() -> Dict[str, float]:
+    """Имитация read_single_sensor для датчика пола."""
+    fail_rate = 0.0                # 0.2 = 20% вызовов упадут (проверка retry)
+    t_min, t_max = 17.2, 18.8      # температура, °C
+    h_min, h_max = 62, 67          # влажность, %
+    v_min, v_max = 2.90, 3.00      # напряжение, В
+    drift = 0.5                   # шаг случайного блуждания (доля диапазона)
+    pull = 0.5                    # возврат к середине диапазона
+
+    # if random.random() < fail_rate:
+    #     raise ConnectionError("Имитация сбоя BLE")
+
+    st = fake_sensor_data.__dict__.setdefault("state", [(t_min + t_max) / 2, (h_min + h_max) / 2])
+    for i, (lo, hi) in enumerate(((t_min, t_max), (h_min, h_max))):
+        st[i] = min(hi, max(lo, st[i] + ((lo + hi) / 2 - st[i]) * pull + random.gauss(0, (hi - lo) * drift)))
+    return {"temp": round(st[0], 1), "humi": float(round(st[1])), "voltage": round(random.uniform(v_min, v_max), 3)}
 
 def _parse_xiaomi_packet(data: bytes) -> Tuple[Optional[float], Optional[float], Optional[float]]:
     """
@@ -49,7 +66,7 @@ async def read_single_sensor(
         Dict с ключами 'temp', 'humi', 'voltage'.
     """
     # Заглушка датчиков
-    # return {"temp": 21.5, "humi":65.0, "voltage": 2.935}
+    # return fake_sensor_data()
 
     data_received = asyncio.Event()
     result: Dict[str, float] = {}
