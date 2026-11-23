@@ -55,8 +55,16 @@ WHERE s.sensor_or_calc_street = 1 AND s.street_temp IS NOT NULL AND s.street_hum
 """
 
 # Выборка показаний датчиков по шаблону даты/месяца (например, YYYY-MM-DD% или YYYY-MM%)
-SENSOR_RECORDS_BY_DATE = "SELECT * FROM table_sensor_data WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
+SENSOR_RECORDS_BY_DATE = (
+    "SELECT * FROM table_sensor_data WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
+)
 
-GAS_RECORDS_BY_MONTH = "SELECT * FROM gas_table WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
-MONTHLY_AVG_STREET_TEMP = "SELECT AVG(street_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
-MONTHLY_AVG_BASEMENT_TEMP = "SELECT AVG(basement_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
+GAS_RECORDS_BY_MONTH = (
+    "SELECT * FROM gas_table WHERE timestamp LIKE ? ORDER BY timestamp ASC;"
+)
+MONTHLY_AVG_STREET_TEMP = (
+    "SELECT AVG(street_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
+)
+MONTHLY_AVG_BASEMENT_TEMP = (
+    "SELECT AVG(basement_temp) AS res FROM table_sensor_data WHERE timestamp LIKE ?;"
+)

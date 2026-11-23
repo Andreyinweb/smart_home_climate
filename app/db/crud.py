@@ -49,6 +49,7 @@ _LIST_TYPES = (list, tuple, set, frozenset)
 
 # --- Внутренние помощники ---
 
+
 def _logger(log_to_api: bool) -> logging.Logger:
     """Возвращает api_log (True) или work_log (False)."""
     return api_log if log_to_api else work_log
@@ -70,7 +71,9 @@ def _check_identifier(name: str) -> str:
 
 
 @contextmanager
-def _use_conn(conn: Optional[sqlite3.Connection]) -> Generator[sqlite3.Connection, None, None]:
+def _use_conn(
+    conn: Optional[sqlite3.Connection],
+) -> Generator[sqlite3.Connection, None, None]:
     """
     Отдаёт переданное соединение либо открывает собственное.
 
@@ -83,7 +86,9 @@ def _use_conn(conn: Optional[sqlite3.Connection]) -> Generator[sqlite3.Connectio
             yield own_conn
 
 
-def _conditions(pk: Any, pk_col: str, where: Optional[Dict[str, Any]]) -> Tuple[List[str], List[Any]]:
+def _conditions(
+    pk: Any, pk_col: str, where: Optional[Dict[str, Any]]
+) -> Tuple[List[str], List[Any]]:
     """
     Собирает условия WHERE по ключу (скаляр или список) и словарю равенств.
 
@@ -120,6 +125,7 @@ def _conditions(pk: Any, pk_col: str, where: Optional[Dict[str, Any]]) -> Tuple[
 
 
 # --- Синхронное ядро ---
+
 
 def get_sync(
     table: str,
@@ -316,12 +322,17 @@ def query_sync(
             cursor = c.executemany(sql, params)
         else:
             cursor = c.execute(sql, params)
-        rows = [dict(r) for r in cursor.fetchall()] if cursor.description is not None else []
+        rows = (
+            [dict(r) for r in cursor.fetchall()]
+            if cursor.description is not None
+            else []
+        )
     logger.debug(f"query: {len(rows)} строк.")
     return rows
 
 
 # --- Асинхронные обёртки ---
+
 
 async def get(
     table: str,
@@ -339,7 +350,19 @@ async def get(
 ) -> List[Dict[str, Any]]:
     """Асинхронная обёртка над get_sync (параметры и логика те же)."""
     return await asyncio.to_thread(
-        get_sync, table, pk, pk_col, where, start, stop, order_col, order_asc, limit, offset, conn, log_to_api
+        get_sync,
+        table,
+        pk,
+        pk_col,
+        where,
+        start,
+        stop,
+        order_col,
+        order_asc,
+        limit,
+        offset,
+        conn,
+        log_to_api,
     )
 
 
@@ -363,7 +386,9 @@ async def delete(
     log_to_api: bool = False,
 ) -> int:
     """Асинхронная обёртка над delete_sync (параметры и логика те же)."""
-    return await asyncio.to_thread(delete_sync, table, pk, pk_col, where, conn, log_to_api)
+    return await asyncio.to_thread(
+        delete_sync, table, pk, pk_col, where, conn, log_to_api
+    )
 
 
 async def query(

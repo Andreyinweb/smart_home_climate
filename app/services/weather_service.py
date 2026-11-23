@@ -120,7 +120,9 @@ async def record_site_weather(
         await asyncio.sleep(0.5)
 
     if not sensor_record_exists:
-        work_log.warning(f"Запись сенсоров ID={row_id} не найдена в table_sensor_data. Погода не сохранена.")
+        work_log.warning(
+            f"Запись сенсоров ID={row_id} не найдена в table_sensor_data. Погода не сохранена."
+        )
         return None
 
     if not timestamp:
@@ -172,15 +174,21 @@ async def record_site_weather(
     return data_to_write
 
 
-async def calibrate_hourly_coefficients(max_time_diff_seconds: int = 600, days: int = 30) -> None:
+async def calibrate_hourly_coefficients(
+    max_time_diff_seconds: int = 600, days: int = 30
+) -> None:
     """Расчет часовых калибровочных коэффициентов delta_temp и delta_ah по медианам за последние days дней."""
     if _calibration_lock.locked():
         work_log.info("[Калибровка] Пропуск: процесс калибровки уже выполняется.")
         return
 
     async with _calibration_lock:
-        work_log.info(f"[Калибровка] Старт калибровки часовых коэффициентов (за {days} дн.)...")
-        rows = await db.query(queries.CALIBRATION_DATA, (max_time_diff_seconds, f"-{days} days"))
+        work_log.info(
+            f"[Калибровка] Старт калибровки часовых коэффициентов (за {days} дн.)..."
+        )
+        rows = await db.query(
+            queries.CALIBRATION_DATA, (max_time_diff_seconds, f"-{days} days")
+        )
         if not rows:
             work_log.warning("[Калибровка] Данные для калибровки не найдены.")
             return
@@ -214,9 +222,13 @@ async def calibrate_hourly_coefficients(max_time_diff_seconds: int = 600, days: 
                     "samples_count": count,
                     "updated_at": now_str,
                 }
-                await db.upsert("hourly_coefficients_table", [coeff_data], pk_col="hour")
+                await db.upsert(
+                    "hourly_coefficients_table", [coeff_data], pk_col="hour"
+                )
 
-        work_log.info("[Калибровка] Калибровка часовых коэффициентов успешно завершена.")
+        work_log.info(
+            "[Калибровка] Калибровка часовых коэффициентов успешно завершена."
+        )
 
 
 async def get_calculated_street_climate(current_hour: int) -> Tuple[float, float, bool]:
@@ -224,13 +236,17 @@ async def get_calculated_street_climate(current_hour: int) -> Tuple[float, float
     rows = await db.get("weather_site_table", order_col="id", limit=1)
     latest_site = rows[0] if rows else None
     if not latest_site:
-        work_log.warning("[Расчет] Нет данных с сайта погоды. Возвращаются значения 0.0.")
+        work_log.warning(
+            "[Расчет] Нет данных с сайта погоды. Возвращаются значения 0.0."
+        )
         return 0.0, 0.0, False
 
     site_temp = float(latest_site.get("site_temp", 0.0))
     site_ah = float(latest_site.get("site_ah", 0.0))
 
-    coeff_rows = await db.get("hourly_coefficients_table", pk=current_hour, pk_col="hour")
+    coeff_rows = await db.get(
+        "hourly_coefficients_table", pk=current_hour, pk_col="hour"
+    )
     coeffs = coeff_rows[0] if coeff_rows else {}
     delta_temp = float(coeffs.get("delta_temp", 0.0))
     delta_ah = float(coeffs.get("delta_ah", 0.0))

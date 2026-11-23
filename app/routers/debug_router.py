@@ -42,7 +42,12 @@ def read_last_lines(file_path: Path, max_lines: int = 300) -> List[str]:
         return [f"Ошибка при чтении файла лога: {e}"]
 
 
-@router.get("/work-log", response_class=HTMLResponse, dependencies=[Depends(verify_development_mode)], summary="Просмотр Work Log")
+@router.get(
+    "/work-log",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_development_mode)],
+    summary="Просмотр Work Log",
+)
 async def get_work_log(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -59,7 +64,9 @@ async def get_work_log(
     context = {
         "website_return_time": website_return_time,
         "log_title": "Work Log (climat_app)",
-        "log_file_name": settings.work_log.name if settings.work_log else "work_log.log",
+        "log_file_name": (
+            settings.work_log.name if settings.work_log else "work_log.log"
+        ),
         "log_content": log_content,
         "lines_count": len(log_lines),
     }
@@ -71,7 +78,12 @@ async def get_work_log(
     )
 
 
-@router.get("/api-log", response_class=HTMLResponse, dependencies=[Depends(verify_development_mode)], summary="Просмотр API Log")
+@router.get(
+    "/api-log",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_development_mode)],
+    summary="Просмотр API Log",
+)
 async def get_api_log(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),

@@ -16,6 +16,7 @@ def clean_logger_name(record: logging.LogRecord) -> bool:
 
 class CycleLogHandler(logging.Handler):
     """Перехватывает сообщения WARNING и ERROR текущего цикла для отображения в UI."""
+
     def emit(self, record: logging.LogRecord):
         if record.levelno >= logging.WARNING:
             log_entry = {
@@ -46,7 +47,9 @@ def get_current_cycle_logs() -> Dict[str, Any]:
     has_error = any(log["levelname"] in ("ERROR", "CRITICAL") for log in _CYCLE_LOGS)
     status = "error" if has_error else "warning"
 
-    messages = [f"{log['levelname']}:{log['name']}:{log['message']}" for log in _CYCLE_LOGS]
+    messages = [
+        f"{log['levelname']}:{log['name']}:{log['message']}" for log in _CYCLE_LOGS
+    ]
     return {
         "status": status,
         "messages": messages,
@@ -55,11 +58,16 @@ def get_current_cycle_logs() -> Dict[str, Any]:
 
 
 def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
-    log_level = logging.DEBUG if config.app_env == AppEnv.DEVELOPMENT or config.app_env == AppEnv.PREVIOUS or config.app_env == AppEnv.STAGING else logging.INFO
+    log_level = (
+        logging.DEBUG
+        if config.app_env == AppEnv.DEVELOPMENT
+        or config.app_env == AppEnv.PREVIOUS
+        or config.app_env == AppEnv.STAGING
+        else logging.INFO
+    )
 
     formatter = logging.Formatter(
-        "%(asctime)s:%(levelname)s:%(name)s:%(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        "%(asctime)s:%(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     work_handler = logging.FileHandler(config.work_log, mode="a")
@@ -84,8 +92,9 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
 
     try:
         import uvicorn.config
+
         uvicorn_config_dict = uvicorn.config.LOGGING_CONFIG
-        
+
         fmt_str = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
         date_fmt = "%Y-%m-%d %H:%M:%S"
 
@@ -95,7 +104,9 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
             uvicorn_config_dict["formatters"]["default"]["datefmt"] = date_fmt
         if "access" in uvicorn_config_dict.get("formatters", {}):
             uvicorn_config_dict["formatters"]["access"]["use_colors"] = False
-            uvicorn_config_dict["formatters"]["access"]["fmt"] = "%(asctime)s:%(levelname)s:%(name)s:%(client_addr)s - \"%(request_line)s\" %(status_code)s"
+            uvicorn_config_dict["formatters"]["access"][
+                "fmt"
+            ] = '%(asctime)s:%(levelname)s:%(name)s:%(client_addr)s - "%(request_line)s" %(status_code)s'
             uvicorn_config_dict["formatters"]["access"]["datefmt"] = date_fmt
 
         uvicorn_config_dict["handlers"]["api_file"] = {
@@ -110,10 +121,12 @@ def setup_loggers(config: Settings) -> tuple[logging.Logger, logging.Logger]:
             "mode": "a",
             "formatter": "access",
         }
-        
+
         uvicorn_config_dict["loggers"]["uvicorn"]["handlers"] = ["api_file"]
         uvicorn_config_dict["loggers"]["uvicorn.error"]["handlers"] = ["api_file"]
-        uvicorn_config_dict["loggers"]["uvicorn.access"]["handlers"] = ["api_access_file"]
+        uvicorn_config_dict["loggers"]["uvicorn.access"]["handlers"] = [
+            "api_access_file"
+        ]
     except Exception:
         pass
 
@@ -213,7 +226,7 @@ setup_loggers(settings)
 #     try:
 #         import uvicorn.config
 #         uvicorn_config_dict = uvicorn.config.LOGGING_CONFIG
-        
+
 #         fmt_str = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
 #         date_fmt = "%Y-%m-%d %H:%M:%S"
 
@@ -238,7 +251,7 @@ setup_loggers(settings)
 #             "mode": "a",
 #             "formatter": "access",
 #         }
-        
+
 #         uvicorn_config_dict["loggers"]["uvicorn"]["handlers"] = ["api_file"]
 #         uvicorn_config_dict["loggers"]["uvicorn.error"]["handlers"] = ["api_file"]
 #         uvicorn_config_dict["loggers"]["uvicorn.access"]["handlers"] = ["api_access_file"]
@@ -255,7 +268,3 @@ setup_loggers(settings)
 
 
 # setup_loggers(settings)
-
-
-
-

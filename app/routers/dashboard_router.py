@@ -18,8 +18,6 @@ from app.schemas.settings_schema import SystemSettingsUpdate
 api_log = logging.getLogger("api_app.routers.dashboard_router")
 
 
-
-
 def _merge_sensor_api(sensor: Any, api: Any) -> dict:
     """Объединяет запись датчиков и запись api_table (timestamp берётся из датчиков)."""
     data = dict(sensor)
@@ -33,7 +31,9 @@ async def _load_merged_by_id(record_id: Optional[int]) -> Optional[dict]:
     """Собирает sensor + api по id. Если любой из записей нет — возвращает None."""
     if record_id is None:
         return None
-    sensor_rows = await db.get("table_sensor_data", pk=record_id, pk_col="id", log_to_api=False)
+    sensor_rows = await db.get(
+        "table_sensor_data", pk=record_id, pk_col="id", log_to_api=False
+    )
     api_rows = await db.get("api_table", pk=record_id, pk_col="id", log_to_api=False)
     sensor = sensor_rows[0] if sensor_rows else None
     api = api_rows[0] if api_rows else None
@@ -48,7 +48,9 @@ def _hhmm(ts: Any) -> str:
     return s[11:16] if len(s) >= 16 else s
 
 
-def _diff_or_none(after: Optional[dict], before: Optional[dict], key: str) -> Optional[float]:
+def _diff_or_none(
+    after: Optional[dict], before: Optional[dict], key: str
+) -> Optional[float]:
     """Разница after - before или None, если данных для сравнения нет."""
     if not after or not before:
         return None
@@ -104,8 +106,16 @@ async def get_index(
         abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)
         app_env = settings.app_env.value
 
-        latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=True)
-        latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=True)
+        latest_sensor_rows = await db.get(
+            "table_sensor_data",
+            order_col="id",
+            order_asc=False,
+            limit=1,
+            log_to_api=True,
+        )
+        latest_api_rows = await db.get(
+            "api_table", order_col="id", order_asc=False, limit=1, log_to_api=True
+        )
         latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
         latest_api = latest_api_rows[0] if latest_api_rows else None
 
@@ -156,7 +166,13 @@ async def get_index(
 
         active_modes = []
         try:
-            latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+            latest_vent_rows = await db.get(
+                "ventilation_table",
+                order_col="id",
+                order_asc=False,
+                limit=1,
+                log_to_api=False,
+            )
             latest_vent = latest_vent_rows[0] if latest_vent_rows else None
             if latest_vent and latest_vent.get("status_ventilation"):
                 active_modes.append("Проветривание")
@@ -164,7 +180,13 @@ async def get_index(
             pass
 
         try:
-            latest_heat_rows = await db.get("heating_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+            latest_heat_rows = await db.get(
+                "heating_table",
+                order_col="id",
+                order_asc=False,
+                limit=1,
+                log_to_api=False,
+            )
             latest_heat = latest_heat_rows[0] if latest_heat_rows else None
             if latest_heat and latest_heat.get("status_heating"):
                 active_modes.append("Отопление")
@@ -197,7 +219,9 @@ async def get_index(
 
     except Exception as e:
         api_log.error(f"Ошибка при формировании главной страницы: {e}", exc_info=True)
-        return_time = getattr(sys_settings, "website_return_time", 60) if sys_settings else 60
+        return_time = (
+            getattr(sys_settings, "website_return_time", 60) if sys_settings else 60
+        )
         return templates.TemplateResponse(
             request=request,
             name=get_template_path("no_data.html", request),
@@ -206,7 +230,9 @@ async def get_index(
         )
 
 
-@router.get("/ventilation", response_class=HTMLResponse, summary="Страница проветривания")
+@router.get(
+    "/ventilation", response_class=HTMLResponse, summary="Страница проветривания"
+)
 async def get_ventilation_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -215,8 +241,12 @@ async def get_ventilation_page(
     sys_settings = await get_settings_db()
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
-    latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
-    latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_sensor_rows = await db.get(
+        "table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
+    latest_api_rows = await db.get(
+        "api_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
     latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
     latest_api = latest_api_rows[0] if latest_api_rows else None
 
@@ -232,7 +262,13 @@ async def get_ventilation_page(
 
     latest_vent = None
     try:
-        latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_vent_rows = await db.get(
+            "ventilation_table",
+            order_col="id",
+            order_asc=False,
+            limit=1,
+            log_to_api=False,
+        )
         latest_vent = latest_vent_rows[0] if latest_vent_rows else None
     except Exception:
         pass
@@ -257,7 +293,9 @@ async def get_ventilation_page(
         vent_before = await _load_merged_by_id(start_id)
         vent_after = await _load_merged_by_id(stop_id)
         start_label = (
-            vent_before.get("timestamp") if vent_before else latest_vent.get("timestamp", "—")
+            vent_before.get("timestamp")
+            if vent_before
+            else latest_vent.get("timestamp", "—")
         )
         card_title = f"История {start_label}, проветривания"
 
@@ -267,13 +305,26 @@ async def get_ventilation_page(
         vent_after = current_data
         card_title = "Проветривание не включалось"
 
-    if vent_before and vent_after and vent_before.get("timestamp") and vent_after.get("timestamp"):
+    if (
+        vent_before
+        and vent_after
+        and vent_before.get("timestamp")
+        and vent_after.get("timestamp")
+    ):
         vent_start_str = _hhmm(vent_before["timestamp"])
         vent_now_str = _hhmm(vent_after["timestamp"])
         vent_difference_time = get_time_difference_str(vent_start_str, vent_now_str)
     else:
-        vent_start_str = _hhmm(vent_before["timestamp"]) if vent_before and vent_before.get("timestamp") else "—"
-        vent_now_str = _hhmm(vent_after["timestamp"]) if vent_after and vent_after.get("timestamp") and latest_vent_exists else "—"
+        vent_start_str = (
+            _hhmm(vent_before["timestamp"])
+            if vent_before and vent_before.get("timestamp")
+            else "—"
+        )
+        vent_now_str = (
+            _hhmm(vent_after["timestamp"])
+            if vent_after and vent_after.get("timestamp") and latest_vent_exists
+            else "—"
+        )
         vent_difference_time = "—"
 
     diffs = {
@@ -314,7 +365,9 @@ async def get_ventilation_page(
     }
 
     return templates.TemplateResponse(
-        request=request, name=get_template_path("ventilation.html", request), context=context
+        request=request,
+        name=get_template_path("ventilation.html", request),
+        context=context,
     )
 
 
@@ -322,7 +375,9 @@ async def get_ventilation_page(
 async def start_ventilation():
     """Запуск проветривания."""
     sys_settings = await get_settings_db()
-    latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_vent_rows = await db.get(
+        "ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
     latest_vent = latest_vent_rows[0] if latest_vent_rows else None
 
     can_start = True
@@ -330,7 +385,13 @@ async def start_ventilation():
         can_start = False
 
     if can_start:
-        latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_sensor_rows = await db.get(
+            "table_sensor_data",
+            order_col="id",
+            order_asc=False,
+            limit=1,
+            log_to_api=False,
+        )
         latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
         if latest_sensor:
             data_to_write = {
@@ -339,10 +400,16 @@ async def start_ventilation():
                 "status_ventilation": True,
                 "stop_vent_plus": 0,
             }
-            await db.upsert("ventilation_table", [data_to_write], pk_col="id", log_to_api=False)
-            api_log.info(f"Успешный старт проветривания: sensor_id={latest_sensor['id']}")
+            await db.upsert(
+                "ventilation_table", [data_to_write], pk_col="id", log_to_api=False
+            )
+            api_log.info(
+                f"Успешный старт проветривания: sensor_id={latest_sensor['id']}"
+            )
 
-        latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_api_rows = await db.get(
+            "api_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+        )
         latest_api = latest_api_rows[0] if latest_api_rows else None
         if latest_api:
             vent_time_val = latest_api.get("vent_time_val") or 0
@@ -360,17 +427,32 @@ async def start_ventilation():
 async def stop_ventilation():
     """Остановка проветривания."""
     sys_settings = await get_settings_db()
-    latest_vent_rows = await db.get("ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_vent_rows = await db.get(
+        "ventilation_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
     latest_vent = latest_vent_rows[0] if latest_vent_rows else None
     if latest_vent and latest_vent.get("status_ventilation"):
-        latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_sensor_rows = await db.get(
+            "table_sensor_data",
+            order_col="id",
+            order_asc=False,
+            limit=1,
+            log_to_api=False,
+        )
         latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
         if latest_sensor:
             stop_vent_plus = latest_sensor["id"] - latest_vent["id"]
 
             if stop_vent_plus == 0:
-                await db.delete("ventilation_table", pk=latest_vent["id"], pk_col="id", log_to_api=False)
-                api_log.info(f"Удаление записи проветривания (stop_vent_plus=0): id={latest_vent['id']}")
+                await db.delete(
+                    "ventilation_table",
+                    pk=latest_vent["id"],
+                    pk_col="id",
+                    log_to_api=False,
+                )
+                api_log.info(
+                    f"Удаление записи проветривания (stop_vent_plus=0): id={latest_vent['id']}"
+                )
             else:
                 data_to_write = {
                     "id": latest_vent["id"],
@@ -378,16 +460,22 @@ async def stop_ventilation():
                     "status_ventilation": False,
                     "stop_vent_plus": stop_vent_plus,
                 }
-                await db.upsert("ventilation_table", [data_to_write], pk_col="id", log_to_api=False)
+                await db.upsert(
+                    "ventilation_table", [data_to_write], pk_col="id", log_to_api=False
+                )
                 api_log.info(
                     f"Успешный стоп проветривания: start_id={latest_vent['id']}, "
                     f"stop_id={latest_sensor['id']}, diff={stop_vent_plus}"
                 )
 
-            latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+            latest_api_rows = await db.get(
+                "api_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+            )
             latest_api = latest_api_rows[0] if latest_api_rows else None
             if latest_api:
-                dto = SystemSettingsUpdate(interval_seconds=sys_settings.previous_interval_in_seconds)
+                dto = SystemSettingsUpdate(
+                    interval_seconds=sys_settings.previous_interval_in_seconds
+                )
                 await update_settings(update_dto=dto)
 
     return RedirectResponse(url="/ventilation", status_code=status.HTTP_303_SEE_OTHER)

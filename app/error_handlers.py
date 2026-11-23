@@ -58,4 +58,3 @@ def register_error_handlers(app: FastAPI) -> None:
     async def unhandled_exc_handler(request: Request, exc: Exception):
         log.error(f"500 {request.method} {request.url.path}: {exc}", exc_info=True)
         return _render(request, 500)
-    

@@ -75,9 +75,12 @@ REAL_CHECK_COLUMNS = (
 )
 
 
-def get_db_connection(path_db: str | Path, read_only: bool = False) -> sqlite3.Connection:
+def get_db_connection(
+    path_db: str | Path, read_only: bool = False
+) -> sqlite3.Connection:
     """Создает и возвращает подключение к базе данных SQLite с включенной поддержкой Foreign Keys.
-    read_only=True: БД-источник открывается только на чтение (не создается, если файла нет)."""
+    read_only=True: БД-источник открывается только на чтение (не создается, если файла нет).
+    """
     if read_only:
         conn = sqlite3.connect(f"{Path(path_db).resolve().as_uri()}?mode=ro", uri=True)
     else:
@@ -101,7 +104,8 @@ def open_db(path_db: str | Path, read_only: bool = False):
 
 def parse_backup_list(raw: Optional[str]) -> List[Path]:
     """Разбирает необязательную переменную BACKUP_LIST.
-    Поддерживаются форматы: ['a', 'b'] (Python), ["a", "b"] (JSON) и простой список через запятую."""
+    Поддерживаются форматы: ['a', 'b'] (Python), ["a", "b"] (JSON) и простой список через запятую.
+    """
     if not raw or not raw.strip():
         return []
     raw = raw.strip()
@@ -136,7 +140,10 @@ def backup_sort_key(path: Path):
     match = _TS_IN_NAME.search(path.stem)
     if match:
         try:
-            return datetime.strptime(match.group(1) + match.group(2), "%Y%m%d%H%M%S"), path.name
+            return (
+                datetime.strptime(match.group(1) + match.group(2), "%Y%m%d%H%M%S"),
+                path.name,
+            )
         except ValueError:
             pass
     try:
@@ -161,7 +168,11 @@ def collect_backup_files(sources: List[Path], target_db: str | Path) -> List[Pat
         if source.is_file():
             candidates = [source]
         else:
-            candidates = [f for f in sorted(source.iterdir()) if f.is_file() and f.suffix in (".sqlite3", ".db")]
+            candidates = [
+                f
+                for f in sorted(source.iterdir())
+                if f.is_file() and f.suffix in (".sqlite3", ".db")
+            ]
         for file in candidates:
             real = file.resolve()
             if real == target or real in found:
@@ -181,11 +192,15 @@ def get_table_columns(conn: sqlite3.Connection, table_name: str) -> List[str]:
         return []
 
 
-def get_existing_dates(conn: sqlite3.Connection, table_name: str, date_col: str = "timestamp") -> Set[Any]:
+def get_existing_dates(
+    conn: sqlite3.Connection, table_name: str, date_col: str = "timestamp"
+) -> Set[Any]:
     """Извлекает все существующие значения даты/времени из целевой таблицы для O(1) проверки дубликатов."""
     try:
         cursor = conn.cursor()
-        cursor.execute(f"SELECT {date_col} FROM {table_name} WHERE {date_col} IS NOT NULL")
+        cursor.execute(
+            f"SELECT {date_col} FROM {table_name} WHERE {date_col} IS NOT NULL"
+        )
         return {row[0] for row in cursor.fetchall()}
     except sqlite3.Error as e:
         print(f"[Ошибка] Не удалось получить существующие даты из {table_name}: {e}")
@@ -196,7 +211,9 @@ def get_timestamp_to_id_map(conn: sqlite3.Connection) -> Dict[str, int]:
     """Строит словарь соответствий timestamp -> id на основе главной таблицы table_sensor_data."""
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT timestamp, id FROM table_sensor_data WHERE timestamp IS NOT NULL")
+        cursor.execute(
+            "SELECT timestamp, id FROM table_sensor_data WHERE timestamp IS NOT NULL"
+        )
         return {row[0]: row[1] for row in cursor.fetchall()}
     except sqlite3.Error as e:
         print(f"[Ошибка] Не удалось построить карту timestamp -> id: {e}")
@@ -228,11 +245,15 @@ def copy_latest_config_tables(
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
                 target_count = cursor.fetchone()[0]
             except sqlite3.Error as e:
-                print(f"[Ошибка] Не удалось проверить количество записей в целевой таблице {table_name}: {e}")
+                print(
+                    f"[Ошибка] Не удалось проверить количество записей в целевой таблице {table_name}: {e}"
+                )
                 continue
 
             if target_count > 0:
-                print(f"[Пропуск] Таблица {table_name} уже содержит записи ({target_count} шт.). Копирование не требуется.")
+                print(
+                    f"[Пропуск] Таблица {table_name} уже содержит записи ({target_count} шт.). Копирование не требуется."
+                )
                 continue
 
         copied = False
@@ -250,7 +271,9 @@ def copy_latest_config_tables(
                     if backup_count == 0:
                         continue
 
-                    common_columns = [col for col in target_columns if col in backup_columns]
+                    common_columns = [
+                        col for col in target_columns if col in backup_columns
+                    ]
                     if not common_columns:
                         continue
 
@@ -263,22 +286,32 @@ def copy_latest_config_tables(
                     if rows:
                         insert_cmd = "INSERT OR REPLACE" if is_replace else "INSERT"
                         insert_query = f"{insert_cmd} INTO {table_name} ({cols_str}) VALUES ({placeholders})"
-                        target_conn.executemany(insert_query, [tuple(row) for row in rows])
+                        target_conn.executemany(
+                            insert_query, [tuple(row) for row in rows]
+                        )
                         target_conn.commit()
                         action = "заменено/записано" if is_replace else "скопировано"
-                        print(f"  [+] {table_name}: {action} {len(rows)} записей из самого свежего бэкапа {backup_path.name}.")
+                        print(
+                            f"  [+] {table_name}: {action} {len(rows)} записей из самого свежего бэкапа {backup_path.name}."
+                        )
                         copied = True
                         break
 
             except sqlite3.Error as e:
                 target_conn.rollback()
-                print(f"  [Ошибка] Чтение таблицы {table_name} из бэкапа {backup_path.name}: {e}")
+                print(
+                    f"  [Ошибка] Чтение таблицы {table_name} из бэкапа {backup_path.name}: {e}"
+                )
 
         if not copied:
             if is_replace:
-                print(f"  [-] {table_name}: подходящих данных в бэкапах не найдено, оставлены текущие значения.")
+                print(
+                    f"  [-] {table_name}: подходящих данных в бэкапах не найдено, оставлены текущие значения."
+                )
             else:
-                print(f"  [-] {table_name}: целевая таблица пуста, но подходящих данных в бэкапах не найдено.")
+                print(
+                    f"  [-] {table_name}: целевая таблица пуста, но подходящих данных в бэкапах не найдено."
+                )
 
 
 def migrate_primary_table(
@@ -315,8 +348,11 @@ def migrate_primary_table(
                     continue
 
                 common_columns = [
-                    col for col in target_columns
-                    if col in backup_columns and col.lower() != "id" and col not in abs_cols_all
+                    col
+                    for col in target_columns
+                    if col in backup_columns
+                    and col.lower() != "id"
+                    and col not in abs_cols_all
                 ]
                 # Абсолютная влажность, реально существующая в бэкапе - читаем как есть.
                 abs_in_backup = [c for c in abs_cols_all if c in backup_columns]
@@ -340,19 +376,26 @@ def migrate_primary_table(
 
                     if row_date in existing_dates:
                         total_skipped += 1
-                    elif check_columns and not all(isinstance(row_dict.get(c), float) for c in check_columns):
+                    elif check_columns and not all(
+                        isinstance(row_dict.get(c), float) for c in check_columns
+                    ):
                         total_invalid += 1
                     else:
                         if CALCULATE_ABS_HUMI_ON_MIGRATE:
                             for ah_col, temp_col, humi_col in ABS_HUMI_SOURCES:
-                                if ah_col not in abs_cols_all or row_dict.get(ah_col) is not None:
+                                if (
+                                    ah_col not in abs_cols_all
+                                    or row_dict.get(ah_col) is not None
+                                ):
                                     continue
                                 t = row_dict.get(temp_col)
                                 h = row_dict.get(humi_col)
                                 if t is not None and h is not None:
                                     row_dict[ah_col] = calculate_absolute_humidity(t, h)
 
-                        rows_to_insert.append(tuple(row_dict.get(col) for col in active_columns))
+                        rows_to_insert.append(
+                            tuple(row_dict.get(col) for col in active_columns)
+                        )
                         existing_dates.add(row_date)
 
                 if rows_to_insert:
@@ -362,7 +405,9 @@ def migrate_primary_table(
                     target_conn.commit()
                     inserted_count = len(rows_to_insert)
                     total_inserted += inserted_count
-                    print(f"  [+] {backup_path.name}: добавлено {inserted_count} новых записей.")
+                    print(
+                        f"  [+] {backup_path.name}: добавлено {inserted_count} новых записей."
+                    )
 
         except sqlite3.Error as e:
             print(f"  [Ошибка] Чтение/запись файла {backup_path.name}: {e}")
@@ -406,7 +451,8 @@ def migrate_dependent_table(
                     continue
 
                 common_non_id = [
-                    col for col in target_columns
+                    col
+                    for col in target_columns
                     if col in backup_columns and col.lower() != "id"
                 ]
                 if not common_non_id:
@@ -435,7 +481,9 @@ def migrate_dependent_table(
                             if row_id is None:
                                 total_skipped += 1
                                 continue
-                            row_tuple = (row_id,) + tuple(row_dict[col] for col in common_non_id)
+                            row_tuple = (row_id,) + tuple(
+                                row_dict[col] for col in common_non_id
+                            )
                         else:
                             row_tuple = tuple(row_dict[col] for col in common_non_id)
 
@@ -448,15 +496,21 @@ def migrate_dependent_table(
                     target_conn.commit()
                     inserted_count = len(rows_to_insert)
                     total_inserted += inserted_count
-                    print(f"  [+] {backup_path.name}: добавлено {inserted_count} новых записей.")
+                    print(
+                        f"  [+] {backup_path.name}: добавлено {inserted_count} новых записей."
+                    )
 
         except sqlite3.Error as e:
             print(f"  [Ошибка] Чтение/запись файла {backup_path.name}: {e}")
 
-    print(f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов/без ID: {total_skipped}")
+    print(
+        f"[Итог для {table_name}] Добавлено: {total_inserted}, Пропущено дубликатов/без ID: {total_skipped}"
+    )
 
 
-def main(not_migrate: Set[str], copy_tables: Set[str], replace_tables: Set[str]) -> None:
+def main(
+    not_migrate: Set[str], copy_tables: Set[str], replace_tables: Set[str]
+) -> None:
     print("=" * 80)
     print(" ЗАПУСК ПРОЦЕССА МИГРАЦИИ И ОБЪЕДИНЕНИЯ ДАННЫХ")
     print("=" * 80)
@@ -485,20 +539,29 @@ def main(not_migrate: Set[str], copy_tables: Set[str], replace_tables: Set[str])
             target_tables = [row[0] for row in cursor.fetchall()]
 
             now_db_tables = [
-                t for t in target_tables
-                if t not in not_migrate and t not in copy_tables and t not in replace_tables
+                t
+                for t in target_tables
+                if t not in not_migrate
+                and t not in copy_tables
+                and t not in replace_tables
             ]
-            print(f"[Инфо] Таблицы логов для хронологической миграции ({len(now_db_tables)}): {now_db_tables}")
+            print(
+                f"[Инфо] Таблицы логов для хронологической миграции ({len(now_db_tables)}): {now_db_tables}"
+            )
 
             # 1. Копирование/замена конфигурационных таблиц
-            copy_latest_config_tables(target_conn, backup_files, copy_tables, replace_tables)
+            copy_latest_config_tables(
+                target_conn, backup_files, copy_tables, replace_tables
+            )
 
             # 2. Миграция главной таблицы датчиков (table_sensor_data)
             migrate_primary_table(target_conn, backup_files, "table_sensor_data")
 
             # 3. Формирование единой карты timestamp -> id
             ts_to_id = get_timestamp_to_id_map(target_conn)
-            print(f"[Инфо] Кэш timestamp -> ID сформирован ({len(ts_to_id)} записей в карте).")
+            print(
+                f"[Инфо] Кэш timestamp -> ID сформирован ({len(ts_to_id)} записей в карте)."
+            )
 
             # 4. Миграция остальных зависимых таблиц логов
             for table_name in now_db_tables:
@@ -514,4 +577,3 @@ def main(not_migrate: Set[str], copy_tables: Set[str], replace_tables: Set[str])
 
 if __name__ == "__main__":
     main(not_magrate_tables, copying_tables, replacing_tables)
-

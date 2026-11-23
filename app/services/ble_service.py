@@ -16,27 +16,45 @@ work_log = logging.getLogger("climat_app.ble_service")
 # UUID характеристики получения показаний в реальном времени Xiaomi LYWSD03MMC
 REALTIME_DATA_CHAR = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6"
 
+
 def fake_sensor_data() -> Dict[str, float]:
     """Имитация read_single_sensor для датчика пола."""
-    fail_rate = 0.0                # 0.2 = 20% вызовов упадут (проверка retry)
-    t_min, t_max = 17.2, 18.8      # температура, °C
-    h_min, h_max = 62, 67          # влажность, %
-    v_min, v_max = 2.90, 3.00      # напряжение, В
-    drift = 0.5                   # шаг случайного блуждания (доля диапазона)
-    pull = 0.5                    # возврат к середине диапазона
+    fail_rate = 0.0  # 0.2 = 20% вызовов упадут (проверка retry)
+    t_min, t_max = 17.2, 18.8  # температура, °C
+    h_min, h_max = 62, 67  # влажность, %
+    v_min, v_max = 2.90, 3.00  # напряжение, В
+    drift = 0.5  # шаг случайного блуждания (доля диапазона)
+    pull = 0.5  # возврат к середине диапазона
 
     # if random.random() < fail_rate:
     #     raise ConnectionError("Имитация сбоя BLE")
 
-    st = fake_sensor_data.__dict__.setdefault("state", [(t_min + t_max) / 2, (h_min + h_max) / 2])
+    st = fake_sensor_data.__dict__.setdefault(
+        "state", [(t_min + t_max) / 2, (h_min + h_max) / 2]
+    )
     for i, (lo, hi) in enumerate(((t_min, t_max), (h_min, h_max))):
-        st[i] = min(hi, max(lo, st[i] + ((lo + hi) / 2 - st[i]) * pull + random.gauss(0, (hi - lo) * drift)))
-    return {"temp": round(st[0], 1), "humi": float(round(st[1])), "voltage": round(random.uniform(v_min, v_max), 3)}
+        st[i] = min(
+            hi,
+            max(
+                lo,
+                st[i]
+                + ((lo + hi) / 2 - st[i]) * pull
+                + random.gauss(0, (hi - lo) * drift),
+            ),
+        )
+    return {
+        "temp": round(st[0], 1),
+        "humi": float(round(st[1])),
+        "voltage": round(random.uniform(v_min, v_max), 3),
+    }
 
-def _parse_xiaomi_packet(data: bytes) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+
+def _parse_xiaomi_packet(
+    data: bytes,
+) -> Tuple[Optional[float], Optional[float], Optional[float]]:
     """
     Разбор 5-байтового пакета Xiaomi LYWSD03MMC (температура, влажность, напряжение).
-    
+
     Структура пакета:
     - Байты 0-1: Температура (signed short, x100, little-endian)
     - Байт 2: Относительная влажность (unsigned char)
@@ -55,18 +73,16 @@ def _parse_xiaomi_packet(data: bytes) -> Tuple[Optional[float], Optional[float],
 
 
 async def read_single_sensor(
-    mac_address: str, 
-    connection_timeout: float = 15.0, 
-    read_timeout: float = 10.0
+    mac_address: str, connection_timeout: float = 15.0, read_timeout: float = 10.0
 ) -> Dict[str, float]:
     """
     Подключается к BLE-датчику по MAC-адресу и считывает текущие климатические параметры.
-    
+
     Returns:
         Dict с ключами 'temp', 'humi', 'voltage'.
     """
     # Заглушка датчиков
-    # return fake_sensor_data()
+    return fake_sensor_data()
 
     data_received = asyncio.Event()
     result: Dict[str, float] = {}
@@ -96,13 +112,15 @@ async def read_single_sensor(
 async def fetch_all_ble_sensors(sys_settings: SystemSettings) -> Dict[str, Any]:
     """
     Опрашивает все активные датчики согласно sys_settings.mode и mac_dict из конфигурации.
-    
+
     Возвращает словарь с ключами формата:
     {sensor_name}_temp, {sensor_name}_humi, {sensor_name}_voltage.
     """
     # Выделяем список датчиков в нижнем регистре (например: ['basement', 'street', 'floor'])
-    sensor_names = [part.strip().lower() for part in sys_settings.mode.split("_") if part.strip()]
-    
+    sensor_names = [
+        part.strip().lower() for part in sys_settings.mode.split("_") if part.strip()
+    ]
+
     # Считываем словарь MAC-адресов {'basement': '...', 'street': '...', ...}
     mac_dict = config_settings.mac_dict
 
@@ -111,7 +129,9 @@ async def fetch_all_ble_sensors(sys_settings: SystemSettings) -> Dict[str, Any]:
 
     for sensor_name in sensor_names:
         # Ищем MAC в mac_dict или напрямую через атрибут <sensor>_mac в config_settings
-        mac = mac_dict.get(sensor_name) or getattr(config_settings, f"{sensor_name}_mac", None)
+        mac = mac_dict.get(sensor_name) or getattr(
+            config_settings, f"{sensor_name}_mac", None
+        )
 
         if not mac:
             work_log.warning(f"[{sensor_name}] MAC-адрес не найден в конфигурации.")
@@ -126,7 +146,9 @@ async def fetch_all_ble_sensors(sys_settings: SystemSettings) -> Dict[str, Any]:
                 data = await read_single_sensor(mac)
             except Exception as e:
                 err_msg = str(e).strip() or type(e).__name__
-                work_log.debug(f"[{sensor_name}] Попытка {retries}/{sys_settings.max_retries} не удалась: {err_msg}")
+                work_log.debug(
+                    f"[{sensor_name}] Попытка {retries}/{sys_settings.max_retries} не удалась: {err_msg}"
+                )
                 await asyncio.sleep(1)
 
         if data and "temp" in data:
@@ -137,7 +159,9 @@ async def fetch_all_ble_sensors(sys_settings: SystemSettings) -> Dict[str, Any]:
                 f"[{sensor_name}] T={data['temp']}°C, H={data['humi']}%, V={data['voltage']}V (попытка {retries})"
             )
         else:
-            work_log.error(f"[{sensor_name}] Не удалось получить данные за {retries} попыток.")
+            work_log.error(
+                f"[{sensor_name}] Не удалось получить данные за {retries} попыток."
+            )
 
         await asyncio.sleep(1)
 

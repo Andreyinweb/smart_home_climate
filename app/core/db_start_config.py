@@ -17,13 +17,17 @@ def _now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-async def _init_row_if_missing(table: str, data: Dict[str, Any], log_to_api: bool = False) -> None:
+async def _init_row_if_missing(
+    table: str, data: Dict[str, Any], log_to_api: bool = False
+) -> None:
     """Если в таблице нет записи id=1, записывает data (первичное заполнение)."""
     if await crud.get(table, pk=1, log_to_api=log_to_api):
         work_log.info(f"[DB Init] Таблица '{table}' уже содержит записи (id=1).")
         return
 
-    work_log.info(f"[DB Init] Запись id=1 в '{table}' не найдена. Первичное заполнение...")
+    work_log.info(
+        f"[DB Init] Запись id=1 в '{table}' не найдена. Первичное заполнение..."
+    )
     if await crud.upsert(table, [data], pk_col="id", log_to_api=log_to_api) > 0:
         work_log.info(f"[DB Init] Первичное заполнение '{table}' успешно завершено.")
     else:
@@ -68,20 +72,33 @@ async def init_settings_table(log_to_api: bool = False) -> None:
     }
 
     if not rows:
-        work_log.info("[DB Init] Запись id=1 в 'settings_table' не найдена. Первичное заполнение из config.settings...")
-        data, ok_msg, err_msg = default_data, "Первичное заполнение", "первичном заполнении"
+        work_log.info(
+            "[DB Init] Запись id=1 в 'settings_table' не найдена. Первичное заполнение из config.settings..."
+        )
+        data, ok_msg, err_msg = (
+            default_data,
+            "Первичное заполнение",
+            "первичном заполнении",
+        )
     else:
         data = dict(rows[0])
         missing = [k for k in default_data if data.get(k) is None]
         if not missing:
-            work_log.info("[DB Init] Таблица 'settings_table' уже содержит все заполненные настройки (id=1).")
+            work_log.info(
+                "[DB Init] Таблица 'settings_table' уже содержит все заполненные настройки (id=1)."
+            )
             return
-        work_log.info("[DB Init] В 'settings_table' найдены незаполненные поля (None). Дозаполнение из конфигурации...")
+        work_log.info(
+            "[DB Init] В 'settings_table' найдены незаполненные поля (None). Дозаполнение из конфигурации..."
+        )
         data.update({k: default_data[k] for k in missing})
         data["timestamp"] = default_data["timestamp"]
         ok_msg, err_msg = "Дозаполнение", "дозаполнении"
 
-    if await crud.upsert("settings_table", [data], pk_col="id", log_to_api=log_to_api) > 0:
+    if (
+        await crud.upsert("settings_table", [data], pk_col="id", log_to_api=log_to_api)
+        > 0
+    ):
         work_log.info(f"[DB Init] {ok_msg} 'settings_table' успешно завершено.")
     else:
         work_log.error(f"[DB Init] Ошибка при {err_msg} 'settings_table'.")
@@ -168,12 +185,16 @@ def _calc_system_row(
         try:
             row_time = datetime.strptime(row["week_time"], "%H:%M").time()
         except (KeyError, TypeError, ValueError):
-            work_log.warning(f"[DB Init] Некорректное week_time в строке id={row.get('id')}: {row.get('week_time')}")
+            work_log.warning(
+                f"[DB Init] Некорректное week_time в строке id={row.get('id')}: {row.get('week_time')}"
+            )
             continue
 
         days = _parse_week_day(row.get("week_day", ""))
         if not days:
-            work_log.warning(f"[DB Init] Некорректный week_day в строке id={row.get('id')}: {row.get('week_day')}")
+            work_log.warning(
+                f"[DB Init] Некорректный week_day в строке id={row.get('id')}: {row.get('week_day')}"
+            )
             continue
 
         for offset in range(-7, 8):
@@ -247,14 +268,16 @@ def _build_default_week_schedule(now_datetime_str: str) -> List[Dict[str, Any]]:
         for day_item in day_list:
             for item in two_elements:
                 next_id += 1
-                records.append({
-                    "id": next_id,
-                    "week_mode": week_mode_item,
-                    "week_day": day_item,
-                    "week_time": item["week_time"],
-                    "week_temperature": item["week_temperature"],
-                    "updated_at": now_datetime_str,
-                })
+                records.append(
+                    {
+                        "id": next_id,
+                        "week_mode": week_mode_item,
+                        "week_day": day_item,
+                        "week_time": item["week_time"],
+                        "week_temperature": item["week_temperature"],
+                        "updated_at": now_datetime_str,
+                    }
+                )
 
     return records
 
@@ -275,13 +298,24 @@ async def init_programmer_week_table(log_to_api: bool = False) -> None:
     all_success = True
 
     if existing_record is None:
-        work_log.info("[DB Init] Запись id=1 в 'programmer_week' не найдена. Первичное заполнение расписания...")
+        work_log.info(
+            "[DB Init] Запись id=1 в 'programmer_week' не найдена. Первичное заполнение расписания..."
+        )
         schedule_rows = _build_default_week_schedule(now.strftime("%Y-%m-%d %H:%M:%S"))
-        all_success = await crud.upsert("programmer_week", schedule_rows, pk_col="id", log_to_api=log_to_api) > 0
+        all_success = (
+            await crud.upsert(
+                "programmer_week", schedule_rows, pk_col="id", log_to_api=log_to_api
+            )
+            > 0
+        )
         current_mode = "week"
     else:
-        work_log.info("[DB Init] Таблица 'programmer_week' уже содержит записи (id=1). Пересчёт системной строки...")
-        schedule_rows = await crud.get("programmer_week", start=2, order_asc=True, log_to_api=log_to_api)
+        work_log.info(
+            "[DB Init] Таблица 'programmer_week' уже содержит записи (id=1). Пересчёт системной строки..."
+        )
+        schedule_rows = await crud.get(
+            "programmer_week", start=2, order_asc=True, log_to_api=log_to_api
+        )
         # Режим берём из текущей системной строки, если он допустим, иначе 'week'
         current_mode = existing_record.get("week_mode")
         if current_mode not in settings.days_week_mode:
@@ -289,11 +323,18 @@ async def init_programmer_week_table(log_to_api: bool = False) -> None:
 
     system_record = _calc_system_row(schedule_rows, current_mode, now)
     if system_record is None:
-        work_log.error(f"[DB Init] Не удалось вычислить системную строку 'programmer_week' для режима '{current_mode}'.")
+        work_log.error(
+            f"[DB Init] Не удалось вычислить системную строку 'programmer_week' для режима '{current_mode}'."
+        )
         return
 
     # Отдельный запрос: у системной строки другой набор колонок (now_id, next_id), чем у строк расписания.
-    if await crud.upsert("programmer_week", [system_record], pk_col="id", log_to_api=log_to_api) <= 0:
+    if (
+        await crud.upsert(
+            "programmer_week", [system_record], pk_col="id", log_to_api=log_to_api
+        )
+        <= 0
+    ):
         all_success = False
 
     if all_success:

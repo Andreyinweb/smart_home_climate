@@ -49,8 +49,11 @@ def create_backup(
             today_str = datetime.now().strftime("%Y%m%d")
             prefix_today = f"{name}_{today_str}"
             today_backups = [
-                f for f in dst_dir.iterdir()
-                if f.is_file() and f.name.startswith(prefix_today) and f.name.endswith(ext)
+                f
+                for f in dst_dir.iterdir()
+                if f.is_file()
+                and f.name.startswith(prefix_today)
+                and f.name.endswith(ext)
             ]
             if len(today_backups) >= max_daily_backups:
                 work_log.debug(
@@ -79,7 +82,11 @@ def create_backup(
         # Ротация старых бэкапов
         prefix = f"{name}_"
         backups = sorted(
-            [f for f in dst_dir.iterdir() if f.is_file() and f.name.startswith(prefix) and f.name.endswith(ext)],
+            [
+                f
+                for f in dst_dir.iterdir()
+                if f.is_file() and f.name.startswith(prefix) and f.name.endswith(ext)
+            ],
             key=lambda p: p.name,
         )
 
@@ -222,13 +229,6 @@ async def create_backup_async(
 #     max_backups: int = 100,
 # ) -> Optional[Path]:
 #     return await asyncio.to_thread(create_backup, source_file, backup_dir, max_backups)
-
-
-
-
-
-
-
 
 
 # # # app/services/backup_service.py
