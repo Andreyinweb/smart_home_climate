@@ -45,14 +45,6 @@ async def lifespan(app: FastAPI):
     work_log = logging.getLogger("climat_app.main")
     work_log.info("-" * 80)
     sys_settings = await get_settings_db()
-    work_log.info(
-        f"Запуск Smart Home Climate API  app_env={settings.app_env.value}     "
-        f"sensor_mode={sys_settings.mode}    site_weather={settings.site_weather.value}"
-    )
-    print(
-        f"Запуск Smart Home Climate API  app_env={settings.app_env.value}     "
-        f"sensor_mode={sys_settings.mode}    site_weather={settings.site_weather.value}"
-    )
 
     # Стартовые установки. Объекты создаются один раз и используются
     # и в фоновом цикле, и при остановке приложения.
@@ -63,6 +55,13 @@ async def lifespan(app: FastAPI):
     programmer = get_programmer(heating_controller=heating_ctrl)
 
     await init_db_start_data()
+
+    startup_message = (
+        f"Запуск Smart Home Climate API  app_env={settings.app_env.value}     "
+        f"sensor_mode={sys_settings.mode}    site_weather={settings.site_weather.value}"
+    )
+    work_log.info(startup_message)
+    print(startup_message)
 
     # Первичное заполнение кэша шапки, чтобы она не была пустой до первого опроса.
     await refresh_header()
@@ -118,7 +117,7 @@ async def lifespan(app: FastAPI):
                 coeff_rows = await db.get("hourly_coefficients_table", pk=int(timestamp_str[11:13]), pk_col="hour")
                 updated_at_str = coeff_rows[0].get("updated_at") if coeff_rows else None
 
-                if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):                    
+                if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
                     await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100, max_daily_backups=1)
                     if sys_settings.mode == "BASEMENT_STREET_FLOOR" or sys_settings.mode == "BASEMENT_STREET":
                         asyncio.create_task(weather_service.calibrate_hourly_coefficients())
