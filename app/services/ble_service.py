@@ -82,7 +82,7 @@ async def read_single_sensor(
         Dict с ключами 'temp', 'humi', 'voltage'.
     """
     # Заглушка датчиков
-    return fake_sensor_data()
+    # return fake_sensor_data()
 
     data_received = asyncio.Event()
     result: Dict[str, float] = {}
