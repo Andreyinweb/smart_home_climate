@@ -43,8 +43,7 @@ SHUTDOWN_STOP_TIMEOUT = 10.0
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     work_log = logging.getLogger("climat_app.main")
-    work_log.info("-" * 80)
-    sys_settings = await get_settings_db()
+    work_log.info("-" * 80)   
 
     # Стартовые установки. Объекты создаются один раз и используются
     # и в фоновом цикле, и при остановке приложения.
@@ -55,6 +54,8 @@ async def lifespan(app: FastAPI):
     programmer = get_programmer(heating_controller=heating_ctrl)
 
     await init_db_start_data()
+
+    sys_settings = await get_settings_db()
 
     startup_message = (
         f"Запуск Smart Home Climate API  app_env={settings.app_env.value}     "
