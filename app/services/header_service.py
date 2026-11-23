@@ -23,6 +23,7 @@ def _fmt_time(timestamp: Any) -> str:
     except ValueError:
         return text[11:19] or _EMPTY
 
+
 # Кэш шапки. Значения хранятся уже готовыми строками, шаблон ничего не форматирует.
 _header: Dict[str, Any] = {
     "time": _EMPTY,
@@ -49,7 +50,9 @@ def _fmt(value: Any, suffix: str = "") -> str:
 async def _latest(table: str) -> Dict[str, Any]:
     """Последняя запись таблицы или пустой словарь (ошибки не пробрасываются)."""
     try:
-        rows = await db.get(table, order_col="id", order_asc=False, limit=1, log_to_api=False)
+        rows = await db.get(
+            table, order_col="id", order_asc=False, limit=1, log_to_api=False
+        )
         return dict(rows[0]) if rows else {}
     except Exception as e:
         work_log.debug(f"[Шапка] Не удалось прочитать {table}: {e}")

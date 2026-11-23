@@ -15,38 +15,40 @@ DATA_FILE: str = str(os.environ.get("DB_NAME", "climate_data.sqlite3"))
 backup_dir: str = str(os.environ.get("BACKUP", f"{PROJECT_DIR}/backup"))
 database_file = DATA_DIR + "/" + DATA_FILE
 
+
 def check_or_create_database(db_file):
     if not os.path.exists(db_file):
         print(f"Файл базы данных '{db_file}' не найден. Создаем новый...")
         try:
-            dir_path = os.path.dirname(db_file) or '.'
+            dir_path = os.path.dirname(db_file) or "."
             if dir_path and not os.path.exists(dir_path):
                 os.makedirs(dir_path, exist_ok=True)
             if dir_path and not os.access(dir_path, os.W_OK):
                 raise PermissionError(f"Нет прав на запись в директорию: {dir_path}")
-            open(db_file, 'a').close()
+            open(db_file, "a").close()
             print(f"Файл '{db_file}' успешно создан.")
         except Exception as e:
             print(f"Ошибка при создании базы данных: {type(e).__name__}: {e}")
     else:
         print(f"Файл базы данных '{db_file}' уже существует.")
 
+
 def create_table(db_path, table_name, fields):
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
-        
+
         cursor.execute(f"""
         SELECT count(*) FROM sqlite_master 
         WHERE type='table' AND name='{table_name}'
         """)
-        
+
         if cursor.fetchone()[0] > 0:
             print(f"Таблица '{table_name}' уже существует в базе данных.")
             conn.close()
             return False
-        
+
         cursor.executescript(f"""
             PRAGMA foreign_keys = ON;
             CREATE TABLE IF NOT EXISTS {table_name}
@@ -64,6 +66,7 @@ def create_table(db_path, table_name, fields):
         print(f"Неожиданная ошибка: {e}")
         return False
 
+
 def create_backup(source_file, backup_dir, max_backups=100):
     try:
         if not os.path.isfile(source_file):
@@ -73,18 +76,21 @@ def create_backup(source_file, backup_dir, max_backups=100):
 
         filename = os.path.basename(source_file)
         name, ext = os.path.splitext(filename)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_name = f"{name}_{timestamp}{ext}"
         backup_path = os.path.join(backup_dir, backup_name)
 
-        with open(source_file, 'rb') as src, open(backup_path, 'wb') as dst:
+        with open(source_file, "rb") as src, open(backup_path, "wb") as dst:
             dst.write(src.read())
 
         prefix = f"{name}_"
-        backups = [f for f in os.listdir(backup_dir) 
-                 if f.startswith(prefix) and f.endswith(ext)]
-        
+        backups = [
+            f
+            for f in os.listdir(backup_dir)
+            if f.startswith(prefix) and f.endswith(ext)
+        ]
+
         if len(backups) > max_backups - 1:
             backups.sort()
             for old_backup in backups[:-max_backups]:
@@ -126,8 +132,7 @@ if __name__ == "__main__":
         programmer_mode TEXT
         )
         """
-    create_table(db_path=database_file, table_name='settings_table', fields=fields_db)
-
+    create_table(db_path=database_file, table_name="settings_table", fields=fields_db)
 
     # Создаём таблицу table_sensor_data
     fields_db = """ (
@@ -150,8 +155,9 @@ if __name__ == "__main__":
         sensor_or_calc_floor BOOLEAN
     )
     """
-    create_table(db_path=database_file, table_name='table_sensor_data', fields=fields_db)
-
+    create_table(
+        db_path=database_file, table_name="table_sensor_data", fields=fields_db
+    )
 
     # Создаём таблицу gas_table # coefficient_gas_hour REAL,
     fields_db = """ (
@@ -174,8 +180,7 @@ if __name__ == "__main__":
         projected_price REAL
     )
     """
-    create_table(db_path=database_file, table_name='gas_table', fields=fields_db)
-
+    create_table(db_path=database_file, table_name="gas_table", fields=fields_db)
 
     # Создаём таблицу api_table
     fields_db = """ (
@@ -202,7 +207,7 @@ if __name__ == "__main__":
         last_graph_temperature_id INTEGER
         )
         """
-    create_table(db_path=database_file, table_name='api_table', fields=fields_db)
+    create_table(db_path=database_file, table_name="api_table", fields=fields_db)
 
     # Создаём таблицу ventilation_table
     fields_db = """ (
@@ -218,7 +223,9 @@ if __name__ == "__main__":
         ah_ratio_median REAL
         )
         """
-    create_table(db_path=database_file, table_name='ventilation_table', fields=fields_db)
+    create_table(
+        db_path=database_file, table_name="ventilation_table", fields=fields_db
+    )
 
     # Создаём таблицу history_of_heating
     fields_db = """ (
@@ -237,7 +244,9 @@ if __name__ == "__main__":
         floor_temp_rise REAL
         )
         """
-    create_table(db_path=database_file, table_name='history_of_heating', fields=fields_db)
+    create_table(
+        db_path=database_file, table_name="history_of_heating", fields=fields_db
+    )
 
     # Таблица сырых данных с сайта (weather_site_table)
     fields_db = """ (
@@ -249,7 +258,9 @@ if __name__ == "__main__":
         name_site TEXT
     )
     """
-    create_table(db_path=database_file, table_name='weather_site_table', fields=fields_db)
+    create_table(
+        db_path=database_file, table_name="weather_site_table", fields=fields_db
+    )
 
     # Таблица часовых калибровочных коэффициентов (hourly_coefficients_table)
     fields_db = """ (
@@ -260,18 +271,22 @@ if __name__ == "__main__":
         updated_at TEXT
     )
     """
-    if create_table(db_path=database_file, table_name='hourly_coefficients_table', fields=fields_db):
+    if create_table(
+        db_path=database_file, table_name="hourly_coefficients_table", fields=fields_db
+    ):
         try:
             conn = sqlite3.connect(database_file)
             cursor = conn.cursor()
             for h in range(24):
                 cursor.execute(
                     "INSERT OR IGNORE INTO hourly_coefficients_table (hour, delta_temp, delta_ah, samples_count) VALUES (?, 0.0, 0.0, 0)",
-                    (h,)
+                    (h,),
                 )
             conn.commit()
             conn.close()
-            print("Инициализирована таблица 'hourly_coefficients_table' 24 часовыми записями.")
+            print(
+                "Инициализирована таблица 'hourly_coefficients_table' 24 часовыми записями."
+            )
         except Exception as e:
             print(f"Ошибка заполнения hourly_coefficients_table: {e}")
 
@@ -282,9 +297,8 @@ if __name__ == "__main__":
         timestamp_stop TEXT
         )
         """
-    create_table(db_path=database_file, table_name='relay_table', fields=fields_db)
+    create_table(db_path=database_file, table_name="relay_table", fields=fields_db)
 
-    
     # Создаём таблицу heating_table
     fields_db = """ (
         id INTEGER PRIMARY KEY,
@@ -294,8 +308,8 @@ if __name__ == "__main__":
         updated_at TEXT
         )
         """
-    create_table(db_path=database_file, table_name='heating_table', fields=fields_db)
-    
+    create_table(db_path=database_file, table_name="heating_table", fields=fields_db)
+
     # Создаём таблицу programmer_const
     fields_db = """ (
         id INTEGER PRIMARY KEY,
@@ -304,7 +318,7 @@ if __name__ == "__main__":
         updated_at TEXT
         )
         """
-    create_table(db_path=database_file, table_name='programmer_const', fields=fields_db)
+    create_table(db_path=database_file, table_name="programmer_const", fields=fields_db)
 
     # Создаём таблицу programmer_temporarily
     fields_db = """ (
@@ -314,10 +328,12 @@ if __name__ == "__main__":
         updated_at TEXT
         )
         """
-    create_table(db_path=database_file, table_name='programmer_temporarily', fields=fields_db)
+    create_table(
+        db_path=database_file, table_name="programmer_temporarily", fields=fields_db
+    )
 
-    # Создаём таблицу programmer_week.  ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su", "Mo_Su", "Mo_Fr", "Sa_Su"] 
-    # day: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],  
+    # Создаём таблицу programmer_week.  ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su", "Mo_Su", "Mo_Fr", "Sa_Su"]
+    # day: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
     # weekdays_weekend: ["Mo_Fr", "Sa", "Su"],  weekdays: ["Mo_Fr", "Sa_Su"], week: ["Mo_Su"]
     fields_db = """ (
         id INTEGER PRIMARY KEY,
@@ -330,14 +346,13 @@ if __name__ == "__main__":
         next_id INTEGER        
         )
         """
-    create_table(db_path=database_file, table_name='programmer_week', fields=fields_db)
+    create_table(db_path=database_file, table_name="programmer_week", fields=fields_db)
 
-#Таблица programmer_week:  id INTEGER PRIMARY KEY, now_id INTEGER, next_id INTEGER, week_mode TEXT,
+# Таблица programmer_week:  id INTEGER PRIMARY KEY, now_id INTEGER, next_id INTEGER, week_mode TEXT,
 # week_day TEXT, week_time TEXT, week_temperature REAL,updated_at TEXT
-# Она заполняется при старте. 
-# Логика таблицы: первая строка это системная строка, now_id программа которая сейчас выполняется, 
-# next_id программа которая выполняется следующей, 
-# week_mode может принимать значения day, weekdays, weekdays_weekend, week, 
-# week_day может принимать значения ["Mo", "Tu", "We", "Th", "Fr", "Mo", "Sa", "Mo_Su", "Mo_Fr", "Sa_Su"], 
+# Она заполняется при старте.
+# Логика таблицы: первая строка это системная строка, now_id программа которая сейчас выполняется,
+# next_id программа которая выполняется следующей,
+# week_mode может принимать значения day, weekdays, weekdays_weekend, week,
+# week_day может принимать значения ["Mo", "Tu", "We", "Th", "Fr", "Mo", "Sa", "Mo_Su", "Mo_Fr", "Sa_Su"],
 # week_time в первой строке дата время окончания текущего цикла, в других строках время начала цикла.
-

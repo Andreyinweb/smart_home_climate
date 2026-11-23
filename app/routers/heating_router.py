@@ -24,7 +24,9 @@ router = APIRouter(
 )
 
 
-def get_diff_class(val: Optional[float], threshold: float, pos_green: bool = True) -> str:
+def get_diff_class(
+    val: Optional[float], threshold: float, pos_green: bool = True
+) -> str:
     """Определяет CSS-класс стиля для отображения дельты."""
     if val is None:
         return "text-gray"
@@ -54,7 +56,9 @@ async def _load_merged_by_id(record_id: Optional[int]) -> Optional[dict]:
     """Собирает sensor + api по id. Если любой из записей нет — возвращает None."""
     if record_id is None:
         return None
-    sensor_rows = await db.get("table_sensor_data", pk=record_id, pk_col="id", log_to_api=False)
+    sensor_rows = await db.get(
+        "table_sensor_data", pk=record_id, pk_col="id", log_to_api=False
+    )
     api_rows = await db.get("api_table", pk=record_id, pk_col="id", log_to_api=False)
     sensor = sensor_rows[0] if sensor_rows else None
     api = api_rows[0] if api_rows else None
@@ -72,13 +76,21 @@ async def get_heating_page(
     sys_settings = await get_settings_db()
     website_return_time = getattr(sys_settings, "website_return_time", 60)
 
-    latest_heating_table_rows = await db.get("heating_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
-    latest_heating_table = latest_heating_table_rows[0] if latest_heating_table_rows else {}
+    latest_heating_table_rows = await db.get(
+        "heating_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
+    latest_heating_table = (
+        latest_heating_table_rows[0] if latest_heating_table_rows else {}
+    )
     minimum_temperature = latest_heating_table.get("temperature_start")
     maximum_temperature = latest_heating_table.get("temperature_stop")
 
-    latest_sensor_rows = await db.get("table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False)
-    latest_api_rows = await db.get("api_table", order_col="id", order_asc=False, limit=1, log_to_api=False)
+    latest_sensor_rows = await db.get(
+        "table_sensor_data", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
+    latest_api_rows = await db.get(
+        "api_table", order_col="id", order_asc=False, limit=1, log_to_api=False
+    )
     latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
     latest_api = latest_api_rows[0] if latest_api_rows else None
 
@@ -94,7 +106,13 @@ async def get_heating_page(
 
     latest_heat = None
     try:
-        latest_heat_rows = await db.get("history_of_heating", order_col="id", order_asc=False, limit=1, log_to_api=False)
+        latest_heat_rows = await db.get(
+            "history_of_heating",
+            order_col="id",
+            order_asc=False,
+            limit=1,
+            log_to_api=False,
+        )
         latest_heat = latest_heat_rows[0] if latest_heat_rows else None
     except Exception:
         pass
@@ -119,7 +137,9 @@ async def get_heating_page(
         heat_active = False
         heat_start_id = latest_heat.get("id")
         stop_heat_plus = latest_heat.get("stop_heat_plus", 0)
-        heat_stop_id = (heat_start_id + stop_heat_plus) if heat_start_id is not None else None
+        heat_stop_id = (
+            (heat_start_id + stop_heat_plus) if heat_start_id is not None else None
+        )
 
         heat_before = await _load_merged_by_id(heat_start_id)
         if not heat_before:
@@ -129,7 +149,9 @@ async def get_heating_page(
         if not db_data:
             db_data = dict(current_db_data)
 
-        heat_start_time = heat_before.get("timestamp", latest_heat.get("timestamp", "—"))
+        heat_start_time = heat_before.get(
+            "timestamp", latest_heat.get("timestamp", "—")
+        )
         heat_now_time = db_data.get("timestamp", "—")
         card_title = f"История {heat_start_time}, отопления"
 
@@ -142,26 +164,52 @@ async def get_heating_page(
         card_title = "Отопление не включалось"
 
     if heat_start_time != "—" and heat_now_time != "—":
-        heat_difference_time = get_time_difference_str(str(heat_start_time)[11:16], str(heat_now_time)[11:16])
+        heat_difference_time = get_time_difference_str(
+            str(heat_start_time)[11:16], str(heat_now_time)[11:16]
+        )
     else:
         heat_difference_time = "—"
 
     diffs = {
-        "diff_basement_temp": safe_diff(db_data.get("basement_temp"), heat_before.get("basement_temp")),
-        "diff_basement_humi": safe_diff(db_data.get("basement_humi"), heat_before.get("basement_humi")),
-        "diff_a_basement_humi": safe_diff(db_data.get("a_basement_humi"), heat_before.get("a_basement_humi")),
-        "diff_floor_temp": safe_diff(db_data.get("floor_temp"), heat_before.get("floor_temp")),
-        "diff_floor_humi": safe_diff(db_data.get("floor_humi"), heat_before.get("floor_humi")),
-        "diff_a_floor_humi": safe_diff(db_data.get("a_floor_humi"), heat_before.get("a_floor_humi")),
+        "diff_basement_temp": safe_diff(
+            db_data.get("basement_temp"), heat_before.get("basement_temp")
+        ),
+        "diff_basement_humi": safe_diff(
+            db_data.get("basement_humi"), heat_before.get("basement_humi")
+        ),
+        "diff_a_basement_humi": safe_diff(
+            db_data.get("a_basement_humi"), heat_before.get("a_basement_humi")
+        ),
+        "diff_floor_temp": safe_diff(
+            db_data.get("floor_temp"), heat_before.get("floor_temp")
+        ),
+        "diff_floor_humi": safe_diff(
+            db_data.get("floor_humi"), heat_before.get("floor_humi")
+        ),
+        "diff_a_floor_humi": safe_diff(
+            db_data.get("a_floor_humi"), heat_before.get("a_floor_humi")
+        ),
     }
 
     style_classes = {
-        "diff_basement_temp_class": get_diff_class(diffs["diff_basement_temp"], 0.1, pos_green=True),
-        "diff_basement_humi_class": get_diff_class(diffs["diff_basement_humi"], 0.5, pos_green=False),
-        "diff_a_basement_humi_class": get_diff_class(diffs["diff_a_basement_humi"], 0.1, pos_green=False),
-        "diff_floor_temp_class": get_diff_class(diffs["diff_floor_temp"], 0.1, pos_green=True),
-        "diff_floor_humi_class": get_diff_class(diffs["diff_floor_humi"], 0.5, pos_green=False),
-        "diff_a_floor_humi_class": get_diff_class(diffs["diff_a_floor_humi"], 0.1, pos_green=False),
+        "diff_basement_temp_class": get_diff_class(
+            diffs["diff_basement_temp"], 0.1, pos_green=True
+        ),
+        "diff_basement_humi_class": get_diff_class(
+            diffs["diff_basement_humi"], 0.5, pos_green=False
+        ),
+        "diff_a_basement_humi_class": get_diff_class(
+            diffs["diff_a_basement_humi"], 0.1, pos_green=False
+        ),
+        "diff_floor_temp_class": get_diff_class(
+            diffs["diff_floor_temp"], 0.1, pos_green=True
+        ),
+        "diff_floor_humi_class": get_diff_class(
+            diffs["diff_floor_humi"], 0.5, pos_green=False
+        ),
+        "diff_a_floor_humi_class": get_diff_class(
+            diffs["diff_a_floor_humi"], 0.1, pos_green=False
+        ),
     }
 
     if heat_active:
@@ -172,8 +220,16 @@ async def get_heating_page(
         btn_start_disabled, btn_stop_disabled = "", "disabled"
 
     before_data = {f"before_{k}": v for k, v in heat_before.items()}
-    heat_start_str = str(heat_start_time)[11:16] if len(str(heat_start_time)) >= 16 else str(heat_start_time)
-    heat_now_str = str(heat_now_time)[11:16] if len(str(heat_now_time)) >= 16 else str(heat_now_time)
+    heat_start_str = (
+        str(heat_start_time)[11:16]
+        if len(str(heat_start_time)) >= 16
+        else str(heat_start_time)
+    )
+    heat_now_str = (
+        str(heat_now_time)[11:16]
+        if len(str(heat_now_time)) >= 16
+        else str(heat_now_time)
+    )
 
     context = {
         "website_return_time": website_return_time,
@@ -198,7 +254,9 @@ async def get_heating_page(
     }
 
     return templates.TemplateResponse(
-        request=request, name=get_template_path("heating.html", request), context=context
+        request=request,
+        name=get_template_path("heating.html", request),
+        context=context,
     )
 
 

@@ -8,3 +8,6 @@ uvicorn==0.51.0
 pydantic>=2.10.0,<3.0.0
 pydantic-settings>=2.7.0,<3.0.0
 python-multipart>=0.0.12
+
+# Development
+black=26.10.1

@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class GasUpdateInputSchema(BaseModel):
-    gas_meter: float = Field(..., gt=0, description="Текущее значение счетчика газа (м³)")
+    gas_meter: float = Field(
+        ..., gt=0, description="Текущее значение счетчика газа (м³)"
+    )
     start_of_month_gas_meter: Optional[float] = Field(
         None, ge=0, description="Показания счетчика на начало месяца (м³)"
     )

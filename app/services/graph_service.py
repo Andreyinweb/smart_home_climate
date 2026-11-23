@@ -7,6 +7,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -61,7 +62,9 @@ def sample_points_to_target(
         for ve in vent_events:
             v_start = ve.get("id")
             v_plus = ve.get("stop_vent_plus", 0) or 0
-            v_stop = (v_start + v_plus) if (v_start is not None and v_plus > 0) else None
+            v_stop = (
+                (v_start + v_plus) if (v_start is not None and v_plus > 0) else None
+            )
             if v_start in id_to_idx:
                 mandatory.add(id_to_idx[v_start])
             if v_stop in id_to_idx:
@@ -71,17 +74,26 @@ def sample_points_to_target(
         for he in heat_events:
             h_start = he.get("id")
             h_plus = he.get("stop_heat_plus", 0) or 0
-            h_stop = (h_start + h_plus) if (h_start is not None and h_plus > 0) else None
+            h_stop = (
+                (h_start + h_plus) if (h_start is not None and h_plus > 0) else None
+            )
             if h_start in id_to_idx:
                 mandatory.add(id_to_idx[h_start])
             if h_stop in id_to_idx:
                 mandatory.add(id_to_idx[h_stop])
 
     sensor_keys = [
-        "street_temp", "basement_temp", "floor_temp",
-        "street_humi", "basement_humi", "floor_humi",
-        "a_street_humi", "a_basement_humi", "a_floor_humi",
-        "gas_per_hour", "coefficient_gas"
+        "street_temp",
+        "basement_temp",
+        "floor_temp",
+        "street_humi",
+        "basement_humi",
+        "floor_humi",
+        "a_street_humi",
+        "a_basement_humi",
+        "a_floor_humi",
+        "gas_per_hour",
+        "coefficient_gas",
     ]
 
     def add_span_extrema(span_indices: List[int]):
@@ -89,8 +101,12 @@ def sample_points_to_target(
             return
         for key in sensor_keys:
             if any(key in data_rows[i] for i in span_indices):
-                min_i = min(span_indices, key=lambda i: data_rows[i].get(key, 0.0) or 0.0)
-                max_i = max(span_indices, key=lambda i: data_rows[i].get(key, 0.0) or 0.0)
+                min_i = min(
+                    span_indices, key=lambda i: data_rows[i].get(key, 0.0) or 0.0
+                )
+                max_i = max(
+                    span_indices, key=lambda i: data_rows[i].get(key, 0.0) or 0.0
+                )
                 mandatory.add(min_i)
                 mandatory.add(max_i)
 
@@ -115,7 +131,9 @@ def sample_points_to_target(
         middle = mandatory_indices[1:-1]
         step = len(middle) / (target_max - 2) if len(middle) > 0 else 1
         pruned_middle = [middle[int(i * step)] for i in range(target_max - 2)]
-        return [data_rows[i] for i in sorted(list(set([first] + pruned_middle + [last])))]
+        return [
+            data_rows[i] for i in sorted(list(set([first] + pruned_middle + [last])))
+        ]
 
     selected_indices = set(mandatory_indices)
     needed = target_min - len(selected_indices)
@@ -190,7 +208,9 @@ def get_event_spans(
     for ev in events:
         start_id = ev.get(start_key)
         plus_val = ev.get(plus_key, 0) or 0
-        stop_id = (start_id + plus_val) if (start_id is not None and plus_val > 0) else 0
+        stop_id = (
+            (start_id + plus_val) if (start_id is not None and plus_val > 0) else 0
+        )
 
         if start_id is None:
             continue
@@ -219,7 +239,9 @@ def render_metric_graph(
     target_lines: Optional[Dict[str, float]] = None,
 ) -> None:
     if not data_rows:
-        work_log.warning(f"[render_metric_graph] Отмена отрисовки '{title_main}': передан пустой список данных.")
+        work_log.warning(
+            f"[render_metric_graph] Отмена отрисовки '{title_main}': передан пустой список данных."
+        )
         return
 
     sampled_rows = sample_points_to_target(
@@ -249,7 +271,11 @@ def render_metric_graph(
 
     n_panels = len(metrics_config)
     fig, axes = plt.subplots(
-        n_panels, 1, figsize=(11, 3 * n_panels), sharex=True, gridspec_kw={"hspace": 0.45}
+        n_panels,
+        1,
+        figsize=(11, 3 * n_panels),
+        sharex=True,
+        gridspec_kw={"hspace": 0.45},
     )
     if n_panels == 1:
         axes = [axes]
@@ -270,8 +296,18 @@ def render_metric_graph(
         unit = config.get("unit", "")
 
         values = [row.get(key, 0.0) or 0.0 for row in sampled_rows]
-        ax.plot(timestamps, values, color=color, linewidth=1.8, label=label, marker="o", markersize=3)
-        ax.set_title(f"Метрика: {label}", fontsize=10, loc="left", color=color, fontweight="bold")
+        ax.plot(
+            timestamps,
+            values,
+            color=color,
+            linewidth=1.8,
+            label=label,
+            marker="o",
+            markersize=3,
+        )
+        ax.set_title(
+            f"Метрика: {label}", fontsize=10, loc="left", color=color, fontweight="bold"
+        )
         if unit:
             ax.set_ylabel(unit)
 
@@ -285,14 +321,33 @@ def render_metric_graph(
             )
 
         for i, (v_start, v_end) in enumerate(vent_spans):
-            ax.axvspan(v_start, v_end, color="#3498db", alpha=0.2, label="Проветривание" if i == 0 else "")
+            ax.axvspan(
+                v_start,
+                v_end,
+                color="#3498db",
+                alpha=0.2,
+                label="Проветривание" if i == 0 else "",
+            )
 
         for i, (h_start, h_end) in enumerate(heat_spans):
-            ax.axvspan(h_start, h_end, color="#e67e22", alpha=0.22, label="Отопление" if i == 0 else "")
+            ax.axvspan(
+                h_start,
+                h_end,
+                color="#e67e22",
+                alpha=0.22,
+                label="Отопление" if i == 0 else "",
+            )
 
         if values:
             latest_val = values[-1]
-            ax.plot(timestamps[-1], latest_val, marker="*", markersize=9, color=color, zorder=6)
+            ax.plot(
+                timestamps[-1],
+                latest_val,
+                marker="*",
+                markersize=9,
+                color=color,
+                zorder=6,
+            )
             ax.annotate(
                 f"{latest_val:.1f}{unit}",
                 xy=(timestamps[-1], latest_val),
@@ -300,7 +355,9 @@ def render_metric_graph(
                 textcoords="offset points",
                 fontsize=8,
                 fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.2", fc="#ffffff", ec="#7f8c8d", alpha=0.9),
+                bbox=dict(
+                    boxstyle="round,pad=0.2", fc="#ffffff", ec="#7f8c8d", alpha=0.9
+                ),
             )
 
         ax.tick_params(labelbottom=True)
@@ -345,7 +402,9 @@ async def update_graph_cache_if_needed(
             if (target_date or target_month) and file_exists:
                 return False
 
-            latest_sensor_rows = await db.get("table_sensor_data", order_col="id", limit=1, log_to_api=False)
+            latest_sensor_rows = await db.get(
+                "table_sensor_data", order_col="id", limit=1, log_to_api=False
+            )
             if not latest_sensor_rows:
                 return False
             max_sensor_id = latest_sensor_rows[0]["id"]
@@ -353,30 +412,68 @@ async def update_graph_cache_if_needed(
             last_processed_id = 0
             latest_api = None
             if id_field:
-                latest_api_rows = await db.get("api_table", order_col="id", limit=1, log_to_api=False)
+                latest_api_rows = await db.get(
+                    "api_table", order_col="id", limit=1, log_to_api=False
+                )
                 if latest_api_rows and id_field in latest_api_rows[0]:
                     latest_api = latest_api_rows[0]
                     raw_id = latest_api.get(id_field)
                     last_processed_id = raw_id if raw_id is not None else 0
 
-            if max_sensor_id > last_processed_id or not file_exists or target_date or target_month:
+            if (
+                max_sensor_id > last_processed_id
+                or not file_exists
+                or target_date
+                or target_month
+            ):
                 if target_date:
-                    sensor_rows = await db.query(queries.SENSOR_RECORDS_BY_DATE, (f"{target_date}%",), log_to_api=False)
+                    sensor_rows = await db.query(
+                        queries.SENSOR_RECORDS_BY_DATE,
+                        (f"{target_date}%",),
+                        log_to_api=False,
+                    )
                 elif target_month:
-                    sensor_rows = await db.query(queries.SENSOR_RECORDS_BY_DATE, (f"{target_month}%",), log_to_api=False)
+                    sensor_rows = await db.query(
+                        queries.SENSOR_RECORDS_BY_DATE,
+                        (f"{target_month}%",),
+                        log_to_api=False,
+                    )
                 else:
-                    sensor_rows = await db.query(queries.SENSOR_GRAPH_POINTS, ("-24 hours",), log_to_api=False)
+                    sensor_rows = await db.query(
+                        queries.SENSOR_GRAPH_POINTS, ("-24 hours",), log_to_api=False
+                    )
 
-                if not sensor_rows and not target_date and not target_month and hasattr(db, "get_sensor_graph_points"):
-                    points = await db.get_sensor_graph_points(hours=24, log_to_api=False)
+                if (
+                    not sensor_rows
+                    and not target_date
+                    and not target_month
+                    and hasattr(db, "get_sensor_graph_points")
+                ):
+                    points = await db.get_sensor_graph_points(
+                        hours=24, log_to_api=False
+                    )
                     sensor_rows = [p.model_dump() for p in points]
 
                 # Получение событий вентиляции и отопления по диапазону ID (от и до)
                 if sensor_rows:
                     min_id = sensor_rows[0]["id"]
                     max_id = sensor_rows[-1]["id"]
-                    vent_events = await db.get("ventilation_table", start=min_id - 1000, stop=max_id, order_col="id", order_asc=True, log_to_api=False)
-                    heat_events = await db.get("history_of_heating", start=min_id - 1000, stop=max_id, order_col="id", order_asc=True, log_to_api=False)
+                    vent_events = await db.get(
+                        "ventilation_table",
+                        start=min_id - 1000,
+                        stop=max_id,
+                        order_col="id",
+                        order_asc=True,
+                        log_to_api=False,
+                    )
+                    heat_events = await db.get(
+                        "history_of_heating",
+                        start=min_id - 1000,
+                        stop=max_id,
+                        order_col="id",
+                        order_asc=True,
+                        log_to_api=False,
+                    )
                 else:
                     vent_events = []
                     heat_events = []
@@ -385,7 +482,11 @@ async def update_graph_cache_if_needed(
                 if graph_type == "humidity":
                     sys_settings = await get_settings_db()
                     if sys_settings:
-                        val = getattr(sys_settings, "target_rh", None) or (sys_settings.get("target_rh") if isinstance(sys_settings, dict) else None)
+                        val = getattr(sys_settings, "target_rh", None) or (
+                            sys_settings.get("target_rh")
+                            if isinstance(sys_settings, dict)
+                            else None
+                        )
                         if val is not None:
                             try:
                                 target_lines["floor_humi"] = float(val)
@@ -407,43 +508,104 @@ async def update_graph_cache_if_needed(
                     if not target_date and not target_month and id_field and latest_api:
                         api_record = dict(latest_api)
                         api_record[id_field] = max_sensor_id
-                        await db.upsert("api_table", [api_record], pk_col="id", log_to_api=False)
+                        await db.upsert(
+                            "api_table", [api_record], pk_col="id", log_to_api=False
+                        )
 
                     return True
             return False
         except Exception as e:
-            work_log.exception(f"[update_graph_cache_if_needed] Ошибка для {graph_type}: {e}")
+            work_log.exception(
+                f"[update_graph_cache_if_needed] Ошибка для {graph_type}: {e}"
+            )
             return False
 
 
-async def update_temperature_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+async def update_temperature_graph_cache_if_needed(
+    target_date: Optional[str] = None, target_month: Optional[str] = None
+) -> Optional[bool]:
     metrics = [
         {"key": "street_temp", "label": "Улица", "color": "#2ecc71", "unit": "°C"},
         {"key": "basement_temp", "label": "Подвал", "color": "#2980b9", "unit": "°C"},
         {"key": "floor_temp", "label": "Пол", "color": "#e74c3c", "unit": "°C"},
     ]
-    return await update_graph_cache_if_needed("temperature", "temperature.png", "График температуры (°C)", metrics, "last_graph_temperature_id", target_date, target_month)
+    return await update_graph_cache_if_needed(
+        "temperature",
+        "temperature.png",
+        "График температуры (°C)",
+        metrics,
+        "last_graph_temperature_id",
+        target_date,
+        target_month,
+    )
 
 
-async def update_humidity_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+async def update_humidity_graph_cache_if_needed(
+    target_date: Optional[str] = None, target_month: Optional[str] = None
+) -> Optional[bool]:
     metrics = [
-        {"key": "street_humi", "label": "Улица (отн.)", "color": "#27ae60", "unit": "%"},
-        {"key": "basement_humi", "label": "Подвал (отн.)", "color": "#2980b9", "unit": "%"},
+        {
+            "key": "street_humi",
+            "label": "Улица (отн.)",
+            "color": "#27ae60",
+            "unit": "%",
+        },
+        {
+            "key": "basement_humi",
+            "label": "Подвал (отн.)",
+            "color": "#2980b9",
+            "unit": "%",
+        },
         {"key": "floor_humi", "label": "Пол (отн.)", "color": "#e74c3c", "unit": "%"},
     ]
-    return await update_graph_cache_if_needed("humidity", "humidity.png", "График влажности (%)", metrics, "last_graph_humidity_id", target_date, target_month)
+    return await update_graph_cache_if_needed(
+        "humidity",
+        "humidity.png",
+        "График влажности (%)",
+        metrics,
+        "last_graph_humidity_id",
+        target_date,
+        target_month,
+    )
 
 
-async def update_abs_humidity_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+async def update_abs_humidity_graph_cache_if_needed(
+    target_date: Optional[str] = None, target_month: Optional[str] = None
+) -> Optional[bool]:
     metrics = [
-        {"key": "a_street_humi", "label": "Улица (абс.)", "color": "#16a085", "unit": "г/м³"},
-        {"key": "a_basement_humi", "label": "Подвал (абс.)", "color": "#2980b9", "unit": "г/м³"},
-        {"key": "a_floor_humi", "label": "Пол (абс.)", "color": "#d35400", "unit": "г/м³"},
+        {
+            "key": "a_street_humi",
+            "label": "Улица (абс.)",
+            "color": "#16a085",
+            "unit": "г/м³",
+        },
+        {
+            "key": "a_basement_humi",
+            "label": "Подвал (абс.)",
+            "color": "#2980b9",
+            "unit": "г/м³",
+        },
+        {
+            "key": "a_floor_humi",
+            "label": "Пол (абс.)",
+            "color": "#d35400",
+            "unit": "г/м³",
+        },
     ]
-    return await update_graph_cache_if_needed("abs_humidity", "abs_humidity.png", "График абсолютной влажности (г/м³)", metrics, None, target_date, target_month)
+    return await update_graph_cache_if_needed(
+        "abs_humidity",
+        "abs_humidity.png",
+        "График абсолютной влажности (г/м³)",
+        metrics,
+        None,
+        target_date,
+        target_month,
+    )
 
 
-async def update_gas_graph_cache_if_needed(target_date: Optional[str] = None, target_month: Optional[str] = None) -> Optional[bool]:
+async def update_gas_graph_cache_if_needed(
+    target_date: Optional[str] = None, target_month: Optional[str] = None
+) -> Optional[bool]:
     """Генерация графика потребления газа (расход в час и коэффициент) из gas_table с кэшированием."""
     if target_date:
         file_path = os.path.join("static/graphs", f"gas_{target_date}.png")
@@ -458,19 +620,35 @@ async def update_gas_graph_cache_if_needed(target_date: Optional[str] = None, ta
         return False
 
     if target_date:
-        rows = await db.query(queries.GAS_RECORDS_BY_MONTH, (f"{target_date}%",), log_to_api=False)
+        rows = await db.query(
+            queries.GAS_RECORDS_BY_MONTH, (f"{target_date}%",), log_to_api=False
+        )
     elif target_month:
-        rows = await db.query(queries.GAS_RECORDS_BY_MONTH, (f"{target_month}%",), log_to_api=False)
+        rows = await db.query(
+            queries.GAS_RECORDS_BY_MONTH, (f"{target_month}%",), log_to_api=False
+        )
     else:
-        rows = await db.get("gas_table", limit=100, order_col="id", order_asc=False, log_to_api=False)
+        rows = await db.get(
+            "gas_table", limit=100, order_col="id", order_asc=False, log_to_api=False
+        )
         rows.reverse()
 
     if not rows:
         return False
 
     metrics = [
-        {"key": "gas_per_hour", "label": "Расход газа в час", "color": "#e67e22", "unit": "м³/ч"},
-        {"key": "coefficient_gas", "label": "Коэффициент газа", "color": "#2980b9", "unit": ""},
+        {
+            "key": "gas_per_hour",
+            "label": "Расход газа в час",
+            "color": "#e67e22",
+            "unit": "м³/ч",
+        },
+        {
+            "key": "coefficient_gas",
+            "label": "Коэффициент газа",
+            "color": "#2980b9",
+            "unit": "",
+        },
     ]
     await asyncio.to_thread(
         render_metric_graph,

@@ -32,7 +32,9 @@ def _logger(log_to_api: bool) -> logging.Logger:
     return api_log if log_to_api else work_log
 
 
-async def _read_settings(settings_id: int, log_to_api: bool) -> Optional[SystemSettings]:
+async def _read_settings(
+    settings_id: int, log_to_api: bool
+) -> Optional[SystemSettings]:
     """
     Читает запись настроек по id и валидирует её через SystemSettings.
 
@@ -41,9 +43,13 @@ async def _read_settings(settings_id: int, log_to_api: bool) -> Optional[SystemS
     :return: Объект SystemSettings или None, если записи нет.
     :raises pydantic.ValidationError: Если запись в БД не проходит валидацию (например, есть NULL).
     """
-    rows = await crud.get("settings_table", pk=settings_id, pk_col="id", log_to_api=log_to_api)
+    rows = await crud.get(
+        "settings_table", pk=settings_id, pk_col="id", log_to_api=log_to_api
+    )
     if not rows:
-        _logger(log_to_api).warning(f"Запись настроек id={settings_id} в 'settings_table' не найдена.")
+        _logger(log_to_api).warning(
+            f"Запись настроек id={settings_id} в 'settings_table' не найдена."
+        )
         return None
     return SystemSettings.model_validate(rows[0])
 
@@ -80,7 +86,9 @@ async def update_settings(
 
     current = await _read_settings(settings_id, log_to_api)
     if current is None:
-        logger.error(f"Обновление настроек невозможно: запись id={settings_id} отсутствует.")
+        logger.error(
+            f"Обновление настроек невозможно: запись id={settings_id} отсутствует."
+        )
         return None
 
     changes = update_dto.model_dump(exclude_unset=True)
@@ -94,6 +102,8 @@ async def update_settings(
 
     updated = SystemSettings.model_validate(data)
 
-    await crud.upsert("settings_table", [updated.model_dump()], pk_col="id", log_to_api=log_to_api)
+    await crud.upsert(
+        "settings_table", [updated.model_dump()], pk_col="id", log_to_api=log_to_api
+    )
     logger.debug(f"Настройки id={settings_id} обновлены: {sorted(changes)}.")
     return updated

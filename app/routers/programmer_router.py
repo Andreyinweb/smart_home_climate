@@ -66,7 +66,9 @@ def _parse_sensor_time(latest_sensor: Optional[Dict[str, Any]]) -> tuple:
     return current_dow, current_time, latest_sensor.get("basement_temp")
 
 
-@router.get("/programmer", response_class=HTMLResponse, summary="Страница программатора")
+@router.get(
+    "/programmer", response_class=HTMLResponse, summary="Страница программатора"
+)
 async def get_programmer_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -77,7 +79,9 @@ async def get_programmer_page(
     programmer_mode = getattr(sys_settings, "programmer_mode", "PROGRAMMER_CONST")
 
     try:
-        rows_sensor = await db.get("table_sensor_data", order_col="id", limit=1, log_to_api=False)
+        rows_sensor = await db.get(
+            "table_sensor_data", order_col="id", limit=1, log_to_api=False
+        )
         latest_sensor = rows_sensor[0] if rows_sensor else None
     except Exception as e:
         api_log.error(f"Ошибка получения данных из table_sensor_data: {e}")
@@ -85,7 +89,9 @@ async def get_programmer_page(
     current_dow, current_time, basement_temp = _parse_sensor_time(latest_sensor)
 
     try:
-        rows_temp = await db.get("programmer_temporarily", pk=1, pk_col="id", log_to_api=False)
+        rows_temp = await db.get(
+            "programmer_temporarily", pk=1, pk_col="id", log_to_api=False
+        )
         latest_temp = rows_temp[0] if rows_temp else None
     except Exception as e:
         api_log.error(f"Ошибка получения данных из programmer_temporarily: {e}")
@@ -99,7 +105,9 @@ async def get_programmer_page(
         temporarily_time = str(latest_temp["temporarily_time"])[11:16]
 
     try:
-        rows_const = await db.get("programmer_const", pk=1, pk_col="id", log_to_api=False)
+        rows_const = await db.get(
+            "programmer_const", pk=1, pk_col="id", log_to_api=False
+        )
         latest_const = rows_const[0] if rows_const else None
     except Exception as e:
         api_log.error(f"Ошибка получения данных из programmer_const: {e}")
@@ -111,14 +119,18 @@ async def get_programmer_page(
         const_max = latest_const["const_max"]
 
     try:
-        rows_week_sys = await db.get("programmer_week", pk=1, pk_col="id", log_to_api=False)
+        rows_week_sys = await db.get(
+            "programmer_week", pk=1, pk_col="id", log_to_api=False
+        )
         week_sys_row = rows_week_sys[0] if rows_week_sys else None
     except Exception as e:
         api_log.error(f"Ошибка получения системной строки из programmer_week: {e}")
         week_sys_row = None
 
     active_row_id = week_sys_row.get("now_id") if week_sys_row else None
-    week_mode = _valid_week_mode(week_sys_row.get("week_mode") if week_sys_row else None)
+    week_mode = _valid_week_mode(
+        week_sys_row.get("week_mode") if week_sys_row else None
+    )
     allowed_days = settings.days_week_mode.get(week_mode, ["Mo_Su"])
 
     all_week_records = await db.get(

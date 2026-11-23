@@ -101,7 +101,11 @@ class GasEngineService:
         config_start_gas = getattr(
             settings,
             "start_of_month_gas_meter",
-            getattr(settings, "START_OF_MONTH_GAS_METER", getattr(settings, "START_GAS", 0.0)),
+            getattr(
+                settings,
+                "START_OF_MONTH_GAS_METER",
+                getattr(settings, "START_GAS", 0.0),
+            ),
         )
         latest_gas_rows = await db.get("gas_table")
         latest_gas = latest_gas_rows[0] if latest_gas_rows else None
@@ -122,17 +126,25 @@ class GasEngineService:
             if start_gas_val is None:
                 start_gas_val = config_start_gas
 
-            gas_display = f"{gas_val:.3f} м³" if gas_val is not None else "Не установлено"
-            start_gas_display = f"{start_gas_val:.3f} м³" if start_gas_val is not None else "0.000 м³"
+            gas_display = (
+                f"{gas_val:.3f} м³" if gas_val is not None else "Не установлено"
+            )
+            start_gas_display = (
+                f"{start_gas_val:.3f} м³" if start_gas_val is not None else "0.000 м³"
+            )
             gas_input_val = f"{gas_val:.3f}" if gas_val is not None else ""
-            start_gas_input_val = f"{start_gas_val:.3f}" if start_gas_val is not None else ""
+            start_gas_input_val = (
+                f"{start_gas_val:.3f}" if start_gas_val is not None else ""
+            )
             timestamp_val = latest_gas.get("timestamp", "—")
 
             gas_diff = latest_gas.get("gas_difference")
             if gas_diff is None and gas_val is not None and start_gas_val is not None:
                 gas_diff = round(gas_val - start_gas_val, 3)
 
-            gas_diff_display = f"{gas_diff:.3f} м³" if gas_diff is not None else "0.000 м³"
+            gas_diff_display = (
+                f"{gas_diff:.3f} м³" if gas_diff is not None else "0.000 м³"
+            )
 
             cost_val = latest_gas.get("cost_of_gas")
             if cost_val is None and gas_diff is not None:
@@ -158,8 +170,14 @@ class GasEngineService:
 
         latest_sensor_rows = await db.get("table_sensor_data")
         latest_sensor = latest_sensor_rows[0] if latest_sensor_rows else None
-        if not latest_sensor or "id" not in latest_sensor or "timestamp" not in latest_sensor:
-            raise ValueError("Таблица table_sensor_data пуста. Невозможно привязать показания.")
+        if (
+            not latest_sensor
+            or "id" not in latest_sensor
+            or "timestamp" not in latest_sensor
+        ):
+            raise ValueError(
+                "Таблица table_sensor_data пуста. Невозможно привязать показания."
+            )
 
         sensor_id = latest_sensor["id"]
         timestamp_str = latest_sensor["timestamp"]
@@ -174,13 +192,21 @@ class GasEngineService:
                     f"Введенное значение ({gas_meter:.3f}) меньше последнего записанного ({last_gas_meter:.3f})"
                 )
 
-        records_this_month = await db.query(queries.GAS_RECORDS_BY_MONTH, (f"{target_month}%",))
+        records_this_month = await db.query(
+            queries.GAS_RECORDS_BY_MONTH, (f"{target_month}%",)
+        )
 
-        table_start_gas = latest_gas.get("start_of_month_gas_meter") if latest_gas else None
+        table_start_gas = (
+            latest_gas.get("start_of_month_gas_meter") if latest_gas else None
+        )
         config_start_gas = getattr(
             settings,
             "start_of_month_gas_meter",
-            getattr(settings, "START_OF_MONTH_GAS_METER", getattr(settings, "START_GAS", 0.0)),
+            getattr(
+                settings,
+                "START_OF_MONTH_GAS_METER",
+                getattr(settings, "START_GAS", 0.0),
+            ),
         )
 
         if start_of_month_input is not None:
@@ -200,7 +226,9 @@ class GasEngineService:
 
         sys_settings = await get_settings_db()
         price_gas = float(getattr(sys_settings, "price_gas", 0.0) or 0.0)
-        hot_water_per_hour = float(getattr(sys_settings, "hot_water_per_hour", 0.0) or 0.0)
+        hot_water_per_hour = float(
+            getattr(sys_settings, "hot_water_per_hour", 0.0) or 0.0
+        )
 
         if start_of_month_input is not None and records_this_month:
             for rec in records_this_month:
@@ -209,11 +237,19 @@ class GasEngineService:
                 rec_gas_meter = float(rec.get("gas_meter", 0.0))
                 rec_month = rec_ts[:7]
 
-                avg_street_res = await db.query(queries.MONTHLY_AVG_STREET_TEMP, (f"{rec_month}%",))
-                rec_avg_street = avg_street_res[0].get("res") if avg_street_res else None
+                avg_street_res = await db.query(
+                    queries.MONTHLY_AVG_STREET_TEMP, (f"{rec_month}%",)
+                )
+                rec_avg_street = (
+                    avg_street_res[0].get("res") if avg_street_res else None
+                )
 
-                avg_basement_res = await db.query(queries.MONTHLY_AVG_BASEMENT_TEMP, (f"{rec_month}%",))
-                rec_avg_basement = avg_basement_res[0].get("res") if avg_basement_res else None
+                avg_basement_res = await db.query(
+                    queries.MONTHLY_AVG_BASEMENT_TEMP, (f"{rec_month}%",)
+                )
+                rec_avg_basement = (
+                    avg_basement_res[0].get("res") if avg_basement_res else None
+                )
 
                 updated_rec = self.calculate_full_record(
                     record_id=rec_id,
@@ -227,13 +263,23 @@ class GasEngineService:
                 )
                 await db.upsert("gas_table", [updated_rec], pk_col="id")
 
-        avg_street_res = await db.query(queries.MONTHLY_AVG_STREET_TEMP, (f"{target_month}%",))
+        avg_street_res = await db.query(
+            queries.MONTHLY_AVG_STREET_TEMP, (f"{target_month}%",)
+        )
         raw_street_target = avg_street_res[0].get("res") if avg_street_res else None
-        avg_street_temp = round(raw_street_target, 2) if raw_street_target is not None else None
+        avg_street_temp = (
+            round(raw_street_target, 2) if raw_street_target is not None else None
+        )
 
-        avg_basement_res = await db.query(queries.MONTHLY_AVG_BASEMENT_TEMP, (f"{target_month}%",))
-        raw_basement_target = avg_basement_res[0].get("res") if avg_basement_res else None
-        avg_basement_temp = round(raw_basement_target, 2) if raw_basement_target is not None else None
+        avg_basement_res = await db.query(
+            queries.MONTHLY_AVG_BASEMENT_TEMP, (f"{target_month}%",)
+        )
+        raw_basement_target = (
+            avg_basement_res[0].get("res") if avg_basement_res else None
+        )
+        avg_basement_temp = (
+            round(raw_basement_target, 2) if raw_basement_target is not None else None
+        )
 
         record_to_write = self.calculate_full_record(
             record_id=sensor_id,
@@ -247,7 +293,11 @@ class GasEngineService:
         )
 
         await db.upsert("gas_table", [record_to_write], pk_col="id")
-        logger.info("Успешно обновлен и рассчитан счетчик газа: %s м³ (id: %s)", gas_meter, sensor_id)
+        logger.info(
+            "Успешно обновлен и рассчитан счетчик газа: %s м³ (id: %s)",
+            gas_meter,
+            sensor_id,
+        )
         return record_to_write
 
     async def get_gas_table_context(self) -> Dict[str, Any]:

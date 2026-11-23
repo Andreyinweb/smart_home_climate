@@ -52,23 +52,23 @@ STATE_HEAT = "heat"
 STATE_BOTH = "both"
 STATE_TAIL = "tail"
 
-MIN_PAIRS = 3                    # минимум реальных пар, которым доверяем
-FRESH_PAIR_MINUTES = 10          # свежая пара: берём diff как есть
-RECENT_PAIRS_MINUTES = 60        # окно для медианы последних пар того же состояния
-RECENT_PAIRS_MAX = 6             # максимум пар в этой медиане
-REST_WINDOW_MINUTES = 24 * 60    # окно медианы покоя
-TAIL_RECORDS = 6                 # длина хвоста после периода (записей)
-HISTORY_LIMIT = 600              # сколько последних реальных пар читаем (около 2 суток)
-PERIODS_LIMIT = 200              # сколько последних периодов читаем из каждой таблицы
-PERIODS_FOR_STATS = 5            # сколько последних периодов с статистикой усредняем
-STATS_REFRESH_LIMIT = 20         # сколько периодов досчитываем за один вызов
-BEFORE_PAIRS = 6                 # пар перед стартом периода для diff_before
-NOMINAL_STEP_MINUTES = 5         # период опроса датчиков
+MIN_PAIRS = 3  # минимум реальных пар, которым доверяем
+FRESH_PAIR_MINUTES = 10  # свежая пара: берём diff как есть
+RECENT_PAIRS_MINUTES = 60  # окно для медианы последних пар того же состояния
+RECENT_PAIRS_MAX = 6  # максимум пар в этой медиане
+REST_WINDOW_MINUTES = 24 * 60  # окно медианы покоя
+TAIL_RECORDS = 6  # длина хвоста после периода (записей)
+HISTORY_LIMIT = 600  # сколько последних реальных пар читаем (около 2 суток)
+PERIODS_LIMIT = 200  # сколько последних периодов читаем из каждой таблицы
+PERIODS_FOR_STATS = 5  # сколько последних периодов с статистикой усредняем
+STATS_REFRESH_LIMIT = 20  # сколько периодов досчитываем за один вызов
+BEFORE_PAIRS = 6  # пар перед стартом периода для diff_before
+NOMINAL_STEP_MINUTES = 5  # период опроса датчиков
 RATIO_MIN, RATIO_MAX = 0.5, 2.0  # допустимое отношение a_floor / a_basement
-STEP_PERCENTILE = 95             # перцентиль реальных шагов для ограничителя скорости
-STEP_MIN_SAMPLES = 20            # минимум шагов для расчёта порога по истории
-STEP_MIN_LIMIT = 0.3             # минимальный порог шага, °C
-DEFAULT_STEP_LIMITS = {          # пороги шага за 5 минут, если истории мало, °C
+STEP_PERCENTILE = 95  # перцентиль реальных шагов для ограничителя скорости
+STEP_MIN_SAMPLES = 20  # минимум шагов для расчёта порога по истории
+STEP_MIN_LIMIT = 0.3  # минимальный порог шага, °C
+DEFAULT_STEP_LIMITS = {  # пороги шага за 5 минут, если истории мало, °C
     STATE_REST: 0.5,
     STATE_VENT: 1.5,
     STATE_HEAT: 1.5,
@@ -86,6 +86,7 @@ _REAL_FLAGS = {"sensor_or_calc_basement": 1, "sensor_or_calc_floor": 1}
 
 
 # --- Базовые расчёты влажности ---
+
 
 def _abs_humi(temp: float | None, humi: float | None) -> Optional[float]:
     """Абсолютная влажность (г/м³) или None, если рассчитать нельзя."""
@@ -140,7 +141,9 @@ def calculate_relative_humidity(temp: float | None, ah: float | None) -> float:
     return 0.0 if value is None else value
 
 
-def calculating_temperature_from_humidity(temp: float, ah: float, target_rh: float) -> Tuple[float, float]:
+def calculating_temperature_from_humidity(
+    temp: float, ah: float, target_rh: float
+) -> Tuple[float, float]:
     """Расчет догрева воздуха (°C) для достижения target_rh."""
     temp_heated = round(temp, 1)
     delta = 0.0
@@ -155,20 +158,23 @@ def calculating_temperature_from_humidity(temp: float, ah: float, target_rh: flo
 
 # --- Внутренние структуры и помощники восстановления ---
 
+
 class _Pair(NamedTuple):
     """Реальная пара показаний подвал/пол из истории."""
+
     id: int
     ts: Any
     b_temp: float
     f_temp: float
-    diff: float                    # подвал - пол
-    ratio: Optional[float]         # a_floor / a_basement
+    diff: float  # подвал - пол
+    ratio: Optional[float]  # a_floor / a_basement
     state: str = STATE_REST
     tail_step: int = 0
 
 
 class _Period(NamedTuple):
     """Период проветривания или отопления. end=None, если период открыт."""
+
     id: int
     end: Optional[int]
     kind: str
@@ -177,13 +183,16 @@ class _Period(NamedTuple):
 
 class _Choice(NamedTuple):
     """Выбранные для восстановления разница температур и отношение абсолютных влажностей."""
+
     diff: float
     ratio: float
     source: str
 
 
 @contextmanager
-def _connection(conn: Optional[sqlite3.Connection]) -> Generator[sqlite3.Connection, None, None]:
+def _connection(
+    conn: Optional[sqlite3.Connection],
+) -> Generator[sqlite3.Connection, None, None]:
     """Отдаёт переданное соединение или открывает своё."""
     if conn is not None:
         yield conn
@@ -261,7 +270,9 @@ def _load_periods(c: sqlite3.Connection) -> List[_Period]:
     periods: List[_Period] = []
     for kind, (table, status_col, stop_col) in _PERIOD_TABLES.items():
         rows = crud.get_sync(table, limit=PERIODS_LIMIT, conn=c)
-        rows = sorted((r for r in rows if r.get("id") and r["id"] > 0), key=lambda r: r["id"])
+        rows = sorted(
+            (r for r in rows if r.get("id") and r["id"] > 0), key=lambda r: r["id"]
+        )
         for i, row in enumerate(rows):
             start = row["id"]
             if row.get(status_col):
@@ -272,7 +283,9 @@ def _load_periods(c: sqlite3.Connection) -> List[_Period]:
     return periods
 
 
-def _state_at(rec_id: int, periods: List[_Period]) -> Tuple[str, int, Optional[_Period]]:
+def _state_at(
+    rec_id: int, periods: List[_Period]
+) -> Tuple[str, int, Optional[_Period]]:
     """
     Состояние системы на записи rec_id.
 
@@ -307,7 +320,11 @@ def _state_at(rec_id: int, periods: List[_Period]) -> Tuple[str, int, Optional[_
 def _load_pairs(c: sqlite3.Connection, periods: List[_Period]) -> List[_Pair]:
     """Последние реальные пары (от старых к новым) с определённым состоянием."""
     rows = crud.get_sync(
-        "table_sensor_data", where=_REAL_FLAGS, order_asc=False, limit=HISTORY_LIMIT, conn=c
+        "table_sensor_data",
+        where=_REAL_FLAGS,
+        order_asc=False,
+        limit=HISTORY_LIMIT,
+        conn=c,
     )
     pairs: List[_Pair] = []
     for row in reversed(rows):
@@ -326,7 +343,9 @@ def _stats_rows(periods: List[_Period], kind: str) -> List[Dict[str, Any]]:
         if p.kind != kind or p.end is None:
             continue
         row = p.row
-        if (row.get("real_pairs") or 0) >= MIN_PAIRS and row.get("diff_median") is not None:
+        if (row.get("real_pairs") or 0) >= MIN_PAIRS and row.get(
+            "diff_median"
+        ) is not None:
             result.append(row)
             if len(result) >= PERIODS_FOR_STATS:
                 break
@@ -334,11 +353,18 @@ def _stats_rows(periods: List[_Period], kind: str) -> List[Dict[str, Any]]:
 
 
 def _rest_choice(pairs: List[_Pair], now_ts: Any) -> Optional[_Choice]:
-    rest = [p for p in pairs
-            if p.state == STATE_REST and _age_minutes(now_ts, p.ts) <= REST_WINDOW_MINUTES]
+    rest = [
+        p
+        for p in pairs
+        if p.state == STATE_REST and _age_minutes(now_ts, p.ts) <= REST_WINDOW_MINUTES
+    ]
     if not rest:
         return None
-    return _Choice(float(statistics.median([p.diff for p in rest])), _median_ratio(rest), "rest_24h")
+    return _Choice(
+        float(statistics.median([p.diff for p in rest])),
+        _median_ratio(rest),
+        "rest_24h",
+    )
 
 
 def _choose_diff(
@@ -359,8 +385,11 @@ def _choose_diff(
         recent = [p for p in same if _age_minutes(now_ts, p.ts) <= RECENT_PAIRS_MINUTES]
         recent = recent[-RECENT_PAIRS_MAX:]
         if len(recent) >= MIN_PAIRS:
-            return _Choice(float(statistics.median([p.diff for p in recent])),
-                           _median_ratio(recent), "recent_pairs")
+            return _Choice(
+                float(statistics.median([p.diff for p in recent])),
+                _median_ratio(recent),
+                "recent_pairs",
+            )
 
     base = _rest_choice(pairs, now_ts) or _Choice(fallback_diff, 1.0, "constant")
 
@@ -374,7 +403,9 @@ def _choose_diff(
             )
     elif state == STATE_TAIL and last_ended is not None:
         row = last_ended.row
-        if (row.get("real_pairs") or 0) >= MIN_PAIRS and row.get("diff_end") is not None:
+        if (row.get("real_pairs") or 0) >= MIN_PAIRS and row.get(
+            "diff_end"
+        ) is not None:
             w = tail_step / TAIL_RECORDS
             end_ratio = row.get("ah_ratio_median") or base.ratio
             return _Choice(
@@ -391,7 +422,11 @@ def _step_limits(pairs: List[_Pair], target: str) -> Dict[str, float]:
     for prev, cur in zip(pairs, pairs[1:]):
         if cur.id - prev.id != 1:
             continue
-        a, b = (prev.f_temp, cur.f_temp) if target == "floor" else (prev.b_temp, cur.b_temp)
+        a, b = (
+            (prev.f_temp, cur.f_temp)
+            if target == "floor"
+            else (prev.b_temp, cur.b_temp)
+        )
         steps[cur.state].append(abs(b - a))
     limits: Dict[str, float] = {}
     for state, default in DEFAULT_STEP_LIMITS.items():
@@ -413,9 +448,14 @@ def _limit_step(new: float, prev: Optional[float], limit: float, steps: int) -> 
 
 # --- Статистика периодов ---
 
-def _period_stats(c: sqlite3.Connection, kind: str, start: int, end: int) -> Dict[str, Any]:
+
+def _period_stats(
+    c: sqlite3.Connection, kind: str, start: int, end: int
+) -> Dict[str, Any]:
     """Считает поля статистики завершённого периода [start, end] только по реальным парам."""
-    rows = crud.get_sync("table_sensor_data", where=_REAL_FLAGS, start=start, stop=end, conn=c)
+    rows = crud.get_sync(
+        "table_sensor_data", where=_REAL_FLAGS, start=start, stop=end, conn=c
+    )
     pairs = [p for p in (_pair_from_row(r) for r in rows) if p is not None]
 
     stats: Dict[str, Any] = {
@@ -438,12 +478,20 @@ def _period_stats(c: sqlite3.Connection, kind: str, start: int, end: int) -> Dic
         stats["ah_ratio_median"] = round(float(statistics.median(ratios)), 3)
 
     before_rows = crud.get_sync(
-        "table_sensor_data", where=_REAL_FLAGS, stop=start - 1,
-        order_asc=False, limit=BEFORE_PAIRS * 3, conn=c,
+        "table_sensor_data",
+        where=_REAL_FLAGS,
+        stop=start - 1,
+        order_asc=False,
+        limit=BEFORE_PAIRS * 3,
+        conn=c,
     )
-    before = [p for p in (_pair_from_row(r) for r in before_rows) if p is not None][:BEFORE_PAIRS]
+    before = [p for p in (_pair_from_row(r) for r in before_rows) if p is not None][
+        :BEFORE_PAIRS
+    ]
     if before:
-        stats["diff_before"] = round(float(statistics.median([p.diff for p in before])), 2)
+        stats["diff_before"] = round(
+            float(statistics.median([p.diff for p in before])), 2
+        )
 
     start_rows = crud.get_sync("table_sensor_data", pk=start, conn=c)
     if start_rows:
@@ -457,7 +505,9 @@ def _period_stats(c: sqlite3.Connection, kind: str, start: int, end: int) -> Dic
     return stats
 
 
-def refresh_period_stats(conn: Optional[sqlite3.Connection] = None, limit: int = STATS_REFRESH_LIMIT) -> int:
+def refresh_period_stats(
+    conn: Optional[sqlite3.Connection] = None, limit: int = STATS_REFRESH_LIMIT
+) -> int:
     """
     Досчитывает статистику завершённых периодов, у которых real_pairs ещё NULL.
 
@@ -475,8 +525,11 @@ def refresh_period_stats(conn: Optional[sqlite3.Connection] = None, limit: int =
             last_id = last[0]["id"] if last else 0
             for kind, (table, status_col, stop_col) in _PERIOD_TABLES.items():
                 rows = crud.get_sync(
-                    table, where={status_col: 0, "real_pairs": None},
-                    order_asc=False, limit=limit, conn=c,
+                    table,
+                    where={status_col: 0, "real_pairs": None},
+                    order_asc=False,
+                    limit=limit,
+                    conn=c,
                 )
                 for row in rows:
                     start = row["id"]
@@ -489,12 +542,15 @@ def refresh_period_stats(conn: Optional[sqlite3.Connection] = None, limit: int =
                     crud.upsert_sync(table, [{"id": start, **stats}], conn=c)
                     done += 1
     except sqlite3.OperationalError as exc:
-        work_log.warning(f"Статистика периодов не обновлена (выполнена ли миграция?): {exc}")
+        work_log.warning(
+            f"Статистика периодов не обновлена (выполнена ли миграция?): {exc}"
+        )
         return 0
     return done
 
 
 # --- Восстановление данных датчиков ---
+
 
 def _sensor_alive(raw: Dict[str, Any], name: str) -> bool:
     """Датчик рабочий, если пришли и температура, и влажность."""
@@ -513,12 +569,19 @@ def _plan_restore(
     last_rows = crud.get_sync("table_sensor_data", conn=c)
     prev = last_rows[0] if last_rows else None
     if prev is None:
-        return _Choice(fallback_diff, 1.0, "constant_no_history"), STATE_REST, None, None
+        return (
+            _Choice(fallback_diff, 1.0, "constant_no_history"),
+            STATE_REST,
+            None,
+            None,
+        )
 
     periods = _load_periods(c)
     pairs = _load_pairs(c, periods)
     state, tail_step, last_ended = _state_at(prev["id"] + 1, periods)
-    choice = _choose_diff(pairs, periods, state, tail_step, last_ended, now_ts, fallback_diff)
+    choice = _choose_diff(
+        pairs, periods, state, tail_step, last_ended, now_ts, fallback_diff
+    )
     limit = _step_limits(pairs, target)[state]
     return choice, state, limit, prev
 
@@ -543,13 +606,22 @@ def _restore_missing(
         with _connection(conn) as c:
             choice, state, limit, prev = _plan_restore(c, now_ts, target, fallback_diff)
     else:
-        choice, state, limit, prev = _Choice(fallback_diff, 1.0, "constant_mode"), STATE_REST, None, None
+        choice, state, limit, prev = (
+            _Choice(fallback_diff, 1.0, "constant_mode"),
+            STATE_REST,
+            None,
+            None,
+        )
 
     # diff = подвал - пол
     temp = t_alive - choice.diff if target == "floor" else t_alive + choice.diff
     if prev is not None and limit is not None:
         minutes = _minutes_between(now_ts, prev.get("timestamp"))
-        steps = round(minutes / NOMINAL_STEP_MINUTES) if minutes is not None and minutes > 0 else 1
+        steps = (
+            round(minutes / NOMINAL_STEP_MINUTES)
+            if minutes is not None and minutes > 0
+            else 1
+        )
         temp = _limit_step(temp, prev.get(f"{target}_temp"), limit, steps)
     temp = round(temp, 2)
 
@@ -557,7 +629,9 @@ def _restore_missing(
     ah_alive = _abs_humi(t_alive, h_alive)
     if ah_alive is not None:
         # ratio = a_floor / a_basement
-        ah_target = ah_alive * choice.ratio if target == "floor" else ah_alive / choice.ratio
+        ah_target = (
+            ah_alive * choice.ratio if target == "floor" else ah_alive / choice.ratio
+        )
         humi = _rel_humi(temp, ah_target)
     if humi is None and prev is not None:
         humi = prev.get(f"{target}_humi")
@@ -573,7 +647,9 @@ def _restore_missing(
     )
 
 
-def _fill_from_previous(data: Dict[str, Any], conn: Optional[sqlite3.Connection]) -> None:
+def _fill_from_previous(
+    data: Dict[str, Any], conn: Optional[sqlite3.Connection]
+) -> None:
     """Оба датчика пропали: повторяем предыдущую запись, оба флага False."""
     with _connection(conn) as c:
         rows = crud.get_sync("table_sensor_data", conn=c)
@@ -639,9 +715,13 @@ def build_sensor_record(
     if not b_ok and not f_ok:
         _fill_from_previous(data, conn)
     elif not f_ok:
-        _restore_missing(data, "floor", has_floor_sensor, t_floor_mac_diff, now_ts, conn)
+        _restore_missing(
+            data, "floor", has_floor_sensor, t_floor_mac_diff, now_ts, conn
+        )
     elif not b_ok:
-        _restore_missing(data, "basement", has_floor_sensor, t_floor_mac_diff, now_ts, conn)
+        _restore_missing(
+            data, "basement", has_floor_sensor, t_floor_mac_diff, now_ts, conn
+        )
 
     data["a_street_humi"] = _abs_humi(data["street_temp"], data["street_humi"])
     data["a_basement_humi"] = _abs_humi(data["basement_temp"], data["basement_humi"])
@@ -651,9 +731,7 @@ def build_sensor_record(
 
 
 def build_api_record(
-    sensor_data: Dict[str, Any],
-    row_id: int,
-    sys_settings: Any
+    sensor_data: Dict[str, Any], row_id: int, sys_settings: Any
 ) -> Dict[str, Any]:
     """Формирует запись строго под схему таблицы 'api_table'."""
     abs_tolerance = getattr(sys_settings, "absolute_humidity_tolerance", 0.5)
@@ -688,18 +766,26 @@ def build_api_record(
     sim_floor_humi = calculate_relative_humidity(f_temp, sim_a_basement_humi)
 
     if vent_status and sim_floor_humi > target_rh:
-        floor_temp_heated, heating_delta = calculating_temperature_from_humidity(f_temp, a_street, target_rh)
+        floor_temp_heated, heating_delta = calculating_temperature_from_humidity(
+            f_temp, a_street, target_rh
+        )
         heat_status = True
         basement_temp_heated = round(b_temp + heating_delta, 1)
-        basement_humi_heated = calculate_relative_humidity(basement_temp_heated, a_street)
+        basement_humi_heated = calculate_relative_humidity(
+            basement_temp_heated, a_street
+        )
         a_basement_humi_heated = a_street
         floor_humi_heated = calculate_relative_humidity(floor_temp_heated, a_street)
         a_floor_humi_heated = a_street
     elif not vent_status and f_humi > target_rh:
-        floor_temp_heated, heating_delta = calculating_temperature_from_humidity(f_temp, a_floor, target_rh)
+        floor_temp_heated, heating_delta = calculating_temperature_from_humidity(
+            f_temp, a_floor, target_rh
+        )
         heat_status = True
         basement_temp_heated = round(b_temp + heating_delta, 1)
-        basement_humi_heated = calculate_relative_humidity(basement_temp_heated, a_basement)
+        basement_humi_heated = calculate_relative_humidity(
+            basement_temp_heated, a_basement
+        )
         a_basement_humi_heated = a_basement
         floor_humi_heated = calculate_relative_humidity(floor_temp_heated, a_basement)
         a_floor_humi_heated = a_basement
@@ -732,8 +818,9 @@ def build_api_record(
         "basement_humi_heated": basement_humi_heated,
         "a_basement_humi_heated": a_basement_humi_heated,
         "floor_humi_heated": floor_humi_heated,
-        "a_floor_humi_heated": a_floor_humi_heated
+        "a_floor_humi_heated": a_floor_humi_heated,
     }
+
 
 def safe_diff(val1: Any, val2: Any) -> float:
     """Безопасное вычисление разницы между двумя значениями."""

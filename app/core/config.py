@@ -42,21 +42,45 @@ class ClimatePhysicsDefaults(BaseModel):
     ВАЖНО: Переменные в этом классе можно менять прямо здесь в коде.
     Значения по умолчанию для физики и программатора задаются здесь.
     """
-    t_floor_mac_diff: float = Field(default=2.0, description="Дельта температур пола и датчика")
-    absolute_humidity_tolerance: float = Field(default=0.5, description="Допуск абсолютной влажности")
-    minimum_humidity: float = Field(default=65.0, description="Минимальная допустимая влажность")
-    target_rh: float = Field(default=70.0, description="Целевая относительная влажность")
-    dangerous_humidity: float = Field(default=75.0, description="Опасный порог влажности")
+
+    t_floor_mac_diff: float = Field(
+        default=2.0, description="Дельта температур пола и датчика"
+    )
+    absolute_humidity_tolerance: float = Field(
+        default=0.5, description="Допуск абсолютной влажности"
+    )
+    minimum_humidity: float = Field(
+        default=65.0, description="Минимальная допустимая влажность"
+    )
+    target_rh: float = Field(
+        default=70.0, description="Целевая относительная влажность"
+    )
+    dangerous_humidity: float = Field(
+        default=75.0, description="Опасный порог влажности"
+    )
 
     price_gas: float = Field(default=7.96, description="Тариф на газ")
-    hot_water_per_hour: float = Field(default=0.0457, description="Расход горячей воды в час")
-    start_of_month_gas_meter: float = Field(default=36870.0, description="Начальные показания счетчика газа")
+    hot_water_per_hour: float = Field(
+        default=0.0457, description="Расход горячей воды в час"
+    )
+    start_of_month_gas_meter: float = Field(
+        default=36870.0, description="Начальные показания счетчика газа"
+    )
 
-    minimum_temperature: float = Field(default=13.0, description="Минимальная допустимая температура")
+    minimum_temperature: float = Field(
+        default=13.0, description="Минимальная допустимая температура"
+    )
     target_temperature: float = Field(default=22.0, description="Целевая температура")
-    maximum_temperature: float = Field(default=26.0, description="Опасная минимальная температура")
-    hysteresis_temperature: float = Field(default=1.0, description="Гистерезис температуры")
-    programmer_mode: ProgrammerMode = Field(default=ProgrammerMode.PROGRAMMER_CONST, description="Режим работы программатора")
+    maximum_temperature: float = Field(
+        default=26.0, description="Опасная минимальная температура"
+    )
+    hysteresis_temperature: float = Field(
+        default=1.0, description="Гистерезис температуры"
+    )
+    programmer_mode: ProgrammerMode = Field(
+        default=ProgrammerMode.PROGRAMMER_CONST,
+        description="Режим работы программатора",
+    )
     days_week_mode: Dict[str, List[str]] = Field(
         default_factory=lambda: {
             "week": ["Mo_Su"],
@@ -73,10 +97,10 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
         env_file=(
             "/etc/climat_app/config.env",
             Path.home() / ".config/climat_app/config.env",
-            ".env"
+            ".env",
         ),
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     # --- Режимы приложения и железа ---
@@ -94,13 +118,21 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
     db_name: str = Field(default="climate_data.sqlite3", alias="DB_NAME")
 
     # --- Выбор источника погоды и API ключи ---
-    site_weather: WeatherProvider = Field(default=WeatherProvider.TOMORROW, alias="SITE_WEATHER")
-    openweathermap_api_key: Optional[SecretStr] = Field(default=None, alias="OPENWEATHERMAP_API_KEY")
-    tomorrow_api_key: Optional[SecretStr] = Field(default=None, alias="TOMORROW_API_KEY")
+    site_weather: WeatherProvider = Field(
+        default=WeatherProvider.TOMORROW, alias="SITE_WEATHER"
+    )
+    openweathermap_api_key: Optional[SecretStr] = Field(
+        default=None, alias="OPENWEATHERMAP_API_KEY"
+    )
+    tomorrow_api_key: Optional[SecretStr] = Field(
+        default=None, alias="TOMORROW_API_KEY"
+    )
 
     # --- Интервалы и таймауты ---
     interval_seconds: int = Field(default=300, alias="INTERVAL_SECONDS", ge=1)
-    previous_interval_in_seconds: int = Field(default=300, alias="INTERVAL_SECONDS", ge=1)
+    previous_interval_in_seconds: int = Field(
+        default=300, alias="INTERVAL_SECONDS", ge=1
+    )
     max_retries: int = Field(default=5, alias="MAX_RETRIES", ge=1)
     website_return_time: int = Field(default=300, alias="WEBSITE_RETURN_TIME", ge=0)
 
@@ -169,7 +201,10 @@ class Settings(BaseSettings, ClimatePhysicsDefaults):
             self.api_log = self.project_dir / self.api_log
 
         # API-ключ нужен только провайдерам с ключом (OPEN_METEO и MET_NO работают без него)
-        if self.site_weather in (WeatherProvider.TOMORROW, WeatherProvider.OPENWEATHERMAP):
+        if self.site_weather in (
+            WeatherProvider.TOMORROW,
+            WeatherProvider.OPENWEATHERMAP,
+        ):
             active_key = self.active_weather_api_key
             if not active_key or not active_key.get_secret_value().strip():
                 raise ValueError(

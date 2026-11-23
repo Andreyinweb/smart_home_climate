@@ -15,7 +15,7 @@ from app.db.connection import get_db_connection
 from app.dependencies import (
     get_relay_controller,
     get_heating_controller,
-    get_programmer
+    get_programmer,
 )
 from app.core.db_start_config import init_db_start_data
 from app.core.db_settings import get_settings_db
@@ -43,7 +43,7 @@ SHUTDOWN_STOP_TIMEOUT = 10.0
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     work_log = logging.getLogger("climat_app.main")
-    work_log.info("-" * 80)   
+    work_log.info("-" * 80)
 
     # Стартовые установки. Объекты создаются один раз и используются
     # и в фоновом цикле, и при остановке приложения.
@@ -78,13 +78,21 @@ async def lifespan(app: FastAPI):
                 logs_service.set_current_cycle_id(now_id)
 
                 work_log.info("[Цикл] Опрос BLE-датчиков...")
-                ble_data = await asyncio.wait_for(fetch_all_ble_sensors(sys_settings), timeout=180.0)
+                ble_data = await asyncio.wait_for(
+                    fetch_all_ble_sensors(sys_settings), timeout=180.0
+                )
 
                 if ble_data:
                     ble_data["timestamp"] = timestamp_str
 
-                    if ble_data.get("street_temp") is None or not ble_data.get("sensor_or_calc_street", True):
-                        c_temp, c_rh, c_flag = await weather_service.get_calculated_street_climate(datetime.now().hour)
+                    if ble_data.get("street_temp") is None or not ble_data.get(
+                        "sensor_or_calc_street", True
+                    ):
+                        c_temp, c_rh, c_flag = (
+                            await weather_service.get_calculated_street_climate(
+                                datetime.now().hour
+                            )
+                        )
                         ble_data["street_temp"] = c_temp
                         ble_data["street_humi"] = c_rh
                         ble_data["sensor_or_calc_street"] = c_flag
@@ -96,9 +104,13 @@ async def lifespan(app: FastAPI):
                     api_record = build_api_record(sensor_record, now_id, sys_settings)
                     await db.upsert("api_table", [api_record])
 
-                    asyncio.create_task(weather_service.record_site_weather(timestamp_str, now_id))
+                    asyncio.create_task(
+                        weather_service.record_site_weather(timestamp_str, now_id)
+                    )
 
-                    work_log.info(f"[Цикл] Данные ID={now_id} успешно записаны в table_sensor_data и api_table.")
+                    work_log.info(
+                        f"[Цикл] Данные ID={now_id} успешно записаны в table_sensor_data и api_table."
+                    )
 
                     # Автоматическое управление отоплением (без отдельного try:
                     # ошибка уходит во внешний обработчик цикла).
@@ -115,30 +127,65 @@ async def lifespan(app: FastAPI):
 
                 await relay_ctrl.verification_relay()
 
-                coeff_rows = await db.get("hourly_coefficients_table", pk=int(timestamp_str[11:13]), pk_col="hour")
+                coeff_rows = await db.get(
+                    "hourly_coefficients_table",
+                    pk=int(timestamp_str[11:13]),
+                    pk_col="hour",
+                )
                 updated_at_str = coeff_rows[0].get("updated_at") if coeff_rows else None
 
-                if not updated_at_str or not updated_at_str.startswith(timestamp_str[:10]):
-                    await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100, max_daily_backups=1)
-                    if sys_settings.mode == "BASEMENT_STREET_FLOOR" or sys_settings.mode == "BASEMENT_STREET":
-                        asyncio.create_task(weather_service.calibrate_hourly_coefficients())
+                if not updated_at_str or not updated_at_str.startswith(
+                    timestamp_str[:10]
+                ):
+                    await backup_service.create_backup_async(
+                        settings.db_path,
+                        settings.backup,
+                        max_backups=100,
+                        max_daily_backups=1,
+                    )
+                    if (
+                        sys_settings.mode == "BASEMENT_STREET_FLOOR"
+                        or sys_settings.mode == "BASEMENT_STREET"
+                    ):
+                        asyncio.create_task(
+                            weather_service.calibrate_hourly_coefficients()
+                        )
 
                 if settings.app_env.value == "PREVIOUS":
-                    work_log.warning("[Цикл] Работает резервная копия программы. РЕЖИМ: PREVIOUS")
+                    work_log.warning(
+                        "[Цикл] Работает резервная копия программы. РЕЖИМ: PREVIOUS"
+                    )
 
             except asyncio.TimeoutError:
-                work_log.error("[Цикл] Превышено время ожидания BLE-датчиков (Timeout).")
+                work_log.error(
+                    "[Цикл] Превышено время ожидания BLE-датчиков (Timeout)."
+                )
             except asyncio.CancelledError:
                 work_log.info("[Цикл] Остановлена фоновая задача опроса BLE-датчиков.")
                 break
             except Exception as e:
-                work_log.error(f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True)
+                work_log.error(
+                    f"[Цикл] Ошибка при опросе и расчете данных: {e}", exc_info=True
+                )
 
             sys_settings = await get_settings_db()
-            interval_settings = getattr(sys_settings, "interval_seconds", settings.interval_seconds)
-            delta_time = round((datetime.now() - datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")).total_seconds())
-            interval = 60 if (interval_settings - delta_time) < 60 else interval_settings - delta_time
-            work_log.info(f"[Цикл] Ожидание до {datetime.now() + timedelta(seconds=interval):%H:%M:%S} (следующий опрос BLE-датчиков). Пауза в базе данных {interval_settings}")
+            interval_settings = getattr(
+                sys_settings, "interval_seconds", settings.interval_seconds
+            )
+            delta_time = round(
+                (
+                    datetime.now()
+                    - datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                ).total_seconds()
+            )
+            interval = (
+                60
+                if (interval_settings - delta_time) < 60
+                else interval_settings - delta_time
+            )
+            work_log.info(
+                f"[Цикл] Ожидание до {datetime.now() + timedelta(seconds=interval):%H:%M:%S} (следующий опрос BLE-датчиков). Пауза в базе данных {interval_settings}"
+            )
             await asyncio.sleep(interval)
 
     polling_task = asyncio.create_task(ble_polling_loop())
@@ -154,23 +201,31 @@ async def lifespan(app: FastAPI):
 
     # 1. Штатная остановка отопления (с записью в БД и историю)
     try:
-        work_log.info("[Lifespan] Остановка отопления через heating_ctrl.stop (stop_forcibly=1)...")
+        work_log.info(
+            "[Lifespan] Остановка отопления через heating_ctrl.stop (stop_forcibly=1)..."
+        )
         stop_result = await asyncio.wait_for(
             heating_ctrl.stop(is_automation=False, stop_forcibly=1),
             timeout=SHUTDOWN_STOP_TIMEOUT,
         )
-        work_log.info(f"[Lifespan] Результат heating_ctrl.stop: {stop_result} (True=остановлено, False=пропущено/сбой, None=занято)")
+        work_log.info(
+            f"[Lifespan] Результат heating_ctrl.stop: {stop_result} (True=остановлено, False=пропущено/сбой, None=занято)"
+        )
     except Exception as e:
         work_log.error(f"[Lifespan] Ошибка при штатной остановке отопления: {e}")
 
     # 2. Страховка: принудительное выключение реле независимо от результата выше
     try:
-        work_log.info("[Lifespan] Страховочное выключение реле котла (stop_programm=1)...")
+        work_log.info(
+            "[Lifespan] Страховочное выключение реле котла (stop_programm=1)..."
+        )
         await relay_ctrl.turn_off(stop_programm=1)
     except Exception as e:
         work_log.error(f"[Lifespan] Ошибка при аварийном выключении реле: {e}")
 
-    await backup_service.create_backup_async(settings.db_path, settings.backup, max_backups=100)
+    await backup_service.create_backup_async(
+        settings.db_path, settings.backup, max_backups=100
+    )
 
     def _truncate_wal():
         try:
@@ -208,11 +263,20 @@ app.include_router(settings_router.router)
 app.include_router(heating_router.router)
 app.include_router(programmer_router.router)
 
-if settings.app_env == AppEnv.DEVELOPMENT or settings.app_env == AppEnv.PREVIOUS or settings.app_env == AppEnv.STAGING:
+if (
+    settings.app_env == AppEnv.DEVELOPMENT
+    or settings.app_env == AppEnv.PREVIOUS
+    or settings.app_env == AppEnv.STAGING
+):
     app.include_router(debug_router.router)
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host=settings.server_host, port=settings.server_port, reload=False)
+    uvicorn.run(
+        "app.main:app",
+        host=settings.server_host,
+        port=settings.server_port,
+        reload=False,
+    )
