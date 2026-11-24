@@ -1,0 +1,123 @@
+{# templates/web/index.html #}
+{% extends "web/base.html" %}
+
+{# Число с d знаками или «—», если значения нет #}
+{% macro n(v, d=1) -%}
+{%- if v is defined and v is not none -%}{{ ('%.' ~ d ~ 'f')|format(v) }}{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{# Подпись источника: датчик / расчёт / пусто, если флага нет #}
+{% macro src(f) -%}
+{%- if f is defined and f is not none -%}{{ 'датчик' if f else 'расчёт' }}{%- endif -%}
+{%- endmacro %}
+
+{% macro thead() -%}
+<thead><tr><th></th><th>Темп.<br>°C</th><th>Отн. вл.<br>%</th><th>Абс. вл.<br>г/м³</th><th>Т. росы<br>°C</th></tr></thead>
+{%- endmacro %}
+
+{% macro row(label, sub, t, rh, ah, dp) -%}
+<tr><td>{{ label }}{% if sub %}<small>{{ sub }}</small>{% endif %}</td><td>{{ n(t) }}</td><td>{{ n(rh) }}</td><td>{{ n(ah, 2) }}</td><td>{{ n(dp) }}</td></tr>
+{%- endmacro %}
+
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Главная</h1>
+    <span class="label">{{ timestamp[:16] if timestamp else '—' }}</span>
+</div>
+
+<!-- ДАТЧИКИ -->
+<section class="card">
+    <div class="card-title">Датчики</div>
+    <table class="t">
+        {{ thead() }}
+        <tbody>
+            {{ row('Улица',  src(sensor_or_calc_street),   street_temp,   street_humi,   a_street_humi,   dp_street) }}
+            {{ row('Подвал', src(sensor_or_calc_basement), basement_temp, basement_humi, a_basement_humi, dp_basement) }}
+            {{ row('Пол',    src(sensor_or_calc_floor),    floor_temp,    floor_humi,    a_floor_humi,    dp_floor) }}
+        </tbody>
+    </table>
+    {% if max_rh is defined and max_rh is not none %}
+    <div class="label note">Макс. ОВ пола: {{ n(max_rh) }}%</div>
+    {% endif %}
+</section>
+
+<!-- РАСЧЁТ (рекомендация, не фактический статус) -->
+<div class="duo">
+    <section class="card">
+        <div class="label">Расчёт: проветривание</div>
+        {% if vent_status is defined and vent_status is not none %}
+            {% if vent_status %}
+            <div class="pill yes">Да{% if vent_time_val %} · {{ vent_time_val }} мин{% endif %}</div>
+            <div class="label note">{{ n(humidity_difference, 2) }} г/м³</div>
+            {% else %}
+            <div class="pill no">Нет</div>
+            {% endif %}
+        {% else %}
+        <div class="pill no">—</div>
+        {% endif %}
+    </section>
+    <section class="card">
+        <div class="label">Расчёт: отопление</div>
+        {% if heat_status is defined and heat_status is not none %}
+            {% if heat_status %}
+            <div class="pill heat-yes">Да{% if heat_info %} {{ heat_info }}{% endif %}</div>
+            {% else %}
+            <div class="pill no">Нет</div>
+            {% endif %}
+        {% else %}
+        <div class="pill no">—</div>
+        {% endif %}
+    </section>
+</div>
+
+<!-- ПРОГНОЗ ПОСЛЕ ПРОВЕТРИВАНИЯ (показывается, если расчёт рекомендует проветривание) -->
+{% if vent_status %}
+<section class="card">
+    <div class="card-title">Прогноз после проветривания</div>
+    <table class="t">
+        {{ thead() }}
+        <tbody>
+            {{ row('Улица',  '', street_temp,   street_humi,     a_street_humi,       dp_street) }}
+            {{ row('Подвал', '', basement_temp, sim_basement_humi, sim_a_basement_humi, sim_dp_basement) }}
+            {{ row('Пол',    '', floor_temp,    sim_floor_humi,    sim_a_basement_humi, sim_dp_floor) }}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+<!-- ПРОГНОЗ ПОСЛЕ ОТОПЛЕНИЯ (показывается, если расчёт рекомендует отопление) -->
+{% if heat_status %}
+<section class="card">
+    <div class="card-title">Прогноз после отопления</div>
+    <table class="t">
+        {{ thead() }}
+        <tbody>
+            {{ row('Улица',  '', street_temp,          street_humi,          a_street_humi,          dp_street) }}
+            {{ row('Подвал', '', basement_temp_heated, basement_humi_heated, a_basement_humi_heated, dp_basement_heated) }}
+            {{ row('Пол',    '', floor_temp_heated,    floor_humi_heated,    a_floor_humi_heated,    dp_floor_heated) }}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+<!-- БАТАРЕИ -->
+<section class="card">
+    <div class="label">Напряжение батарей, В</div>
+    <div class="volts">
+        <span>Ул <b>{{ n(street_voltage, 3) }}</b></span>
+        <span>Подв <b>{{ n(basement_voltage, 3) }}</b></span>
+        <span>Пол <b>{{ n(floor_voltage, 3) }}</b></span>
+    </div>
+</section>
+
+{% if app_env is defined and app_env in ["DEVELOPMENT", "STAGING", "PREVIOUS"] %}
+<section class="card debug-links">
+    <a href="/debug/work-log">📝 Work Log</a>
+    <a href="/debug/api-log">🌐 API Log</a>
+</section>
+{% endif %}
+
+{% endblock %}

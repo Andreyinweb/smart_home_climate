@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Климат</title>
+<style>
+/* ===== Токены. Менять цвета только здесь ===== */
+:root{
+  --bg:#12112a;          /* фон страницы */
+  --card:#1c1a3a;        /* карточка */
+  --inner:#0f0e22;       /* вложенная тёмная панель */
+  --line:#2f2c58;        /* разделители */
+  --text:#e9e6ff;
+  --label:#9a95c8;       /* подписи */
+  --accent:#7c3acd;      /* активный пункт меню */
+  --accent-soft:#cfc9ff;
+  --t-min:#6fa8ff;       /* уставка "от" */
+  --t-max:#ff7a8c;       /* уставка "до" */
+
+  --ok-bg:#12382f;   --ok-line:#3fcf8e;   --ok-text:#5fe0a6;   --ok-label:#8be8bd;
+  --warn-bg:#3d3410; --warn-line:#e6c229; --warn-text:#f2d85a;
+  --bad-bg:#3a1620;  --bad-line:#ff5d6c;  --bad-text:#ff8c98;
+  --crit-bg:#d81f3a; --crit-line:#ffffff; --crit-text:#ffffff;
+  --idle-bg:#2b2858;
+
+  --radius-card:12px;
+  --gap:6px;
+  --font:Roboto,"Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.2;
+  -webkit-text-size-adjust:100%}
+body{max-width:480px;margin:0 auto;min-height:100vh;
+  padding:var(--gap) var(--gap) calc(var(--gap) + env(safe-area-inset-bottom))}
+.page{display:flex;flex-direction:column;gap:5px}
+
+/* ===== Общие классы ===== */
+.card{background:var(--card);border-radius:10px;padding:6px 10px}
+.label{font-size:11px;color:var(--label)}
+.card-title{font-size:13px;font-weight:500;margin-bottom:4px}
+
+/* ===== Шапка ===== */
+.header{padding:6px 8px}
+.header-row{display:flex;align-items:center;gap:8px}
+.menu-btn{width:24px;height:24px;border-radius:50%;background:var(--inner);border:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu-btn svg{width:14px;height:14px;stroke:var(--accent-soft)}
+.poll-time{font-size:13px;font-weight:500}
+.status{margin-left:auto;display:flex;align-items:center;gap:4px;border-radius:999px;
+  padding:4px 9px;font-size:12px;font-weight:500}
+.status[hidden]{display:none}
+.status.vent{background:var(--ok-bg);color:var(--ok-text)}
+.status.heat{background:#3d2410;color:#ffb36b}
+.status svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+
+.panel{background:var(--inner);border-radius:8px;padding:5px 8px;margin-top:5px}
+.panel-top{display:flex;justify-content:space-between}
+.panel-top .sensor-name{color:var(--accent-soft)}
+.temps{display:grid;grid-template-columns:1fr 1.3fr 1fr;text-align:center;align-items:end}
+.temps .min{font-size:13px;color:var(--t-min)}
+.temps .now{font-size:20px;font-weight:500}
+.temps .max{font-size:13px;color:var(--t-max)}
+.sep{border-top:.5px solid var(--line);margin:4px 0 3px}
+.hum{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:6px;text-align:center;margin-top:1px}
+.hum .val{font-size:13px}
+
+/* Влажность пола: рамка всегда, цвет зависит от зоны */
+.floor{border:1.5px solid var(--ok-line);border-radius:8px;background:var(--ok-bg);padding:1px 0}
+.floor .label{color:var(--ok-label)}
+.floor .val{font-weight:500;color:var(--ok-text)}
+.floor[data-zone="warn"]{border-color:var(--warn-line);background:var(--warn-bg)}
+.floor[data-zone="warn"] .label,.floor[data-zone="warn"] .val{color:var(--warn-text)}
+.floor[data-zone="bad"]{border-color:var(--bad-line);background:var(--bad-bg)}
+.floor[data-zone="bad"] .label,.floor[data-zone="bad"] .val{color:var(--bad-text)}
+.floor[data-zone="critical"]{border:2px solid var(--crit-line);background:var(--crit-bg)}
+.floor[data-zone="critical"] .label,.floor[data-zone="critical"] .val{color:var(--crit-text)}
+.floor .warn-icon{display:none;width:12px;height:12px;vertical-align:-1px;margin-right:2px;
+  stroke:#fff;fill:none;stroke-width:2}
+.floor[data-zone="critical"] .warn-icon{display:inline}
+
+/* ===== Блок ошибок (под шапкой, только если есть ошибки) ===== */
+.errors{display:flex;flex-direction:column;gap:5px}
+.errors[hidden]{display:none}
+.error-item{background:var(--bad-bg);border:1px solid var(--bad-line);border-radius:10px;
+  padding:8px 10px;font-size:13px;color:#ffd5da}
+
+/* ===== Заголовок страницы ===== */
+.page-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px}
+.page-head h1{font-size:16px;font-weight:500;color:#f1efff}
+
+/* ===== Таблицы ===== */
+table.t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+table.t th{font-size:11px;font-weight:400;color:var(--label);text-align:left;padding:0 0 3px}
+table.t td{padding:3px 0;border-top:.5px solid var(--line)}
+table.t td small{display:block;font-size:11px;color:var(--label)}
+
+/* ===== Рекомендации (расчёт, не факт) ===== */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.pill{display:inline-block;margin-top:4px;border-radius:8px;padding:2px 8px;font-size:12px}
+.pill.yes{background:var(--ok-bg);color:var(--ok-text);font-weight:500}
+.pill.no{background:var(--idle-bg);color:var(--accent-soft);padding:2px 10px}
+.pill.heat-yes{background:#3d2410;color:#ffb36b;font-weight:500}
+
+/* ===== Выезжающее меню ===== */
+.drawer{position:fixed;inset:0;display:none;z-index:10}
+.drawer.open{display:block}
+.drawer-bg{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.drawer-panel{position:absolute;left:0;top:0;bottom:0;width:78%;max-width:320px;background:var(--card);
+  padding:16px 12px;display:flex;flex-direction:column;gap:6px}
+.drawer-title{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:500;margin-bottom:10px}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:16px;
+  color:var(--text);text-decoration:none;font-size:16px}
+.nav .ico{width:34px;height:34px;border-radius:10px;background:var(--inner);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--accent-soft)}
+.nav.active{background:var(--accent)}
+.nav.active .ico{background:rgba(255,255,255,.2);color:#fff}
+.nav-sep{border-top:.5px solid var(--line);margin:6px 0}
+
+@media (prefers-reduced-motion:no-preference){
+  .floor{transition:background .2s,border-color .2s}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== ШАПКА (одинаковая на всех страницах) ===== -->
+  <header class="card header">
+    <div class="header-row">
+      <button class="menu-btn" id="menuBtn" aria-label="Открыть меню">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div>
+        <div class="label">Опрос</div>
+        <div class="poll-time" id="pollTime">--</div>
+      </div>
+      <!-- Фактический статус: проветривание / отопление / пусто (hidden) -->
+      <div class="status" id="status" hidden>
+        <svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7a2 2 0 1 1-2 2"/></svg>
+        <span id="statusText"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-top"><span class="label">Т, °C</span><span class="label sensor-name" id="activeSensor"></span></div>
+      <div class="temps">
+        <div><div class="label">от</div><div class="min" id="tMin">--</div></div>
+        <div><div class="label">сейчас</div><div class="now" id="tNow">--</div></div>
+        <div><div class="label">до</div><div class="max" id="tMax">--</div></div>
+      </div>
+      <div class="sep"></div>
+      <div class="label">Влаж., %</div>
+      <div class="hum">
+        <div><div class="label">Ул</div><div class="val" id="hOut">--</div></div>
+        <div><div class="label">Подв</div><div class="val" id="hBase">--</div></div>
+        <div class="floor" id="floorBox" data-zone="ok">
+          <div class="label">Пол</div>
+          <div class="val">
+            <svg class="warn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></svg><span id="hFloor">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== БЛОК ОШИБОК (виден только при ошибках) ===== -->
+  <section class="errors" id="errors" hidden></section>
+
+  <!-- ===== СОДЕРЖИМОЕ СТРАНИЦЫ "ГЛАВНАЯ". Для новых страниц менять только эту часть ===== -->
+  <main class="page" id="content">
+    <div class="page-head">
+      <h1>Главная</h1>
+      <span class="label" id="pageDate">--</span>
+    </div>
+
+    <section class="card">
+      <div class="card-title">Датчики</div>
+      <table class="t">
+        <colgroup><col style="width:26%"><col style="width:18%"><col style="width:18%"><col style="width:20%"><col style="width:18%"></colgroup>
+        <thead><tr><th></th><th>Темп.<br>°C</th><th>Отн. вл.<br>%</th><th>Абс. вл.<br>г/м³</th><th>Т. росы<br>°C</th></tr></thead>
+        <tbody id="sensorsBody"></tbody>
+      </table>
+      <div class="label" style="margin-top:3px" id="floorMax"></div>
+    </section>
+
+    <div class="duo">
+      <!-- Рекомендация расчёта, а не фактический статус -->
+      <section class="card">
+        <div class="label">Расчёт: проветривание</div>
+        <div class="pill no" id="ventPill">--</div>
+        <div class="label" style="margin-top:3px" id="ventAbs"></div>
+      </section>
+      <section class="card">
+        <div class="label">Расчёт: отопление</div>
+        <div class="pill no" id="heatPill">--</div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-title">Прогноз после проветривания</div>
+      <table class="t">
+        <colgroup><col style="width:26%"><col style="width:18%"><col style="width:18%"><col style="width:20%"><col style="width:18%"></colgroup>
+        <thead><tr><th></th><th>Темп.<br>°C</th><th>Отн. вл.<br>%</th><th>Абс. вл.<br>г/м³</th><th>Т. росы<br>°C</th></tr></thead>
+        <tbody id="forecastBody"></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<!-- ===== МЕНЮ ===== -->
+<div class="drawer" id="drawer">
+  <div class="drawer-bg" id="drawerBg"></div>
+  <nav class="drawer-panel" aria-label="Разделы">
+    <div class="drawer-title"><span class="nav ico" style="background:var(--accent);color:#fff">T</span>Климат</div>
+    <a class="nav active" href="/"><span class="ico">Гл</span>Главная</a>
+    <a class="nav" href="/vent"><span class="ico">Пр</span>Проветривание</a>
+    <a class="nav" href="/heating"><span class="ico">От</span>Отопление</a>
+    <a class="nav" href="/scheduler"><span class="ico">Пг</span>Программатор</a>
+    <a class="nav" href="/charts"><span class="ico">Гр</span>Графики</a>
+    <a class="nav" href="/table"><span class="ico">Тб</span>Таблица</a>
+    <a class="nav" href="/gas"><span class="ico">Газ</span>Газ</a>
+    <div class="nav-sep"></div>
+    <a class="nav" href="/settings"><span class="ico">Нс</span>Настройки</a>
+  </nav>
+</div>
+
+<script>
+/* ===== 1. ДАННЫЕ. Сейчас заглушка. В бою заменить на fetch('/api/state') ===== */
+const state = {
+  polledAt: "2026-11-24T00:30:12",      // время последнего опроса датчиков
+  status: "vent",                        // "vent" | "heat" | "idle"  (фактический статус)
+  active: { name: "Подвал", tMin: 21.5, tNow: 22.8, tMax: 22.5 },
+  thresholds: { floorWarn: 65, floorMax: 70, floorCritical: 75 },   // из настроек
+  sensors: {
+    outdoor:  { label: "Улица",  sub: "расчёт", t: 6.4,  rh: 90.3, ah: 6.73, dp: 4.9  },
+    basement: { label: "Подвал", sub: "датчик", t: 22.8, rh: 49.0, ah: 9.96, dp: 11.5 },
+    floor:    { label: "Пол",    sub: "датчик", t: 18.5, rh: 62.0, ah: 9.80, dp: 11.1 }
+  },
+  recommend: { vent: { yes: true, minutes: 3, ah: 3.23 }, heat: { yes: false } },
+  forecast: [
+    { label: "Улица",  t: 6.4,  rh: 90.3, ah: 6.73, dp: 4.9 },
+    { label: "Подвал", t: 22.8, rh: 33.1, ah: 6.73, dp: 5.7 },
+    { label: "Пол",    t: 18.5, rh: 42.6, ah: 6.73, dp: 5.5 }
+  ],
+  errors: []                             // например: ["Датчик пола не отвечает"]
+};
+
+/* ===== 2. ВСПОМОГАТЕЛЬНОЕ ===== */
+const $ = id => document.getElementById(id);
+const fmt = (n, d = 1) => Number(n).toFixed(d).replace(".", ",");
+const pad = n => String(n).padStart(2, "0");
+const DAYS = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
+
+/* Зона влажности пола. Границы: <warn = ok; warn..<max = warn; max..critical = bad; >critical = critical */
+function floorZone(rh, th) {
+  if (rh > th.floorCritical) return "critical";
+  if (rh >= th.floorMax)     return "bad";
+  if (rh >= th.floorWarn)    return "warn";
+  return "ok";
+}
+
+/* ===== 3. РЕНДЕР ===== */
+function render(s) {
+  const d = new Date(s.polledAt);
+  $("pollTime").textContent = `${DAYS[d.getDay()]} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  $("pageDate").textContent = `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const st = $("status");
+  if (s.status === "vent" || s.status === "heat") {
+    st.hidden = false;
+    st.className = "status " + s.status;
+    $("statusText").textContent = s.status === "vent" ? "Проветривание" : "Отопление";
+  } else { st.hidden = true; }
+
+  $("activeSensor").textContent = "датчик: " + s.active.name.toLowerCase();
+  $("tMin").textContent = fmt(s.active.tMin);
+  $("tNow").textContent = fmt(s.active.tNow);
+  $("tMax").textContent = fmt(s.active.tMax);
+
+  $("hOut").textContent  = fmt(s.sensors.outdoor.rh);
+  $("hBase").textContent = fmt(s.sensors.basement.rh);
+  $("hFloor").textContent = fmt(s.sensors.floor.rh);
+  $("floorBox").dataset.zone = floorZone(s.sensors.floor.rh, s.thresholds);
+
+  const eb = $("errors");
+  eb.innerHTML = "";
+  eb.hidden = s.errors.length === 0;
+  s.errors.forEach(text => {
+    const el = document.createElement("div");
+    el.className = "error-item";
+    el.textContent = text;
+    eb.appendChild(el);
+  });
+
+  $("sensorsBody").innerHTML = Object.values(s.sensors).map(r =>
+    `<tr><td>${r.label}<small>${r.sub}</small></td><td>${fmt(r.t)}</td><td>${fmt(r.rh)}</td><td>${fmt(r.ah,2)}</td><td>${fmt(r.dp)}</td></tr>`
+  ).join("");
+  $("floorMax").textContent = `Макс. ОВ пола: ${fmt(s.thresholds.floorMax)}%`;
+
+  const v = $("ventPill");
+  v.className = "pill " + (s.recommend.vent.yes ? "yes" : "no");
+  v.textContent = s.recommend.vent.yes ? `Да · ${s.recommend.vent.minutes} мин` : "Нет";
+  $("ventAbs").textContent = s.recommend.vent.yes ? `${fmt(s.recommend.vent.ah,2)} г/м³` : "";
+
+  const h = $("heatPill");
+  h.className = "pill " + (s.recommend.heat.yes ? "heat-yes" : "no");
+  h.textContent = s.recommend.heat.yes ? "Да" : "Нет";
+
+  $("forecastBody").innerHTML = s.forecast.map(r =>
+    `<tr><td>${r.label}</td><td>${fmt(r.t)}</td><td>${fmt(r.rh)}</td><td>${fmt(r.ah,2)}</td><td>${fmt(r.dp)}</td></tr>`
+  ).join("");
+}
+
+/* ===== 4. МЕНЮ ===== */
+const drawer = $("drawer");
+$("menuBtn").addEventListener("click", () => drawer.classList.add("open"));
+$("drawerBg").addEventListener("click", () => drawer.classList.remove("open"));
+
+/* ===== 5. ЗАПУСК ===== */
+render(state);
+/* В бою:
+   async function refresh(){ const r = await fetch('/api/state'); render(await r.json()); }
+   refresh(); setInterval(refresh, 10000);
+*/
+</script>
+</body>
+</html>
+
