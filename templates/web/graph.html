@@ -1,0 +1,61 @@
+{# templates/web/graph.html #}
+{% extends "web/base.html" %}
+
+{% block title %}Графики{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Графики</h1>
+</div>
+
+<!-- ВЫБОР ГРАФИКА И ПЕРИОДА -->
+<form class="card stack" method="get" action="/graphs">
+    <div class="fields">
+        <div class="field wide">
+            <label class="label" for="graph_type">График</label>
+            <select id="graph_type" name="graph_type" class="inp" onchange="this.form.submit()">
+                <option value="temperature" {% if graph_type == 'temperature' %}selected{% endif %}>Температура</option>
+                <option value="humidity" {% if graph_type == 'humidity' %}selected{% endif %}>Влажность (отн.)</option>
+                <option value="abs_humidity" {% if graph_type == 'abs_humidity' %}selected{% endif %}>Влажность (абс.)</option>
+                <option value="gas" {% if graph_type == 'gas' %}selected{% endif %}>Газ</option>
+            </select>
+        </div>
+        <div class="field">
+            <label class="label" for="target_date">Сутки</label>
+            <input type="date" id="target_date" name="target_date" class="inp" value="{{ target_date }}">
+        </div>
+        <div class="field">
+            <label class="label" for="target_month">Месяц</label>
+            <input type="month" id="target_month" name="target_month" class="inp" value="{{ target_month }}">
+        </div>
+    </div>
+
+    <div class="btn-row">
+        <button type="submit" class="btn btn-start">Показать</button>
+        <a href="/graphs?graph_type={{ graph_type }}" class="btn btn-ghost">Сбросить</a>
+    </div>
+</form>
+
+<!-- ГРАФИК -->
+<section class="card">
+    <img id="graph-image" class="graph-img" alt="График"
+         src="{{ graph_url }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // График строится в фоне: через 10 секунд перезагружаем картинку с новой отметкой времени
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            const img = document.getElementById('graph-image');
+            if (img) {
+                const sep = img.src.includes('?') ? '&' : '?';
+                img.src = img.src + sep + 't=' + new Date().getTime();
+            }
+        }, 10000);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{# templates/web/logs.html — общий шаблон для /debug/work-log и /debug/api-log #}
+{% extends "web/base.html" %}
+
+{% block title %}{{ log_title }}{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>{{ log_title }}</h1>
+</div>
+
+<section class="card">
+    <div class="log-head">
+        <div class="label">
+            Файл: <b class="text-blue">{{ log_file_name }}</b><br>
+            Записей в окне: <b class="text-blue">{{ lines_count }}</b>
+        </div>
+        <a href="{{ log_url }}" class="btn btn-start btn-sm">Обновить</a>
+    </div>
+
+    <pre class="log"><code>{{ log_content if log_content else 'Файл лога пуст.' }}</code></pre>
+</section>
+
+{% endblock %}

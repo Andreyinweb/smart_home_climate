@@ -1,0 +1,57 @@
+{# templates/web/gas.html #}
+{% extends "web/base.html" %}
+
+{% block title %}Газ{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Газ</h1>
+    <span class="label">Замер: {{ timestamp if timestamp else '—' }}</span>
+</div>
+
+{% if error is defined and error %}
+<div class="error-item">{{ ico('alert') }}<span>{{ error }}</span></div>
+{% endif %}
+
+<!-- ПОКАЗАТЕЛИ -->
+<section class="stats">
+    <div class="stat">
+        <div class="label">На начало месяца</div>
+        <b>{{ start_of_month_gas if start_of_month_gas else '0.000 м³' }}</b>
+    </div>
+    <div class="stat">
+        <div class="label">Текущие показания</div>
+        <b class="text-blue">{{ current_gas if current_gas else 'Не установлено' }}</b>
+    </div>
+    <div class="stat">
+        <div class="label">Расход с начала месяца</div>
+        <b class="text-warn">{{ gas_difference if gas_difference else '0.000 м³' }}</b>
+    </div>
+    <div class="stat">
+        <div class="label">Сумма на данный момент</div>
+        <b class="text-green">{{ cost_of_gas if cost_of_gas else '0.00' }}</b>
+    </div>
+</section>
+
+<!-- ВВОД ПОКАЗАНИЙ -->
+<form class="card stack" action="/api/gas/update" method="post">
+    <div class="card-title">Ввод показаний</div>
+
+    <div class="field">
+        <label class="label" for="gas_meter">Новое значение счётчика, м³</label>
+        <input type="number" id="gas_meter" name="gas_meter" class="inp"
+               step="0.001" min="0" placeholder="Например: 1234.567"
+               value="{{ gas_input_value if gas_input_value else '' }}" required>
+    </div>
+
+    <div class="field">
+        <label class="label" for="start_of_month_gas_meter">Показания на начало месяца, м³</label>
+        <input type="number" id="start_of_month_gas_meter" name="start_of_month_gas_meter" class="inp"
+               step="0.001" min="0" placeholder="Например: 1200.000">
+    </div>
+
+    <button type="submit" class="btn btn-start">Сохранить показания</button>
+</form>
+
+{% endblock %}

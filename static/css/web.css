@@ -18,7 +18,7 @@
   --bad-bg:#3a1620;  --bad-line:#ff5d6c;  --bad-text:#ff8c98;
   --crit-bg:#d81f3a; --crit-line:#ffffff; --crit-text:#ffffff;
   --idle-bg:#2b2858;
-  --heat-bg:#3d2410; --heat-text:#ffb36b;
+  --heat-bg:#3d2410; --heat-text:#ffb36b; --heat-line:#ff9f3d;
 
   --gap:.375rem;
   --drawer:20rem;
@@ -123,6 +123,116 @@ table.t th:nth-child(4){width:20%}
 /* Debug-ссылки */
 .debug-links{display:flex;gap:.875rem;font-size:.75rem}
 .debug-links a{color:var(--accent-soft);text-decoration:none}
+
+/* Цвета текста (дельты, подписи значений) */
+.text-gray{color:var(--label)}
+.text-blue{color:var(--t-min)}
+.text-green{color:var(--ok-text)}
+.text-red{color:var(--bad-text)}
+.text-amber{color:var(--heat-text)}
+
+/* Кнопки (классы btn-* приходят из роутера) */
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:.3125rem}
+.btn-row form{margin:0}
+.btn{display:flex;align-items:center;justify-content:center;gap:.375rem;width:100%;
+  border:0;border-radius:.625rem;padding:.625rem .5rem;font:inherit;font-size:.8125rem;
+  font-weight:500;cursor:pointer;color:#fff;background:var(--accent)}
+.btn .i{width:1rem;height:1rem}
+.btn-start{background:var(--ok-line);color:#06241a}
+.btn-stop{background:var(--bad-line);color:#2a0409}
+.btn-start.btn-heat{background:var(--heat-line);color:#2b1400}
+.btn-disabled,.btn:disabled{background:var(--idle-bg);color:var(--label);cursor:not-allowed}
+.btn:not(:disabled):active{opacity:.85}
+
+/* Заголовок карточки со второстепенной подписью справа */
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.25rem}
+.card-head .card-title{margin:0}
+.card-title.history{display:inline-block;background:var(--idle-bg);color:var(--accent-soft);
+  border-radius:.5rem;padding:.125rem .5rem}
+
+/* Таблица проветривания: 4 колонки, под заголовком время/источник */
+table.t.vt th:nth-child(1){width:34%}
+table.t.vt th:nth-child(2),table.t.vt th:nth-child(3),table.t.vt th:nth-child(4){width:22%}
+table.t.vt th b{display:block;font-weight:500;color:var(--t-min)}
+table.t.vt th b.text-amber{color:var(--heat-text)}
+table.t.vt td{font-variant-numeric:tabular-nums}
+
+/* Итоговая строка карточки */
+.foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+  margin-top:.375rem;padding-top:.3125rem;border-top:.5px solid var(--line);font-size:.75rem}
+.foot b{font-weight:500}
+
+/* Программатор: блоки режимов, поля ввода, расписание */
+.mode-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.375rem}
+.mode{display:flex;align-items:center;gap:.5rem;font-size:.8125rem;font-weight:500;cursor:pointer}
+.mode input{width:1.125rem;height:1.125rem;accent-color:var(--accent);cursor:pointer}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:.375rem}
+.field .label{display:block;margin-bottom:.125rem}
+
+.inp{width:100%;min-width:0;background:var(--inner);color:var(--text);border:1px solid var(--line);
+  border-radius:.5rem;padding:.3125rem .4375rem;font:inherit;font-size:.8125rem}
+.inp:focus{outline:none;border-color:var(--accent)}
+.inp:disabled{cursor:not-allowed}
+.sel-mode{width:auto}
+.disabled-block{opacity:.45}
+
+.day-head{margin:.375rem 0 .125rem}
+.empty{padding:.25rem 0}
+table.t.wk th:nth-child(1){width:32%}
+table.t.wk th:nth-child(2){width:28%}
+table.t.wk th:nth-child(3){width:26%}
+table.t.wk th:nth-child(4){width:14%}
+table.t.wk td{padding:.1875rem .1875rem .1875rem 0}
+table.t.wk td:last-child{padding-right:0}
+table.t.wk .inp{padding:.25rem .3125rem;font-size:.75rem}
+tr.active-row td{background:var(--ok-bg)}
+
+.btn-del{display:flex;align-items:center;justify-content:center;width:1.625rem;height:1.625rem;
+  margin:0 auto;border:0;border-radius:50%;background:var(--bad-bg);color:var(--bad-text);cursor:pointer}
+.btn-del .i{width:.75rem;height:.75rem}
+.btn-del:disabled{opacity:.4;cursor:not-allowed}
+.btn-add{display:flex;align-items:center;justify-content:center;gap:.375rem;width:100%;margin-top:.5rem;
+  padding:.5rem;border:0;border-radius:.625rem;background:var(--t-min);color:#0b1a33;
+  font:inherit;font-size:.8125rem;font-weight:500;cursor:pointer}
+.btn-add:not(:disabled):active{opacity:.85}
+.btn-add:disabled{opacity:.4;cursor:not-allowed}
+
+/* Газ: плитки показателей, таблица «поле — значение» */
+.text-warn{color:var(--warn-text)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:.3125rem}
+.stat{background:var(--card);border-radius:.625rem;padding:.375rem .625rem}
+.stat b{display:block;margin-top:.125rem;font-size:1rem;font-weight:500}
+.field{display:flex;flex-direction:column;gap:.125rem}
+.field .label{display:block}
+table.t.kv td:nth-child(1){width:60%}
+table.t.kv td:nth-child(2){text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+table.t.kv td{padding:.3125rem .5rem;border-top:0}
+table.t.kv tr:nth-child(even) td{background:var(--inner)}
+table.t.kv tr td:first-child{border-radius:.375rem 0 0 .375rem}
+table.t.kv tr td:last-child{border-radius:0 .375rem .375rem 0}
+
+/* Страница «Нет данных» */
+body.nodata{display:flex;align-items:center;justify-content:center}
+.nodata-card{width:100%;max-width:24rem;padding:1.25rem 1rem;text-align:center;align-items:stretch}
+.nodata-icon{width:3rem;height:3rem;margin:0 auto;color:var(--accent-soft)}
+.nodata-title{font-size:1.25rem;font-weight:500}
+.nodata code{background:var(--inner);border-radius:.25rem;padding:.0625rem .25rem;color:var(--bad-text)}
+.nodata-refresh{display:flex;align-items:center;justify-content:space-between;margin:.25rem 0}
+
+/* Логи (debug) */
+.log-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.log-head b{font-weight:500}
+a.btn{text-decoration:none}
+.btn-sm{width:auto;padding:.3125rem .75rem;font-size:.75rem}
+pre.log{margin-top:.375rem;padding:.5rem;background:var(--inner);color:var(--text);
+  border:1px solid var(--line);border-radius:.5rem;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.6875rem;line-height:1.4;
+  max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
+
+/* Графики */
+.field.wide{grid-column:1 / -1}
+.btn-ghost{background:var(--idle-bg);color:var(--accent-soft)}
+.graph-img{display:block;width:100%;height:auto;border-radius:.5rem}
 
 /* Меню: на узком экране поверх, на широком отдельной колонкой слева */
 .drawer{position:fixed;inset:0;display:none;z-index:10}

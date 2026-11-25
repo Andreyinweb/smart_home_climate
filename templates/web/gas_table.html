@@ -1,0 +1,51 @@
+{# templates/web/gas_table.html #}
+{% extends "web/base.html" %}
+
+{% block title %}Таблица газа{% endblock %}
+
+{% block content %}
+{# (поле в БД, подпись) #}
+{% set fields = [
+    ('id', 'ID'),
+    ('timestamp', 'Время замера'),
+    ('gas_meter', 'Показания счётчика'),
+    ('start_of_month_gas_meter', 'На начало месяца'),
+    ('gas_difference', 'Расход с начала месяца'),
+    ('average_street_temp', 'Средняя Т улицы'),
+    ('average_basement_temp', 'Средняя Т подвала'),
+    ('delta_T', 'Разница Т'),
+    ('gas_per_hour', 'Газ в час'),
+    ('gas_per_month', 'Газ в месяц'),
+    ('hot_water_per_month', 'Горячая вода в месяц'),
+    ('hot_water_per_hour', 'Горячая вода в час'),
+    ('coefficient_gas', 'Коэффициент'),
+    ('price_gas', 'Цена газа'),
+    ('cost_of_gas', 'Стоимость газа'),
+    ('gas_forecast', 'Прогноз газа'),
+    ('projected_price', 'Прогнозная стоимость')
+] %}
+
+<div class="page-head">
+    <h1>Таблица газа</h1>
+    <span class="label">Последняя запись</span>
+</div>
+
+<section class="card">
+    {% if gas_data %}
+    <table class="t kv">
+        <tbody>
+            {% for key, label in fields %}
+            {% set v = gas_data[key] %}
+            <tr>
+                <td>{{ label }}<small>{{ key }}</small></td>
+                <td>{{ v if v is defined and v is not none and v != '' else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty label">Записи в таблице gas_table отсутствуют.</div>
+    {% endif %}
+</section>
+
+{% endblock %}

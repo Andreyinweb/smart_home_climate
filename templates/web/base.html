@@ -55,8 +55,8 @@
                     <div class="poll-time">{{ hdr.time|default('—') }}</div>
                 </div>
                 <div class="statuses">
-                    {% if hdr.ventilation %}<span class="status vent">{{ ico('wind') }}Проветривание</span>{% endif %}
-                    {% if hdr.heating %}<span class="status heat">{{ ico('flame') }}Отопление</span>{% endif %}
+                    {% if hdr.ventilation %}<a class="status vent" href="/ventilation">{{ ico('wind') }}Проветривание</a>{% endif %}
+                    {% if hdr.heating %}<a class="status heat" href="/heating">{{ ico('flame') }}Отопление</a>{% endif %}
                 </div>
             </div>
             <div class="panel">

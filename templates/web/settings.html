@@ -1,0 +1,125 @@
+{# templates/web/settings.html #}
+{% extends "web/base.html" %}
+
+{% block title %}Настройки{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Настройки</h1>
+</div>
+
+<form class="stack" action="/api/settings/update" method="post">
+
+    <!-- РЕЖИМЫ И ОПРОС -->
+    <section class="card stack">
+        <div class="card-title">Режимы и опрос</div>
+
+        <div class="field">
+            <label class="label" for="mode">Режим работы (mode)</label>
+            <select id="mode" name="mode" class="inp">
+                {% for m in ['BASEMENT_STREET_FLOOR', 'BASEMENT_STREET', 'BASEMENT_FLOOR', 'BASEMENT'] %}
+                <option value="{{ m }}" {% if mode == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="field">
+            <label class="label" for="programmer_mode">Режим программатора (programmer_mode)</label>
+            <select id="programmer_mode" name="programmer_mode" class="inp">
+                {% for m in ['PROGRAMMER_CONST', 'PROGRAMMER_TEMPORARILY_CONST', 'PROGRAMMER_TEMPORARILY_WEEK', 'PROGRAMMER_WEEK'] %}
+                <option value="{{ m }}" {% if programmer_mode == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="fields">
+            <div class="field">
+                <label class="label" for="interval_seconds">Интервал опроса, сек</label>
+                <input type="number" id="interval_seconds" name="interval_seconds" class="inp" value="{{ interval_seconds }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="max_retries">Макс. попыток опроса</label>
+                <input type="number" id="max_retries" name="max_retries" class="inp" value="{{ max_retries }}" required>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="website_return_time">Автообновление сайта, сек</label>
+            <input type="number" id="website_return_time" name="website_return_time" class="inp" value="{{ website_return_time }}" required>
+        </div>
+    </section>
+
+    <!-- ВЛАЖНОСТЬ -->
+    <section class="card stack">
+        <div class="card-title">Влажность</div>
+
+        <div class="fields">
+            <div class="field">
+                <label class="label" for="minimum_humidity">Минимальная отн., %</label>
+                <input type="number" step="0.1" id="minimum_humidity" name="minimum_humidity" class="inp" value="{{ minimum_humidity }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="target_rh">Целевая отн. (target_rh), %</label>
+                <input type="number" step="0.1" id="target_rh" name="target_rh" class="inp" value="{{ target_rh }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="dangerous_humidity">Опасная отн., %</label>
+                <input type="number" step="0.1" id="dangerous_humidity" name="dangerous_humidity" class="inp" value="{{ dangerous_humidity }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="absolute_humidity_tolerance">Погрешность абс., г/м³</label>
+                <input type="number" step="0.01" id="absolute_humidity_tolerance" name="absolute_humidity_tolerance" class="inp" value="{{ absolute_humidity_tolerance }}" required>
+            </div>
+        </div>
+    </section>
+
+    <!-- ТЕМПЕРАТУРА -->
+    <section class="card stack">
+        <div class="card-title">Температура</div>
+
+        <div class="fields">
+            <div class="field">
+                <label class="label" for="minimum_temperature">Минимальная, °C</label>
+                <input type="number" step="0.1" id="minimum_temperature" name="minimum_temperature" class="inp" value="{{ minimum_temperature }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="target_temperature">Целевая, °C</label>
+                <input type="number" step="0.1" id="target_temperature" name="target_temperature" class="inp" value="{{ target_temperature }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="maximum_temperature">Максимальная, °C</label>
+                <input type="number" step="0.1" id="maximum_temperature" name="maximum_temperature" class="inp" value="{{ maximum_temperature }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="hysteresis_temperature">Гистерезис, °C</label>
+                <input type="number" step="0.1" id="hysteresis_temperature" name="hysteresis_temperature" class="inp" value="{{ hysteresis_temperature }}" required>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="t_floor_mac_diff">Разница температур пола (t_floor_mac_diff), °C</label>
+            <input type="number" step="0.01" id="t_floor_mac_diff" name="t_floor_mac_diff" class="inp" value="{{ t_floor_mac_diff }}" required>
+        </div>
+    </section>
+
+    <!-- ГАЗ И ВОДА -->
+    <section class="card stack">
+        <div class="card-title">Газ и горячая вода</div>
+
+        <div class="fields">
+            <div class="field">
+                <label class="label" for="price_gas">Тариф на газ, грн/м³</label>
+                <input type="number" step="0.01" id="price_gas" name="price_gas" class="inp" value="{{ price_gas }}" required>
+            </div>
+            <div class="field">
+                <label class="label" for="hot_water_per_hour">Горячая вода, м³/час</label>
+                <input type="number" step="0.01" id="hot_water_per_hour" name="hot_water_per_hour" class="inp" value="{{ hot_water_per_hour }}" required>
+            </div>
+        </div>
+    </section>
+
+    <button type="submit" class="btn btn-start">Сохранить настройки</button>
+</form>
+
+{% endblock %}
