@@ -1,0 +1,122 @@
+{# templates/web/base.html #}
+{% macro ico(name, cls='') -%}
+<svg class="i {{ cls }}" viewBox="0 0 24 24" aria-hidden="true">
+{%- if name == 'home' %}<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>
+{%- elif name == 'wind' %}<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7a2 2 0 1 1-2 2"/>
+{%- elif name == 'flame' %}<path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-6 1-10z"/>
+{%- elif name == 'clock' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif name == 'chart' %}<path d="M3 20h18"/><path d="M4 16l5-6 4 3 6-8"/>
+{%- elif name == 'table' %}<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M10 4v16"/>
+{%- elif name == 'gauge' %}<circle cx="12" cy="12" r="9"/><path d="M12 12l4-4"/><path d="M7 15a6 6 0 0 1 .5-4"/>
+{%- elif name == 'gear' %}<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>
+{%- elif name == 'thermo' %}<path d="M10 14V5a2 2 0 1 1 4 0v9a4 4 0 1 1-4 0z"/>
+{%- elif name == 'menu' %}<path d="M4 6h16M4 12h16M4 18h16"/>
+{%- elif name == 'close' %}<path d="M6 6l12 12M18 6L6 18"/>
+{%- elif name == 'alert' %}<path d="M12 3l10 18H2zM12 10v5M12 18h.01"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    {% if website_return_time %}
+    <meta http-equiv="refresh" content="{{ website_return_time }}">
+    {% endif %}
+    <title>{% block title %}Климат{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/web.css?v=1">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% set cycle_info = get_cycle_logs() %}
+    {% set hdr = get_header_info() %}
+    {% set path = (request.url.path.rstrip('/') or '/') if request is defined else '' %}
+    {% set menu_items = [
+        ('/', 'Главная', 'home'),
+        ('/ventilation', 'Проветривание', 'wind'),
+        ('/heating', 'Отопление', 'flame'),
+        ('/programmer', 'Программатор', 'clock'),
+        ('/graphs', 'Графики', 'chart'),
+        ('/gas/table', 'Таблица', 'table'),
+        ('/gas', 'Газ', 'gauge'),
+        ('/settings', 'Настройки', 'gear')
+    ] %}
+
+    <div class="page">
+
+        <!-- ШАПКА -->
+        <header class="card header">
+            <div class="header-row">
+                <button class="menu-btn" id="menuBtn" type="button" aria-label="Меню">{{ ico('menu') }}</button>
+                <div>
+                    <div class="label">Опрос</div>
+                    <div class="poll-time">{{ hdr.time|default('—') }}</div>
+                </div>
+                <div class="statuses">
+                    {% if hdr.ventilation %}<a class="status vent" href="/ventilation">{{ ico('wind') }}Проветривание</a>{% endif %}
+                    {% if hdr.heating %}<a class="status heat" href="/heating">{{ ico('flame') }}Отопление</a>{% endif %}
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-top"><span class="label">Датчик температуры: подвал.</span><span class="label sensor-name"> </span></div>
+                <div class="temps">
+                    <div><div class="label">от</div><div class="min">{{ hdr.t_min|default('—') }} °C</div></div>
+                    <div><div class="label">сейчас</div><div class="now">{{ hdr.t_now|default('—') }} °C</div></div>
+                    <div><div class="label">до</div><div class="max">{{ hdr.t_max|default('—') }} °C</div></div>
+                </div>
+                <div class="sep"></div>
+                <div class="label">Влажность</div>
+                <div class="hum">
+                    <div><div class="label">Ул</div><div class="val">{{ hdr.h_street|default('—') }}</div></div>
+                    <div><div class="label">Подв</div><div class="val">{{ hdr.h_basement|default('—') }}</div></div>
+                    <div class="floor" data-zone="{{ hdr.floor_zone|default('none') }}">
+                        <div class="label">Пол</div>
+                        <div class="val">{{ ico('alert', 'warn-icon') }}{{ hdr.h_floor|default('—') }}</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ОШИБКИ ЦИКЛА (только если есть) -->
+        {% if cycle_info and cycle_info.messages %}
+        <section class="errors">
+            {% for msg in cycle_info.messages %}
+            <div class="error-item {{ cycle_info.status }}">{{ ico('alert') }}<span>[Цикл #{{ cycle_info.cycle_id }}] {{ msg }}</span></div>
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        <main class="stack">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- МЕНЮ -->
+    <div class="drawer" id="drawer">
+        <div class="drawer-bg" id="drawerBg"></div>
+        <nav class="drawer-panel" aria-label="Разделы">
+            <div class="drawer-title">
+                <span class="brand">{{ ico('thermo') }}</span>Климат
+                <button class="drawer-close" id="menuClose" type="button" aria-label="Закрыть меню">{{ ico('close') }}</button>
+            </div>
+            {% for href, label, icon in menu_items %}
+            {% if href == '/settings' %}<div class="nav-sep"></div>{% endif %}
+            <a class="nav{% if path == href %} active{% endif %}" href="{{ href }}"><span class="ico">{{ ico(icon) }}</span>{{ label }}</a>
+            {% endfor %}
+        </nav>
+    </div>
+
+    <script>
+    (function () {
+        var b = document.body;
+        function setMenu(open) { b.classList.toggle('menu-open', open); }
+        document.getElementById('menuBtn').addEventListener('click', function () { setMenu(true); });
+        document.getElementById('menuClose').addEventListener('click', function () { setMenu(false); });
+        document.getElementById('drawerBg').addEventListener('click', function () { setMenu(false); });
+    })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

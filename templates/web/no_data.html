@@ -1,0 +1,25 @@
+{# templates/web/no_data.html — отдельная страница без base.html: данных ещё нет, шапке нечего показывать #}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta http-equiv="refresh" content="{{ website_return_time }}">
+    <title>Нет данных</title>
+    <link rel="stylesheet" href="/static/css/web.css?v=3">
+</head>
+<body class="nodata">
+    <main class="card nodata-card stack">
+        <svg class="i nodata-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/></svg>
+        <h1 class="nodata-title">Нет данных</h1>
+        <p class="label">Сервер запущен, но таблица телеметрии <code>api_table</code> пуста.</p>
+        <p class="label">Проверьте, что скрипты сбора данных активны и отправляют показатели датчиков.</p>
+        <div class="panel nodata-refresh">
+            <span class="label">Автообновление</span>
+            <span class="poll-time">каждые {{ website_return_time }} сек.</span>
+        </div>
+        <button type="button" class="btn" onclick="window.location.reload()">Обновить вручную</button>
+    </main>
+</body>
+</html>

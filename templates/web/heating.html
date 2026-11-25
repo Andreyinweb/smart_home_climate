@@ -1,0 +1,115 @@
+{# templates/web/heating.html #}
+{% extends "web/base.html" %}
+
+{# Число с d знаками или «—». sign=true добавляет знак (для дельт) #}
+{% macro n(v, d=1, sign=false) -%}
+{%- if v is defined and v is not none -%}{{ ('%+.' ~ d ~ 'f' if sign else '%.' ~ d ~ 'f')|format(v) }}{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro tm(v) -%}{{ v if v else '—' }}{%- endmacro %}
+
+{# Строка сравнения: Пуск / Сейчас (Финиш) / Дельта #}
+{% macro cmp(label, before, now, diff, cls, d=1) -%}
+<tr>
+    <td>{{ label }}</td>
+    <td>{{ n(before, d) }}</td>
+    <td>{{ n(now, d) }}</td>
+    <td class="{{ cls if cls else 'text-gray' }}">{{ n(diff, d, true) }}</td>
+</tr>
+{%- endmacro %}
+
+{# Строка начальных показателей: Улица / Подвал / Пол #}
+{% macro init(label, s, b, f, d=1) -%}
+<tr>
+    <td>{{ label }}</td>
+    <td>{{ n(s, d) }}</td>
+    <td>{{ n(b, d) }}</td>
+    <td class="text-red">{{ n(f, d) }}</td>
+</tr>
+{%- endmacro %}
+
+{% block title %}Отопление{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Отопление</h1>
+</div>
+
+<!-- УПРАВЛЕНИЕ + УСТАВКИ -->
+<section class="card">
+    <div class="btn-row">
+        <form action="/api/heating/start" method="post">
+            <button type="submit" class="btn btn-heat {{ btn_start_class if btn_start_class else 'btn-start' }}" {{ btn_start_disabled if btn_start_disabled else '' }}>
+                {{ ico('flame') }}Запустить
+            </button>
+        </form>
+        <form action="/api/heating/stop" method="post">
+            <button type="submit" class="btn {{ btn_stop_class if btn_stop_class else 'btn-disabled' }}" {{ btn_stop_disabled if btn_stop_disabled else '' }}>
+                {{ ico('close') }}Остановить
+            </button>
+        </form>
+    </div>   
+</section>
+
+<!-- СРАВНЕНИЕ: текущий цикл или история последнего -->
+<section class="card">
+    <div class="card-head">
+        {% if is_history_title or (not heat_active and latest_heat_exists) %}
+        <h2 class="card-title history">{{ card_title }}</h2>
+        {% else %}
+        <h2 class="card-title">{{ card_title }}</h2>
+        {% endif %}
+    </div>
+
+    <table class="t vt">
+        <thead>
+            <tr>
+                <th>Параметр</th>
+                <th>Пуск<b class="text-amber">{{ tm(heat_start_time) }}</b></th>
+                <th>{% if heat_active %}Сейчас{% else %}Финиш{% endif %}<b class="text-amber">{{ tm(heat_now_time) }}</b></th>
+                <th>Дельта<b class="text-amber">{{ tm(heat_difference_time) }}</b></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ cmp('Подвал Т, °C',    before_basement_temp,   basement_temp,   diff_basement_temp,   diff_basement_temp_class) }}
+            {{ cmp('Подвал ОВ, %',    before_basement_humi,   basement_humi,   diff_basement_humi,   diff_basement_humi_class) }}
+            {{ cmp('Подвал АВ, г/м³', before_a_basement_humi, a_basement_humi, diff_a_basement_humi, diff_a_basement_humi_class, 2) }}
+            {{ cmp('Пол Т, °C',       before_floor_temp,      floor_temp,      diff_floor_temp,      diff_floor_temp_class) }}
+            {{ cmp('Пол ОВ, %',       before_floor_humi,      floor_humi,      diff_floor_humi,      diff_floor_humi_class) }}
+            {{ cmp('Пол АВ, г/м³',    before_a_floor_humi,    a_floor_humi,    diff_a_floor_humi,    diff_a_floor_humi_class, 2) }}
+        </tbody>
+    </table>
+</section>
+
+<!-- НАЧАЛЬНЫЕ ПОКАЗАТЕЛИ -->
+<section class="card">
+    <div class="card-head">
+        <h2 class="card-title">Начальные показатели</h2>
+        <span class="label">Время: <span class="text-amber">{{ tm(heat_start_time) }}</span></span>
+    </div>
+
+    <table class="t vt">
+        <thead>
+            <tr>
+                <th>Параметр</th>
+                <th>Улица<b>{{ 'Датчик' if before_sensor_or_calc_street else 'Расчёт' }}</b></th>
+                <th>Подвал<b>{{ 'Датчик' if before_sensor_or_calc_basement else 'Расчёт' }}</b></th>
+                <th>Пол<b>{{ 'Датчик' if before_sensor_or_calc_floor else 'Расчёт' }}</b></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ init('Т, °C',    before_street_temp, before_basement_temp, before_floor_temp) }}
+            {{ init('ОВ, %',    before_street_humi, before_basement_humi, before_floor_humi) }}
+            {{ init('АВ, г/м³', before_a_street_humi, before_a_basement_humi, before_a_floor_humi, 2) }}
+            {{ init('ТР, °C',   before_dp_street, before_dp_basement, before_dp_floor) }}
+        </tbody>
+    </table>
+
+    <div class="foot">
+        <span>Проветривание</span>
+        <b>{{ n(before_humidity_difference if before_humidity_difference is defined else 0, 2) }} г/м³</b>
+    </div>
+</section>
+
+{% endblock %}

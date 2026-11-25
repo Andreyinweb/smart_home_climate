@@ -1,0 +1,275 @@
+/* static/css/web.css — тёмная тема. Цвета менять только в :root.
+   Размеры в rem: на телефоне 1rem = 16px, на компьютере (от 1000px) 1rem = 20px,
+   поэтому весь интерфейс масштабируется одной строкой в конце файла. */
+:root{
+  --bg:#12112a;
+  --card:#1c1a3a;
+  --inner:#0f0e22;
+  --line:#2f2c58;
+  --text:#e9e6ff;
+  --label:#9a95c8;
+  --accent:#7c3acd;
+  --accent-soft:#cfc9ff;
+  --t-min:#6fa8ff;
+  --t-max:#ff7a8c;
+
+  --ok-bg:#12382f;   --ok-line:#3fcf8e;   --ok-text:#5fe0a6;   --ok-label:#8be8bd;
+  --warn-bg:#3d3410; --warn-line:#e6c229; --warn-text:#f2d85a;
+  --bad-bg:#3a1620;  --bad-line:#ff5d6c;  --bad-text:#ff8c98;
+  --crit-bg:#d81f3a; --crit-line:#ffffff; --crit-text:#ffffff;
+  --idle-bg:#2b2858;
+  --heat-bg:#3d2410; --heat-text:#ffb36b; --heat-line:#ff9f3d;
+
+  --gap:.375rem;
+  --drawer:20rem;
+  --font:Roboto,"Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.2;
+  -webkit-text-size-adjust:100%}
+body{min-height:100vh;padding:var(--gap) var(--gap) calc(var(--gap) + env(safe-area-inset-bottom))}
+a{color:inherit}
+
+/* Одна колонка */
+.page{max-width:30rem;margin:0 auto}
+.page,.stack{display:flex;flex-direction:column;gap:.3125rem}
+
+/* Иконки */
+.i{width:.875rem;height:.875rem;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* Общие */
+.card{background:var(--card);border-radius:.625rem;padding:.375rem .625rem}
+.label{font-size:.6875rem;color:var(--label)}
+.note{margin-top:.1875rem}
+.card-title{font-size:.8125rem;font-weight:500;margin-bottom:.25rem}
+
+/* Шапка */
+.header{padding:.375rem .5rem}
+.header-row{display:flex;align-items:center;gap:.5rem}
+.menu-btn{width:1.5rem;height:1.5rem;border-radius:50%;background:var(--inner);border:0;
+  color:var(--accent-soft);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.poll-time{font-size:.8125rem;font-weight:500}
+.statuses{margin-left:auto;display:flex;gap:.25rem}
+.status{display:flex;align-items:center;gap:.25rem;border-radius:999px;padding:.25rem .5625rem;
+  font-size:.75rem;font-weight:500}
+.status .i{width:.8125rem;height:.8125rem}
+.status.vent{background:var(--ok-bg);color:var(--ok-text)}
+.status.heat{background:var(--heat-bg);color:var(--heat-text)}
+
+.panel{background:var(--inner);border-radius:.5rem;padding:.3125rem .5rem;margin-top:.3125rem}
+.panel-top{display:flex;justify-content:space-between}
+.sensor-name{color:var(--accent-soft)}
+.temps{display:grid;grid-template-columns:1fr 1.3fr 1fr;text-align:center;align-items:end}
+.temps .min{font-size:.8125rem;color:var(--t-min)}
+.temps .now{font-size:1.25rem;font-weight:500}
+.temps .max{font-size:.8125rem;color:var(--t-max)}
+.sep{border-top:.5px solid var(--line);margin:.25rem 0 .1875rem}
+.hum{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:.375rem;text-align:center;margin-top:.0625rem}
+.hum .val{font-size:.8125rem}
+
+/* Влажность пола: зона приходит из hdr.floor_zone (ok | warn | bad | critical) */
+.floor{border:1.5px solid var(--line);border-radius:.5rem;padding:.0625rem 0}
+.floor[data-zone="ok"]{border-color:var(--ok-line);background:var(--ok-bg)}
+.floor[data-zone="ok"] .label{color:var(--ok-label)}
+.floor[data-zone="ok"] .val{font-weight:500;color:var(--ok-text)}
+.floor[data-zone="warn"]{border-color:var(--warn-line);background:var(--warn-bg)}
+.floor[data-zone="warn"] .label,.floor[data-zone="warn"] .val{color:var(--warn-text)}
+.floor[data-zone="warn"] .val{font-weight:500}
+.floor[data-zone="bad"]{border-color:var(--bad-line);background:var(--bad-bg)}
+.floor[data-zone="bad"] .label,.floor[data-zone="bad"] .val{color:var(--bad-text)}
+.floor[data-zone="bad"] .val{font-weight:500}
+.floor[data-zone="critical"]{border:2px solid var(--crit-line);background:var(--crit-bg)}
+.floor[data-zone="critical"] .label,.floor[data-zone="critical"] .val{color:var(--crit-text)}
+.floor[data-zone="critical"] .val{font-weight:500}
+.warn-icon{display:none;width:.75rem;height:.75rem;vertical-align:-1px;margin-right:.125rem}
+.floor[data-zone="critical"] .warn-icon{display:inline}
+
+/* Ошибки цикла */
+.errors{display:flex;flex-direction:column;gap:.3125rem}
+.error-item{display:flex;align-items:flex-start;gap:.5rem;background:var(--bad-bg);
+  border:1px solid var(--bad-line);border-radius:.625rem;padding:.5rem .625rem;
+  font-size:.8125rem;color:#ffd5da}
+.error-item .i{width:1.125rem;height:1.125rem;color:var(--bad-text)}
+.error-item.warning{background:var(--warn-bg);border-color:var(--warn-line);color:#fff3b8}
+.error-item.warning .i{color:var(--warn-text)}
+
+/* Заголовок страницы */
+.page-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 .25rem}
+.page-head h1{font-size:1rem;font-weight:500;color:#f1efff}
+
+/* Таблицы */
+table.t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.75rem}
+table.t th{font-size:.6875rem;font-weight:400;color:var(--label);text-align:left;padding:0 0 .1875rem}
+table.t td{padding:.1875rem 0;border-top:.5px solid var(--line)}
+table.t td small{display:block;font-size:.6875rem;color:var(--label)}
+table.t th:nth-child(1){width:26%}
+table.t th:nth-child(2),table.t th:nth-child(5){width:18%}
+table.t th:nth-child(3){width:18%}
+table.t th:nth-child(4){width:20%}
+
+/* Расчёт (рекомендация, не факт) */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:.3125rem}
+.pill{display:inline-block;margin-top:.25rem;border-radius:.5rem;padding:.125rem .5rem;font-size:.75rem}
+.pill.yes{background:var(--ok-bg);color:var(--ok-text);font-weight:500}
+.pill.heat-yes{background:var(--heat-bg);color:var(--heat-text);font-weight:500}
+.pill.no{background:var(--idle-bg);color:var(--accent-soft);padding:.125rem .625rem}
+
+/* Батареи */
+.volts{display:flex;justify-content:space-between;font-size:.75rem;margin-top:.125rem}
+.volts b{font-weight:500}
+
+/* Debug-ссылки */
+.debug-links{display:flex;gap:.875rem;font-size:.75rem}
+.debug-links a{color:var(--accent-soft);text-decoration:none}
+
+/* Цвета текста (дельты, подписи значений) */
+.text-gray{color:var(--label)}
+.text-blue{color:var(--t-min)}
+.text-green{color:var(--ok-text)}
+.text-red{color:var(--bad-text)}
+.text-amber{color:var(--heat-text)}
+
+/* Кнопки (классы btn-* приходят из роутера) */
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:.3125rem}
+.btn-row form{margin:0}
+.btn{display:flex;align-items:center;justify-content:center;gap:.375rem;width:100%;
+  border:0;border-radius:.625rem;padding:.625rem .5rem;font:inherit;font-size:.8125rem;
+  font-weight:500;cursor:pointer;color:#fff;background:var(--accent)}
+.btn .i{width:1rem;height:1rem}
+.btn-start{background:var(--ok-line);color:#06241a}
+.btn-stop{background:var(--bad-line);color:#2a0409}
+.btn-start.btn-heat{background:var(--heat-line);color:#2b1400}
+.btn-disabled,.btn:disabled{background:var(--idle-bg);color:var(--label);cursor:not-allowed}
+.btn:not(:disabled):active{opacity:.85}
+
+/* Заголовок карточки со второстепенной подписью справа */
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.25rem}
+.card-head .card-title{margin:0}
+.card-title.history{display:inline-block;background:var(--idle-bg);color:var(--accent-soft);
+  border-radius:.5rem;padding:.125rem .5rem}
+
+/* Таблица проветривания: 4 колонки, под заголовком время/источник */
+table.t.vt th:nth-child(1){width:34%}
+table.t.vt th:nth-child(2),table.t.vt th:nth-child(3),table.t.vt th:nth-child(4){width:22%}
+table.t.vt th b{display:block;font-weight:500;color:var(--t-min)}
+table.t.vt th b.text-amber{color:var(--heat-text)}
+table.t.vt td{font-variant-numeric:tabular-nums}
+
+/* Итоговая строка карточки */
+.foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+  margin-top:.375rem;padding-top:.3125rem;border-top:.5px solid var(--line);font-size:.75rem}
+.foot b{font-weight:500}
+
+/* Программатор: блоки режимов, поля ввода, расписание */
+.mode-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.375rem}
+.mode{display:flex;align-items:center;gap:.5rem;font-size:.8125rem;font-weight:500;cursor:pointer}
+.mode input{width:1.125rem;height:1.125rem;accent-color:var(--accent);cursor:pointer}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:.375rem}
+.field .label{display:block;margin-bottom:.125rem}
+
+.inp{width:100%;min-width:0;background:var(--inner);color:var(--text);border:1px solid var(--line);
+  border-radius:.5rem;padding:.3125rem .4375rem;font:inherit;font-size:.8125rem}
+.inp:focus{outline:none;border-color:var(--accent)}
+.inp:disabled{cursor:not-allowed}
+.sel-mode{width:auto}
+.disabled-block{opacity:.45}
+
+.day-head{margin:.375rem 0 .125rem}
+.empty{padding:.25rem 0}
+table.t.wk th:nth-child(1){width:32%}
+table.t.wk th:nth-child(2){width:28%}
+table.t.wk th:nth-child(3){width:26%}
+table.t.wk th:nth-child(4){width:14%}
+table.t.wk td{padding:.1875rem .1875rem .1875rem 0}
+table.t.wk td:last-child{padding-right:0}
+table.t.wk .inp{padding:.25rem .3125rem;font-size:.75rem}
+tr.active-row td{background:var(--ok-bg)}
+
+.btn-del{display:flex;align-items:center;justify-content:center;width:1.625rem;height:1.625rem;
+  margin:0 auto;border:0;border-radius:50%;background:var(--bad-bg);color:var(--bad-text);cursor:pointer}
+.btn-del .i{width:.75rem;height:.75rem}
+.btn-del:disabled{opacity:.4;cursor:not-allowed}
+.btn-add{display:flex;align-items:center;justify-content:center;gap:.375rem;width:100%;margin-top:.5rem;
+  padding:.5rem;border:0;border-radius:.625rem;background:var(--t-min);color:#0b1a33;
+  font:inherit;font-size:.8125rem;font-weight:500;cursor:pointer}
+.btn-add:not(:disabled):active{opacity:.85}
+.btn-add:disabled{opacity:.4;cursor:not-allowed}
+
+/* Газ: плитки показателей, таблица «поле — значение» */
+.text-warn{color:var(--warn-text)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:.3125rem}
+.stat{background:var(--card);border-radius:.625rem;padding:.375rem .625rem}
+.stat b{display:block;margin-top:.125rem;font-size:1rem;font-weight:500}
+.field{display:flex;flex-direction:column;gap:.125rem}
+.field .label{display:block}
+table.t.kv td:nth-child(1){width:60%}
+table.t.kv td:nth-child(2){text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+table.t.kv td{padding:.3125rem .5rem;border-top:0}
+table.t.kv tr:nth-child(even) td{background:var(--inner)}
+table.t.kv tr td:first-child{border-radius:.375rem 0 0 .375rem}
+table.t.kv tr td:last-child{border-radius:0 .375rem .375rem 0}
+
+/* Страница «Нет данных» */
+body.nodata{display:flex;align-items:center;justify-content:center}
+.nodata-card{width:100%;max-width:24rem;padding:1.25rem 1rem;text-align:center;align-items:stretch}
+.nodata-icon{width:3rem;height:3rem;margin:0 auto;color:var(--accent-soft)}
+.nodata-title{font-size:1.25rem;font-weight:500}
+.nodata code{background:var(--inner);border-radius:.25rem;padding:.0625rem .25rem;color:var(--bad-text)}
+.nodata-refresh{display:flex;align-items:center;justify-content:space-between;margin:.25rem 0}
+
+/* Логи (debug) */
+.log-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.log-head b{font-weight:500}
+a.btn{text-decoration:none}
+.btn-sm{width:auto;padding:.3125rem .75rem;font-size:.75rem}
+pre.log{margin-top:.375rem;padding:.5rem;background:var(--inner);color:var(--text);
+  border:1px solid var(--line);border-radius:.5rem;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.6875rem;line-height:1.4;
+  max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
+
+/* Графики */
+.field.wide{grid-column:1 / -1}
+.btn-ghost{background:var(--idle-bg);color:var(--accent-soft)}
+.graph-img{display:block;width:100%;height:auto;border-radius:.5rem}
+
+/* Меню: на узком экране поверх, на широком отдельной колонкой слева */
+.drawer{position:fixed;inset:0;display:none;z-index:10}
+body.menu-open .drawer{display:block}
+.drawer-bg{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.drawer-panel{position:absolute;left:0;top:0;bottom:0;width:78%;max-width:20rem;background:var(--card);
+  padding:1rem .75rem;display:flex;flex-direction:column;gap:.375rem;overflow-y:auto}
+.drawer-title{display:flex;align-items:center;gap:.625rem;font-size:1.25rem;font-weight:500;margin-bottom:.625rem}
+.brand{width:2.125rem;height:2.125rem;border-radius:.625rem;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center}
+.brand .i{width:1.25rem;height:1.25rem}
+.drawer-close{margin-left:auto;width:2rem;height:2rem;border:0;background:none;
+  color:var(--label);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.drawer-close .i{width:1.375rem;height:1.375rem}
+.nav{display:flex;align-items:center;gap:.75rem;padding:.5625rem .625rem;border-radius:1rem;
+  color:var(--text);text-decoration:none;font-size:1rem}
+.nav .ico{width:2.125rem;height:2.125rem;border-radius:.625rem;background:var(--inner);color:var(--accent-soft);
+  display:flex;align-items:center;justify-content:center}
+.nav .ico .i{width:1.125rem;height:1.125rem}
+.nav.active{background:var(--accent)}
+.nav.active .ico{background:rgba(255,255,255,.2);color:#fff}
+.nav-sep{border-top:.5px solid var(--line);margin:.375rem 0}
+
+@media (min-width:768px){
+  .drawer{inset:0 auto 0 0;width:var(--drawer)}
+  .drawer-bg{display:none}
+  .drawer-panel{width:100%;max-width:none}
+  body.menu-open{padding-left:calc(var(--drawer) + .375rem)}
+}
+
+/* Компьютер: тот же интерфейс, крупнее и шире (одна колонка, как у старого сайта) */
+@media (min-width:1000px){
+  html{font-size:20px}
+  :root{--drawer:16rem}
+  .page{max-width:48rem}
+  .page,.stack{gap:.5rem}
+}
+@media (prefers-reduced-motion:no-preference){
+  .floor{transition:background .2s,border-color .2s}
+}

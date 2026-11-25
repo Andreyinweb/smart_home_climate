@@ -3,7 +3,7 @@
 from collections import deque
 import logging
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -42,6 +42,37 @@ def read_last_lines(file_path: Path, max_lines: int = 300) -> List[str]:
         return [f"Ошибка при чтении файла лога: {e}"]
 
 
+async def render_log_page(
+    request: Request,
+    templates: Jinja2Templates,
+    *,
+    log_path: Optional[Path],
+    log_title: str,
+    default_name: str,
+    log_url: str,
+) -> Any:
+    """Общий рендер страницы лога: последние 100 строк файла в одном шаблоне logs.html."""
+    sys_settings = await get_settings_db()
+    website_return_time = getattr(sys_settings, "website_return_time", 60)
+
+    log_lines = read_last_lines(log_path, max_lines=100)
+
+    context = {
+        "website_return_time": website_return_time,
+        "log_title": log_title,
+        "log_file_name": log_path.name if log_path else default_name,
+        "log_content": "".join(log_lines),
+        "lines_count": len(log_lines),
+        "log_url": log_url,
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name=get_template_path("logs.html", request),
+        context=context,
+    )
+
+
 @router.get(
     "/work-log",
     response_class=HTMLResponse,
@@ -54,27 +85,13 @@ async def get_work_log(
 ) -> Any:
     """Отображение последних 100 строк файла work_log.log."""
     api_log.info("GET /debug/work-log -> просмотр лога основной логики")
-
-    sys_settings = await get_settings_db()
-    website_return_time = getattr(sys_settings, "website_return_time", 60)
-
-    log_lines = read_last_lines(settings.work_log, max_lines=100)
-    log_content = "".join(log_lines)
-
-    context = {
-        "website_return_time": website_return_time,
-        "log_title": "Work Log (climat_app)",
-        "log_file_name": (
-            settings.work_log.name if settings.work_log else "work_log.log"
-        ),
-        "log_content": log_content,
-        "lines_count": len(log_lines),
-    }
-
-    return templates.TemplateResponse(
-        request=request,
-        name=get_template_path("work_log.html", request),
-        context=context,
+    return await render_log_page(
+        request,
+        templates,
+        log_path=settings.work_log,
+        log_title="Work Log (climat_app)",
+        default_name="work_log.log",
+        log_url="/debug/work-log",
     )
 
 
@@ -90,23 +107,11 @@ async def get_api_log(
 ) -> Any:
     """Отображение последних 100 строк файла api_log.log."""
     api_log.info("GET /debug/api-log -> просмотр лога веб-сервера")
-
-    sys_settings = await get_settings_db()
-    website_return_time = getattr(sys_settings, "website_return_time", 60)
-
-    log_lines = read_last_lines(settings.api_log, max_lines=100)
-    log_content = "".join(log_lines)
-
-    context = {
-        "website_return_time": website_return_time,
-        "log_title": "API Log (api_app)",
-        "log_file_name": settings.api_log.name if settings.api_log else "api_log.log",
-        "log_content": log_content,
-        "lines_count": len(log_lines),
-    }
-
-    return templates.TemplateResponse(
-        request=request,
-        name=get_template_path("api_log.html", request),
-        context=context,
+    return await render_log_page(
+        request,
+        templates,
+        log_path=settings.api_log,
+        log_title="API Log (api_app)",
+        default_name="api_log.log",
+        log_url="/debug/api-log",
     )

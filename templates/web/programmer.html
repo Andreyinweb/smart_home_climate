@@ -1,0 +1,235 @@
+{# templates/web/programmer.html #}
+{% extends "web/base.html" %}
+
+{% block title %}Программатор{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Программатор</h1>
+</div>
+
+<form action="/api/programmer/update" method="post" id="programmerForm" class="stack" onsubmit="return validateForm(event)">
+
+    <!-- ВРЕМЕННО -->
+    <section class="card" id="block_temporarily">
+        <div class="mode-head">
+            <label class="mode">
+                <input type="checkbox" id="flag_temporarily" name="flag_temporarily" {% if flag_temporarily %}checked{% endif %} onchange="toggleMode('temporarily')">
+                Временно
+            </label>
+        </div>
+        <div class="fields">
+            <div class="field">
+                <span class="label">Температура, °C</span>
+                <input type="number" id="temporarily_temp" name="temporarily_temp" class="inp"
+                       value="{{ '%.1f'|format(temporarily_temp) if temporarily_temp is defined and temporarily_temp is not none else '20.0' }}"
+                       step="0.1" min="15.0" max="30.0">
+            </div>
+            <div class="field">
+                <span class="label">Время окончания</span>
+                <input type="time" id="temporarily_time" name="temporarily_time" class="inp"
+                       value="{{ temporarily_time if temporarily_time else '' }}">
+            </div>
+        </div>
+    </section>
+
+    <!-- ПОСТОЯННО -->
+    <section class="card" id="block_const">
+        <div class="mode-head">
+            <label class="mode">
+                <input type="checkbox" id="flag_const" name="flag_const" {% if flag_const %}checked{% endif %} onchange="toggleMode('const')">
+                Постоянно
+            </label>
+        </div>
+        <div class="fields">
+            <div class="field">
+                <span class="label">Мин., °C</span>
+                <input type="number" id="const_min" name="const_min" class="inp"
+                       value="{{ '%.1f'|format(const_min) if const_min is defined and const_min is not none else '18.0' }}"
+                       step="0.1" min="15.0" max="30.0">
+            </div>
+            <div class="field">
+                <span class="label">Макс., °C</span>
+                <input type="number" id="const_max" name="const_max" class="inp"
+                       value="{{ '%.1f'|format(const_max) if const_max is defined and const_max is not none else '24.0' }}"
+                       step="0.1" min="15.0" max="30.0">
+            </div>
+        </div>
+    </section>
+
+    <!-- ПО НЕДЕЛЕ -->
+    <section class="card" id="block_week">
+        <div class="mode-head">
+            <label class="mode">
+                <input type="checkbox" id="flag_week" name="flag_week" {% if flag_week %}checked{% endif %} onchange="toggleMode('week')">
+                По неделе
+            </label>
+            <!-- Select без name: не уходит с основной формой, смена режима идёт отдельным запросом -->
+            <select id="week_mode" class="inp sel-mode" data-current="{{ week_mode }}" onchange="switchWeekMode(this)">
+                {% for m in week_modes_list %}
+                <option value="{{ m }}" {% if m == week_mode %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if week_records %}
+            {% for group in grouped_records %}
+            <div class="day-head label">Дни: {{ group.day }}</div>
+            {% if group.records %}
+            <table class="t wk">
+                <thead>
+                    <tr><th>День</th><th>Время</th><th>Т, °C</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for row in group.records %}
+                    <tr class="{% if flag_week and active_row_id is not none and row.id == active_row_id %}active-row{% endif %}">
+                        <td>
+                            <input type="hidden" name="week_ids" value="{{ row.id }}">
+                            {% if week_mode == 'week' %}
+                            <select class="inp" disabled data-locked="true">
+                                <option value="Mo_Su" selected>Mo_Su</option>
+                            </select>
+                            <input type="hidden" name="week_days" value="Mo_Su">
+                            {% else %}
+                            <select name="week_days" class="inp">
+                                {% for d in allowed_days %}
+                                <option value="{{ d }}" {% if d == row.week_day %}selected{% endif %}>{{ d }}</option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
+                        </td>
+                        <td><input type="time" name="week_times" value="{{ row.week_time }}" class="inp"></td>
+                        <td>
+                            <input type="number" name="week_temps" class="inp"
+                                   value="{{ '%.1f'|format(row.week_temperature) if row.week_temperature is not none else '20.0' }}"
+                                   step="0.1" min="15.0" max="30.0">
+                        </td>
+                        <td>
+                            <button type="submit" formaction="/api/programmer/week/delete/{{ row.id }}" class="btn-del" title="Удалить строку" aria-label="Удалить строку">{{ ico('close') }}</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty label">Записи отсутствуют</div>
+            {% endif %}
+            {% endfor %}
+        {% else %}
+        <div class="empty label">Записи для режима {{ week_mode }} отсутствуют.</div>
+        {% endif %}
+
+        <button type="submit" formaction="/api/programmer/week/add" class="btn-add" title="Добавить строку" aria-label="Добавить строку">+ Добавить строку</button>
+    </section>
+
+    <button type="submit" class="btn btn-start">Сохранить</button>
+</form>
+
+<!-- Отдельная форма смены режима дней недели. Вне programmerForm: вложенные формы недопустимы -->
+<form id="weekModeForm" action="/api/programmer/week/mode" method="post" hidden>
+    <input type="hidden" name="week_mode" id="week_mode_target">
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Отслеживание несохранённых правок в записях и флагах.
+    // Select режима исключён: его изменение не является правкой записей.
+    let programmerDirty = false;
+    document.getElementById('programmerForm').addEventListener('input', (e) => {
+        if (e.target.id !== 'week_mode') {
+            programmerDirty = true;
+        }
+    });
+
+    function switchWeekMode(select) {
+        if (programmerDirty && !confirm('Есть несохранённые изменения. Переключить режим без сохранения?')) {
+            select.value = select.dataset.current;
+            return;
+        }
+        document.getElementById('week_mode_target').value = select.value;
+        document.getElementById('weekModeForm').submit();
+    }
+
+    function toggleMode(changedSource) {
+        const chkTemp = document.getElementById('flag_temporarily');
+        const chkConst = document.getElementById('flag_const');
+        const chkWeek = document.getElementById('flag_week');
+
+        const blockTemp = document.getElementById('block_temporarily');
+        const blockConst = document.getElementById('block_const');
+        const blockWeek = document.getElementById('block_week');
+
+        const tempInputs = blockTemp.querySelectorAll('input:not([type="checkbox"])');
+        const constInputs = blockConst.querySelectorAll('input:not([type="checkbox"])');
+        const weekInputs = blockWeek.querySelectorAll('select, input:not([type="checkbox"]), button');
+
+        // Взаимоисключение базовых режимов (Постоянно и По неделе)
+        if (changedSource === 'const' && chkConst.checked) {
+            chkWeek.checked = false;
+        } else if (changedSource === 'week' && chkWeek.checked) {
+            chkConst.checked = false;
+        }
+
+        // Блок Временно
+        const tempOff = !chkTemp.checked;
+        blockTemp.classList.toggle('disabled-block', tempOff);
+        tempInputs.forEach(input => input.disabled = tempOff);
+
+        // Блок Постоянно: серый, если флаг не взведён ИЛИ активен временный режим
+        const constOff = !chkConst.checked || chkTemp.checked;
+        blockConst.classList.toggle('disabled-block', constOff);
+        constInputs.forEach(input => input.disabled = constOff);
+
+        // Блок По неделе: серый, если флаг не взведён ИЛИ активен временный режим
+        const weekOff = !chkWeek.checked || chkTemp.checked;
+        blockWeek.classList.toggle('disabled-block', weekOff);
+        weekInputs.forEach(input => {
+            input.disabled = weekOff || input.getAttribute('data-locked') === 'true';
+        });
+    }
+
+    function validateForm(event) {
+        const chkConst = document.getElementById('flag_const');
+        const chkTemp = document.getElementById('flag_temporarily');
+
+        // Для временного с постоянным время окончания обязательно.
+        // Для временного с недельным время может быть пустым или 00:00.
+        if (chkTemp.checked && chkConst.checked) {
+            const timeVal = document.getElementById('temporarily_time').value.trim();
+            if (!timeVal || timeVal === '00:00' || timeVal === '0') {
+                alert('Ошибка: Для временного режима с постоянным укажите время окончания.');
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        if (chkConst.checked) {
+            const constMin = parseFloat(document.getElementById('const_min').value);
+            const constMax = parseFloat(document.getElementById('const_max').value);
+
+            if (isNaN(constMin) || isNaN(constMax) || constMin >= constMax) {
+                alert('Ошибка: Значение Мин. (Постоянно) должно быть заполнено и строго меньше Макс.');
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        // Disabled-поля не отправляются: включаем всё, кроме заблокированного Mo_Su
+        document.querySelectorAll('#programmerForm input, #programmerForm select, #programmerForm button')
+            .forEach(input => {
+                if (input.getAttribute('data-locked') !== 'true') {
+                    input.disabled = false;
+                }
+            });
+
+        return true;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        toggleMode('');
+    });
+</script>
+{% endblock %}
