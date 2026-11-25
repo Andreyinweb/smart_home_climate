@@ -25,12 +25,12 @@
 
 <div class="page-head">
     <h1>Главная</h1>
-    <span class="label">{{ timestamp[:16] if timestamp else '—' }}</span>
+    <span class="label">{{ timestamp if timestamp else '—' }}</span>
 </div>
 
 <!-- ДАТЧИКИ -->
 <section class="card">
-    <div class="card-title">Датчики</div>
+    <div class="card-title"></div>
     <table class="t">
         {{ thead() }}
         <tbody>
@@ -40,14 +40,14 @@
         </tbody>
     </table>
     {% if max_rh is defined and max_rh is not none %}
-    <div class="label note">Макс. ОВ пола: {{ n(max_rh) }}%</div>
+    <div class="label note">Максимальная относительная влажность пола: {{ n(max_rh) }}%</div>
     {% endif %}
 </section>
 
 <!-- РАСЧЁТ (рекомендация, не фактический статус) -->
 <div class="duo">
     <section class="card">
-        <div class="label">Расчёт: проветривание</div>
+        <div class="label">ПРОВЕТРИВАНИЕ расчёт</div>
         {% if vent_status is defined and vent_status is not none %}
             {% if vent_status %}
             <div class="pill yes">Да{% if vent_time_val %} · {{ vent_time_val }} мин{% endif %}</div>
@@ -60,7 +60,7 @@
         {% endif %}
     </section>
     <section class="card">
-        <div class="label">Расчёт: отопление</div>
+        <div class="label">ОТОПЛЕНИЕ расчёт</div>
         {% if heat_status is defined and heat_status is not none %}
             {% if heat_status %}
             <div class="pill heat-yes">Да{% if heat_info %} {{ heat_info }}{% endif %}</div>
@@ -80,9 +80,9 @@
     <table class="t">
         {{ thead() }}
         <tbody>
-            {{ row('Улица',  '', street_temp,   street_humi,     a_street_humi,       dp_street) }}
-            {{ row('Подвал', '', basement_temp, sim_basement_humi, sim_a_basement_humi, sim_dp_basement) }}
-            {{ row('Пол',    '', floor_temp,    sim_floor_humi,    sim_a_basement_humi, sim_dp_floor) }}
+            {{ row('Улица',  '', street_temp,   street_humi,     a_street_humi) }}
+            {{ row('Подвал', '', basement_temp, sim_basement_humi, sim_a_basement_humi) }}
+            {{ row('Пол',    '', floor_temp,    sim_floor_humi,    sim_a_basement_humi) }}
         </tbody>
     </table>
 </section>
@@ -95,9 +95,9 @@
     <table class="t">
         {{ thead() }}
         <tbody>
-            {{ row('Улица',  '', street_temp,          street_humi,          a_street_humi,          dp_street) }}
-            {{ row('Подвал', '', basement_temp_heated, basement_humi_heated, a_basement_humi_heated, dp_basement_heated) }}
-            {{ row('Пол',    '', floor_temp_heated,    floor_humi_heated,    a_floor_humi_heated,    dp_floor_heated) }}
+            {{ row('Улица',  '', street_temp,          street_humi,          a_street_humi) }}
+            {{ row('Подвал', '', basement_temp_heated, basement_humi_heated, a_basement_humi_heated) }}
+            {{ row('Пол',    '', floor_temp_heated,    floor_humi_heated,    a_floor_humi_heated) }}
         </tbody>
     </table>
 </section>
@@ -105,11 +105,11 @@
 
 <!-- БАТАРЕИ -->
 <section class="card">
-    <div class="label">Напряжение батарей, В</div>
+    <div class="label">Напряжение батарей.</div>
     <div class="volts">
-        <span>Ул <b>{{ n(street_voltage, 3) }}</b></span>
-        <span>Подв <b>{{ n(basement_voltage, 3) }}</b></span>
-        <span>Пол <b>{{ n(floor_voltage, 3) }}</b></span>
+        <span>Улица: <b>{{ n(street_voltage, 3) }} В</b></span>
+        <span>Подвал: <b>{{ n(basement_voltage, 3) }} В</b></span>
+        <span>Пол: <b>{{ n(floor_voltage, 3) }} В</b></span>
     </div>
 </section>
 

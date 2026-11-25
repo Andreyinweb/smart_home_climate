@@ -60,14 +60,14 @@
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-top"><span class="label">Т, °C</span><span class="label sensor-name">датчик: подвал</span></div>
+                <div class="panel-top"><span class="label">Датчик температуры: подвал.</span><span class="label sensor-name"> </span></div>
                 <div class="temps">
-                    <div><div class="label">от</div><div class="min">{{ hdr.t_min|default('—') }}</div></div>
-                    <div><div class="label">сейчас</div><div class="now">{{ hdr.t_now|default('—') }}</div></div>
-                    <div><div class="label">до</div><div class="max">{{ hdr.t_max|default('—') }}</div></div>
+                    <div><div class="label">от</div><div class="min">{{ hdr.t_min|default('—') }} °C</div></div>
+                    <div><div class="label">сейчас</div><div class="now">{{ hdr.t_now|default('—') }} °C</div></div>
+                    <div><div class="label">до</div><div class="max">{{ hdr.t_max|default('—') }} °C</div></div>
                 </div>
                 <div class="sep"></div>
-                <div class="label">Влаж., %</div>
+                <div class="label">Влажность</div>
                 <div class="hum">
                     <div><div class="label">Ул</div><div class="val">{{ hdr.h_street|default('—') }}</div></div>
                     <div><div class="label">Подв</div><div class="val">{{ hdr.h_basement|default('—') }}</div></div>
