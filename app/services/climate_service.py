@@ -93,7 +93,11 @@ def _abs_humi(temp: float | None, humi: float | None) -> Optional[float]:
     if temp is None or humi is None:
         return None
     try:
-        es = 6.112 * math.exp((17.67 * temp) / (temp + 243.5))
+        if temp < 0:
+            a, b = 21.875, 265.5
+        else:
+            a, b = 17.67, 243.5
+        es = 6.112 * math.exp((a * temp) / (temp + b))
         e = es * (humi / 100.0)
         return round((216.7 * e) / (temp + 273.15), 2)
     except (ValueError, ZeroDivisionError, OverflowError):
@@ -105,7 +109,11 @@ def _rel_humi(temp: float | None, ah: float | None) -> Optional[float]:
     if temp is None or ah is None or temp <= -273.15 or ah <= 0:
         return None
     try:
-        es = 6.112 * math.exp((17.67 * temp) / (temp + 243.5))
+        if temp < 0:
+            a, b = 21.875, 265.5
+        else:
+            a, b = 17.67, 243.5
+        es = 6.112 * math.exp((a * temp) / (temp + b))
         if es == 0:
             return None
         e = (ah * (temp + 273.15)) / 216.7
