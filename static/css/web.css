@@ -55,6 +55,7 @@ a{color:inherit}
 .status{display:flex;align-items:center;gap:.25rem;border-radius:999px;padding:.25rem .5625rem;
   font-size:.75rem;font-weight:500}
 .status .i{width:.8125rem;height:.8125rem}
+a.status{text-decoration:none}
 .status.vent{background:var(--ok-bg);color:var(--ok-text)}
 .status.heat{background:var(--heat-bg);color:var(--heat-text)}
 
@@ -233,6 +234,11 @@ pre.log{margin-top:.375rem;padding:.5rem;background:var(--inner);color:var(--tex
 .field.wide{grid-column:1 / -1}
 .btn-ghost{background:var(--idle-bg);color:var(--accent-soft)}
 .graph-img{display:block;width:100%;height:auto;border-radius:.5rem}
+
+/* Страница ошибки */
+.err-card{padding:1rem .75rem;text-align:center;gap:.5rem}
+.err-code{font-size:3rem;font-weight:500;line-height:1}
+.err-title{font-size:1rem;font-weight:500}
 
 /* Меню: на узком экране поверх, на широком отдельной колонкой слева */
 .drawer{position:fixed;inset:0;display:none;z-index:10}

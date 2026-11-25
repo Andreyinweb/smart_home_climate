@@ -1,0 +1,15 @@
+{# templates/web/error.html #}
+{% extends "web/base.html" %}
+
+{% block title %}{{ status_code }} — {{ title }}{% endblock %}
+
+{% block content %}
+<section class="card err-card stack">
+    <div class="err-code text-red">{{ status_code }}</div>
+    <h2 class="err-title">{{ title }}</h2>
+    {% if message %}
+    <p class="label">{{ message }}</p>
+    {% endif %}
+    <a href="/" class="btn btn-start">{{ ico('home') }}На главную</a>
+</section>
+{% endblock %}
