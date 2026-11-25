@@ -13,6 +13,7 @@
 {%- elif name == 'menu' %}<path d="M4 6h16M4 12h16M4 18h16"/>
 {%- elif name == 'close' %}<path d="M6 6l12 12M18 6L6 18"/>
 {%- elif name == 'alert' %}<path d="M12 3l10 18H2zM12 10v5M12 18h.01"/>
+{%- elif name == 'theme' %}<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z"/>
 {%- endif -%}
 </svg>
 {%- endmacro %}
@@ -21,12 +22,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="dark light">
     {% if website_return_time %}
     <meta http-equiv="refresh" content="{{ website_return_time }}">
     {% endif %}
     <title>{% block title %}Климат{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/web.css?v=1">
+    <script>try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+    <link rel="stylesheet" href="/static/css/web.css?v=2">
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -105,6 +107,12 @@
             {% if href == '/settings' %}<div class="nav-sep"></div>{% endif %}
             <a class="nav{% if path == href %} active{% endif %}" href="{{ href }}"><span class="ico">{{ ico(icon) }}</span>{{ label }}</a>
             {% endfor %}
+            <button class="nav nav-btn" id="themeBtn" type="button" aria-expanded="false" aria-controls="themeOpts"><span class="ico">{{ ico('theme') }}</span>Тема<span class="nav-val" id="themeCur">Авто</span></button>
+            <div class="theme-opts" id="themeOpts" hidden>
+                <button class="theme-opt" type="button" data-theme-set="auto">Авто</button>
+                <button class="theme-opt" type="button" data-theme-set="dark">Тёмная</button>
+                <button class="theme-opt" type="button" data-theme-set="light">Светлая</button>
+            </div>
         </nav>
     </div>
 
@@ -115,6 +123,39 @@
         document.getElementById('menuBtn').addEventListener('click', function () { setMenu(true); });
         document.getElementById('menuClose').addEventListener('click', function () { setMenu(false); });
         document.getElementById('drawerBg').addEventListener('click', function () { setMenu(false); });
+
+        // Тема: auto (по умолчанию, без атрибута) | dark | light
+        var root = document.documentElement;
+        var names = { auto: 'Авто', dark: 'Тёмная', light: 'Светлая' };
+        var opts = document.querySelectorAll('.theme-opt');
+        function current() {
+            var t = root.getAttribute('data-theme');
+            return (t === 'light' || t === 'dark') ? t : 'auto';
+        }
+        function mark() {
+            var m = current();
+            document.getElementById('themeCur').textContent = names[m];
+            opts.forEach(function (o) { o.classList.toggle('active', o.dataset.themeSet === m); });
+        }
+        function setTheme(m) {
+            if (m === 'auto') root.removeAttribute('data-theme');
+            else root.setAttribute('data-theme', m);
+            try {
+                if (m === 'auto') localStorage.removeItem('theme');
+                else localStorage.setItem('theme', m);
+            } catch (e) {}
+            mark();
+        }
+        opts.forEach(function (o) {
+            o.addEventListener('click', function () { setTheme(o.dataset.themeSet); });
+        });
+        document.getElementById('themeBtn').addEventListener('click', function () {
+            var box = document.getElementById('themeOpts');
+            var open = box.hasAttribute('hidden');
+            if (open) box.removeAttribute('hidden'); else box.setAttribute('hidden', '');
+            this.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        mark();
     })();
     </script>
     {% block scripts %}{% endblock %}

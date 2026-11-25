@@ -2,6 +2,7 @@
    Размеры в rem: на телефоне 1rem = 16px, на компьютере (от 1000px) 1rem = 20px,
    поэтому весь интерфейс масштабируется одной строкой в конце файла. */
 :root{
+  color-scheme:dark;
   --bg:#12112a;
   --card:#1c1a3a;
   --inner:#0f0e22;
@@ -20,9 +21,40 @@
   --idle-bg:#2b2858;
   --heat-bg:#3d2410; --heat-text:#ffb36b; --heat-line:#ff9f3d;
 
+  --err-text:#ffd5da; --warn-msg:#fff3b8; --h1:#f1efff; --on-blue:#0b1a33;
+
   --gap:.375rem;
   --drawer:20rem;
   --font:Roboto,"Segoe UI",system-ui,-apple-system,sans-serif;
+}
+/* Светлая тема: авто (системная) и ручной выбор. Тёмная задана в :root выше. */
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+  color-scheme:light;
+  --bg:#f3f2fb; --card:#ffffff; --inner:#ecebf7; --line:#d6d3ec;
+  --text:#1c1a3a; --label:#6a659a; --accent:#7c3acd; --accent-soft:#5b3aa8;
+  --t-min:#2f6fd6; --t-max:#d6334b;
+  --ok-bg:#d8f5e8;   --ok-line:#2bb673;   --ok-text:#0f7a4b;   --ok-label:#1a8f5c;
+  --warn-bg:#fbf0c4; --warn-line:#d4a90a; --warn-text:#7a5d00;
+  --bad-bg:#fde0e4;  --bad-line:#e5485b;  --bad-text:#b3182c;
+  --crit-bg:#d81f3a; --crit-line:#8f1022; --crit-text:#ffffff;
+  --idle-bg:#e2e0f3;
+  --heat-bg:#fde6d0; --heat-text:#a04a00; --heat-line:#f08a1f;
+  --err-text:#7a1020; --warn-msg:#5c4600; --h1:#1c1a3a; --on-blue:#ffffff;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f3f2fb; --card:#ffffff; --inner:#ecebf7; --line:#d6d3ec;
+  --text:#1c1a3a; --label:#6a659a; --accent:#7c3acd; --accent-soft:#5b3aa8;
+  --t-min:#2f6fd6; --t-max:#d6334b;
+  --ok-bg:#d8f5e8;   --ok-line:#2bb673;   --ok-text:#0f7a4b;   --ok-label:#1a8f5c;
+  --warn-bg:#fbf0c4; --warn-line:#d4a90a; --warn-text:#7a5d00;
+  --bad-bg:#fde0e4;  --bad-line:#e5485b;  --bad-text:#b3182c;
+  --crit-bg:#d81f3a; --crit-line:#8f1022; --crit-text:#ffffff;
+  --idle-bg:#e2e0f3;
+  --heat-bg:#fde6d0; --heat-text:#a04a00; --heat-line:#f08a1f;
+  --err-text:#7a1020; --warn-msg:#5c4600; --h1:#1c1a3a; --on-blue:#ffffff;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px}
@@ -91,14 +123,14 @@ a.status{text-decoration:none}
 .errors{display:flex;flex-direction:column;gap:.3125rem}
 .error-item{display:flex;align-items:flex-start;gap:.5rem;background:var(--bad-bg);
   border:1px solid var(--bad-line);border-radius:.625rem;padding:.5rem .625rem;
-  font-size:.8125rem;color:#ffd5da}
+  font-size:.8125rem;color:var(--err-text)}
 .error-item .i{width:1.125rem;height:1.125rem;color:var(--bad-text)}
-.error-item.warning{background:var(--warn-bg);border-color:var(--warn-line);color:#fff3b8}
+.error-item.warning{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-msg)}
 .error-item.warning .i{color:var(--warn-text)}
 
 /* Заголовок страницы */
 .page-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 .25rem}
-.page-head h1{font-size:1rem;font-weight:500;color:#f1efff}
+.page-head h1{font-size:1rem;font-weight:500;color:var(--h1)}
 
 /* Таблицы */
 table.t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.75rem}
@@ -193,7 +225,7 @@ tr.active-row td{background:var(--ok-bg)}
 .btn-del .i{width:.75rem;height:.75rem}
 .btn-del:disabled{opacity:.4;cursor:not-allowed}
 .btn-add{display:flex;align-items:center;justify-content:center;gap:.375rem;width:100%;margin-top:.5rem;
-  padding:.5rem;border:0;border-radius:.625rem;background:var(--t-min);color:#0b1a33;
+  padding:.5rem;border:0;border-radius:.625rem;background:var(--t-min);color:var(--on-blue);
   font:inherit;font-size:.8125rem;font-weight:500;cursor:pointer}
 .btn-add:not(:disabled):active{opacity:.85}
 .btn-add:disabled{opacity:.4;cursor:not-allowed}
@@ -260,6 +292,13 @@ body.menu-open .drawer{display:block}
 .nav .ico .i{width:1.125rem;height:1.125rem}
 .nav.active{background:var(--accent)}
 .nav.active .ico{background:rgba(255,255,255,.2);color:#fff}
+.nav-btn{width:100%;border:0;background:none;font:inherit;text-align:left;cursor:pointer}
+.nav-val{margin-left:auto;font-size:.8125rem;color:var(--label)}
+.theme-opts{display:flex;flex-direction:column;gap:.125rem;margin-left:2.875rem}
+.theme-opts[hidden]{display:none}
+.theme-opt{border:0;background:none;color:var(--text);font:inherit;font-size:.9375rem;text-align:left;
+  padding:.4375rem .625rem;border-radius:.75rem;cursor:pointer}
+.theme-opt.active{background:var(--inner);color:var(--accent-soft);font-weight:500}
 .nav-sep{border-top:.5px solid var(--line);margin:.375rem 0}
 
 @media (min-width:768px){
