@@ -2,13 +2,29 @@
 
 # run/run.sh
 #
-# Источники настроек (по порядку): окружение → .env → run/env.txt (из него создаётся .env) → иначе СТОП.
-# Обязательные переменные = имена из run/env.txt ДО строки-разделителя «##########…».
+# Запуск из корня проекта:  bash run/run.sh [-new | -calc]
+#   без параметров  обычный запуск
+#   -new            общий сброс к базовым настройкам: .env, база данных, backup-файлы, журналы и заглушка
+#                   usbrelay переносятся в архив backup/reset_<время>, после чего старт как с нуля.
+#                   Виртуальное окружение не трогается. Нужен терминал и ввод слова NEW.
+#   -calc           после подготовки и миграции выполнить run/initial_calculations.py и выйти (main.py не запускается)
 #
-# Автоматический режим (сервер): в окружении есть VERSION и ещё хотя бы одна обязательная переменная.
-#   Все вопросы получают «да», .env существующий не трогается, python/pip не ставятся (вместо этого стоп).
-# Обычный режим (разработка): любое действие только с согласия в терминале.
-#   Нет терминала — на вопросы отвечается «нет».
+# Значение каждой переменной: окружение → .env → run/env.txt → значение по умолчанию.
+# Обязательны только переменные из run/env.txt ДО строки-разделителя «##########…» (сейчас только VERSION).
+#
+# Автоматический режим (сервер): задана переменная окружения RUN_AUTO=true (например, в unit-файле systemd).
+#   Все вопросы получают «да», существующий .env не трогается, python/pip не ставятся (вместо этого стоп).
+# Обычный режим (разработка): любое действие только с согласия в терминале. Нет терминала — «нет».
+#
+# Первый старт (нет .env и нет переменных проекта в окружении): показывается список действий
+#   и задаётся один вопрос на весь список. При «нет» ничего не создаётся.
+#
+# Язык сообщений в терминале: LANGUAGE (окружение, .env, env.txt), иначе язык системы, иначе английский.
+#   Поддерживаются ru, uk, en. Журнал run_log.log всегда на английском. LANGUAGE в дочерние процессы
+#   не экспортируется (это переменная gettext), приложение читает её из .env.
+#
+# После создания .env значения в run/env.txt очищаются (остаются имена, комментарии и VERSION),
+# чтобы данные не попали в git.
 #
 # Реле usbrelay (/usr/local/bin/usbrelay):
 #   Заглушка run/stub.txt ставится только в обычном режиме и только при APP_ENV=DEVELOPMENT.
@@ -27,8 +43,10 @@ exec 3>&1 4>&2 5<&0
 DIR_PATH="$PWD"
 ENV_FILE="$DIR_PATH/.env"
 ENV_TXT="$DIR_PATH/run/env.txt"
+CALC_FILE="$DIR_PATH/run/initial_calculations.py"
 SEP_LINE='########################## Не обязательные переменные  ########################################'
 RE_SEP='^[[:space:]]*#{10,}'
+RE_VER='^[0-9]+(\.[0-9]+)*$'
 
 # Заглушка usbrelay
 RELAY_BIN="/usr/local/bin/usbrelay"
@@ -38,10 +56,288 @@ STUB_STATE="/tmp/usbrelay_mock_state.json"  # файл состояния заг
 APP_ENV_DEFAULTED=false
 APP_ENV_DOWNGRADED=false
 
+AUTO=false
+case "${RUN_AUTO:-}" in
+    1|true|TRUE|True|yes|YES|Yes) AUTO=true ;;
+esac
+
+MODE_NEW=false
+MODE_CALC=false
+IGNORE_ENV=false     # true после -new: переменные окружения не используются
+FORCE_FIRST=false    # true после -new: считать старт первым
+FIRST_START=false
+PRECONSENT=false     # true после согласия со списком первого старта
+HAVE_ENVF=false
+FIXED=false
+LANG_CODE="en"
+
+declare -A M=() E=() TXT_VAL=() ENVF_VAL=() FINAL=() IS_OPT=()
+REQ_NAMES=()
+defaulted=()
+NEW_SRC=()
+NEW_CAT=()
+
+#################################### Тексты сообщений ####################################
+# Терминал: язык LANG_CODE (M). Журнал: всегда английский (E). Недостающие ключи берутся из английского.
+# Строки — формат для printf: %s подставляет параметры, \n — перевод строки.
+
+lang_en() {
+    M[usage]='Usage: bash run/run.sh [-new | -calc]\n  (no options)  normal start\n  -new          full reset to base settings (everything is moved to backup/reset_<time>)\n  -calc         after preparation run run/initial_calculations.py and exit'
+    M[bad_arg]='Unknown option: %s'
+    M[both_modes]='Options -new and -calc cannot be used together.'
+    M[new_auto]='-new does not work in automatic mode (RUN_AUTO): there is nobody to confirm.'
+    M[need_tty]='-new needs a terminal for confirmation.'
+    M[app_running]='The application is running (app.main). Stop it and try again.'
+    M[calc_missing]='File %s not found.'
+    M[no_env_txt]='File %s not found (run run.sh from the project root).'
+    M[no_version_section]='The required part of %s must contain VERSION.'
+    M[req_missing]='Required variable %s is empty (set it in the environment, .env or run/env.txt).'
+    M[bad_version]="Invalid VERSION='%s' (expected something like 3.0.0)."
+    M[first_title]='First start. The following actions will be performed:'
+    M[first_python]='Python %s (installed with sudo if missing) and venv/pip packages'
+    M[first_venv]='Virtual environment %s and packages from requirements.txt'
+    M[first_env]='File .env (values are taken from run/env.txt, then run/env.txt is cleared)'
+    M[first_logs]='Logs: %s'
+    M[first_db]='Database: %s, backups folder: %s'
+    M[first_stub]='usbrelay stub in %s (APP_ENV=DEVELOPMENT, sudo)'
+    M[first_ask]='Perform all of the above?'
+    M[first_declined]='Cancelled. Nothing was created.'
+    M[q_mkdir]='Create folder %s?'
+    M[q_mkfile]='Create file %s?'
+    M[q_pkg]="Install package '%s'?"
+    M[q_python]='Install %s?'
+    M[q_venv]='Create virtual environment %s?'
+    M[q_stub]='APP_ENV=DEVELOPMENT: install the usbrelay stub to %s (sudo)?'
+    M[q_envcreate]='File .env not found. Create it?'
+    M[q_envrewrite]='.env lacks variables or values were corrected. Rewrite .env from the template (unknown variables will be removed)?'
+    M[q_project_dir]="PROJECT_DIR='%s' but the project is in '%s'. Replace paths (%s) with defaults?"
+    M[q_site]="SITE_WEATHER='%s' is unknown. Replace with MET_NO?"
+    M[d_project_dir]="Paths point to another project ('%s'). Fix PROJECT_DIR or the paths."
+    M[d_site]="Unknown SITE_WEATHER='%s' (allowed: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)."
+    M[d_env_write]='Could not write %s'
+    M[d_log]='Could not open the log %s'
+    M[d_dir]='Folder %s was not created'
+    M[d_file]='File %s was not created'
+    M[d_pkg_auto]="Package '%s' is not installed. Packages are not installed in automatic mode."
+    M[d_pkg]="Package '%s' is not installed."
+    M[d_py_auto]='%s not found. Python is not installed in automatic mode.'
+    M[d_py_cancel]='Installation of %s was cancelled.'
+    M[d_pip]='pip is not installed.'
+    M[d_venv_mod]='The venv module for %s is not installed.'
+    M[d_stub_rm]='Could not remove the stub %s (sudo needed). Remove it manually.'
+    M[d_stub_inst]='Could not install the stub to %s (sudo needed).'
+    M[d_stub_src]='%s not found: it is required when APP_ENV=DEVELOPMENT.'
+    M[d_stub_mark]="%s has no marker '%s': such a stub cannot be removed safely later."
+    M[d_tmp]='Could not create a temporary file.'
+    M[d_new_mv]='Could not move %s to the archive.'
+    M[err_trap]='run.sh: error (code %s), line %s. Details: %s'
+    M[new_title]='RESET TO BASE SETTINGS. The following will be moved to the archive:'
+    M[new_stub]='usbrelay stub %s will be removed (sudo)'
+    M[new_archive]='Archive folder: %s'
+    M[new_keep]='The virtual environment (%s) is not touched.'
+    M[new_confirm]='Type NEW to confirm (anything else cancels): '
+    M[new_cancel]='Cancelled. Nothing was changed.'
+    M[new_nothing]='Nothing to archive. Continuing as a first start.'
+    M[new_done]='Moved to the archive: %s'
+    M[yn_invalid]='Please enter y/n'
+    M[calc_done]='Calculations finished.'
+}
+
+lang_ru() {
+    M[usage]='Использование: bash run/run.sh [-new | -calc]\n  (без параметров)  обычный запуск\n  -new              общий сброс к базовым настройкам (всё переносится в backup/reset_<время>)\n  -calc             после подготовки выполнить run/initial_calculations.py и выйти'
+    M[bad_arg]='Неизвестный параметр: %s'
+    M[both_modes]='Параметры -new и -calc нельзя использовать вместе.'
+    M[new_auto]='-new не работает в автоматическом режиме (RUN_AUTO): подтверждать некому.'
+    M[need_tty]='Для -new нужен терминал, чтобы подтвердить сброс.'
+    M[app_running]='Приложение запущено (app.main). Остановите его и повторите.'
+    M[calc_missing]='Не найден файл %s.'
+    M[no_env_txt]='Не найден файл %s (запускайте run.sh из корня проекта).'
+    M[no_version_section]='В обязательной части %s должна быть переменная VERSION.'
+    M[req_missing]='Обязательная переменная %s пуста (задайте её в окружении, .env или run/env.txt).'
+    M[bad_version]="Некорректная VERSION='%s' (ожидается вид 3.0.0)."
+    M[first_title]='Первый запуск. Будут выполнены действия:'
+    M[first_python]='Python %s (установка через sudo, если его нет) и пакеты venv/pip'
+    M[first_venv]='Виртуальное окружение %s и пакеты из requirements.txt'
+    M[first_env]='Файл .env (значения берутся из run/env.txt, после чего run/env.txt очищается)'
+    M[first_logs]='Журналы: %s'
+    M[first_db]='База данных: %s, папка backup: %s'
+    M[first_stub]='Заглушка usbrelay в %s (APP_ENV=DEVELOPMENT, sudo)'
+    M[first_ask]='Выполнить все действия из списка?'
+    M[first_declined]='Отменено. Ничего не создано.'
+    M[q_mkdir]='Создать папку %s?'
+    M[q_mkfile]='Создать файл %s?'
+    M[q_pkg]="Установить пакет '%s'?"
+    M[q_python]='Установить %s?'
+    M[q_venv]='Создать виртуальное окружение %s?'
+    M[q_stub]='APP_ENV=DEVELOPMENT: установить заглушку usbrelay в %s (sudo)?'
+    M[q_envcreate]='Файл .env не найден. Создать его?'
+    M[q_envrewrite]='В .env не хватает переменных или значения исправлены. Перезаписать .env по шаблону (неизвестные переменные будут удалены)?'
+    M[q_project_dir]="PROJECT_DIR='%s', а проект в '%s'. Заменить пути (%s) на значения по умолчанию?"
+    M[q_site]="SITE_WEATHER='%s' неизвестен. Заменить на MET_NO?"
+    M[d_project_dir]="Пути указывают на другой проект ('%s'). Исправьте PROJECT_DIR или пути."
+    M[d_site]="Неизвестный SITE_WEATHER='%s' (допустимо: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)."
+    M[d_env_write]='Не удалось записать %s'
+    M[d_log]='Не удалось открыть журнал %s'
+    M[d_dir]='Папка %s не создана'
+    M[d_file]='Файл %s не создан'
+    M[d_pkg_auto]="Не установлен пакет '%s'. В автоматическом режиме пакеты не ставятся."
+    M[d_pkg]="Пакет '%s' не установлен."
+    M[d_py_auto]='%s не найден. В автоматическом режиме Python не устанавливается.'
+    M[d_py_cancel]='Установка %s отменена.'
+    M[d_pip]='pip не установлен.'
+    M[d_venv_mod]='Модуль venv для %s не установлен.'
+    M[d_stub_rm]='Не удалось удалить заглушку %s (нужны права sudo). Удалите её вручную.'
+    M[d_stub_inst]='Не удалось установить заглушку в %s (нужны права sudo).'
+    M[d_stub_src]='Не найден %s: он нужен при APP_ENV=DEVELOPMENT.'
+    M[d_stub_mark]="В %s нет маркера '%s': такую заглушку потом нельзя безопасно удалить."
+    M[d_tmp]='Не удалось создать временный файл.'
+    M[d_new_mv]='Не удалось перенести %s в архив.'
+    M[err_trap]='run.sh: ошибка (код %s), строка %s. Подробности: %s'
+    M[new_title]='СБРОС К БАЗОВЫМ НАСТРОЙКАМ. В архив будет перенесено:'
+    M[new_stub]='заглушка usbrelay %s будет удалена (sudo)'
+    M[new_archive]='Папка архива: %s'
+    M[new_keep]='Виртуальное окружение (%s) не затрагивается.'
+    M[new_confirm]='Для подтверждения введите NEW (всё остальное — отмена): '
+    M[new_cancel]='Отменено. Ничего не изменено.'
+    M[new_nothing]='Архивировать нечего. Продолжаем как первый старт.'
+    M[new_done]='Перенесено в архив: %s'
+    M[yn_invalid]='Пожалуйста, введите y/n'
+    M[calc_done]='Расчёт завершён.'
+}
+
+lang_uk() {
+    M[usage]='Використання: bash run/run.sh [-new | -calc]\n  (без параметрів)  звичайний запуск\n  -new              загальне скидання до базових налаштувань (усе переноситься в backup/reset_<час>)\n  -calc             після підготовки виконати run/initial_calculations.py і вийти'
+    M[bad_arg]='Невідомий параметр: %s'
+    M[both_modes]='Параметри -new і -calc не можна використовувати разом.'
+    M[new_auto]='-new не працює в автоматичному режимі (RUN_AUTO): підтверджувати нікому.'
+    M[need_tty]='Для -new потрібен термінал, щоб підтвердити скидання.'
+    M[app_running]='Застосунок запущено (app.main). Зупиніть його і повторіть.'
+    M[calc_missing]='Не знайдено файл %s.'
+    M[no_env_txt]='Не знайдено файл %s (запускайте run.sh з кореня проєкту).'
+    M[no_version_section]='В обовʼязковій частині %s має бути змінна VERSION.'
+    M[req_missing]='Обовʼязкова змінна %s порожня (задайте її в оточенні, .env або run/env.txt).'
+    M[bad_version]="Некоректна VERSION='%s' (очікується вигляд 3.0.0)."
+    M[first_title]='Перший запуск. Буде виконано дії:'
+    M[first_python]='Python %s (встановлення через sudo, якщо його немає) і пакети venv/pip'
+    M[first_venv]='Віртуальне середовище %s і пакети з requirements.txt'
+    M[first_env]='Файл .env (значення беруться з run/env.txt, після чого run/env.txt очищається)'
+    M[first_logs]='Журнали: %s'
+    M[first_db]='База даних: %s, папка backup: %s'
+    M[first_stub]='Заглушка usbrelay у %s (APP_ENV=DEVELOPMENT, sudo)'
+    M[first_ask]='Виконати всі дії зі списку?'
+    M[first_declined]='Скасовано. Нічого не створено.'
+    M[q_mkdir]='Створити папку %s?'
+    M[q_mkfile]='Створити файл %s?'
+    M[q_pkg]="Встановити пакет '%s'?"
+    M[q_python]='Встановити %s?'
+    M[q_venv]='Створити віртуальне середовище %s?'
+    M[q_stub]='APP_ENV=DEVELOPMENT: встановити заглушку usbrelay у %s (sudo)?'
+    M[q_envcreate]='Файл .env не знайдено. Створити його?'
+    M[q_envrewrite]='В .env бракує змінних або значення виправлено. Перезаписати .env за шаблоном (невідомі змінні буде видалено)?'
+    M[q_project_dir]="PROJECT_DIR='%s', а проєкт у '%s'. Замінити шляхи (%s) на значення за замовчуванням?"
+    M[q_site]="SITE_WEATHER='%s' невідомий. Замінити на MET_NO?"
+    M[d_project_dir]="Шляхи вказують на інший проєкт ('%s'). Виправте PROJECT_DIR або шляхи."
+    M[d_site]="Невідомий SITE_WEATHER='%s' (допустимо: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)."
+    M[d_env_write]='Не вдалося записати %s'
+    M[d_log]='Не вдалося відкрити журнал %s'
+    M[d_dir]='Папку %s не створено'
+    M[d_file]='Файл %s не створено'
+    M[d_pkg_auto]="Не встановлено пакет '%s'. В автоматичному режимі пакети не встановлюються."
+    M[d_pkg]="Пакет '%s' не встановлено."
+    M[d_py_auto]='%s не знайдено. В автоматичному режимі Python не встановлюється.'
+    M[d_py_cancel]='Встановлення %s скасовано.'
+    M[d_pip]='pip не встановлено.'
+    M[d_venv_mod]='Модуль venv для %s не встановлено.'
+    M[d_stub_rm]='Не вдалося видалити заглушку %s (потрібні права sudo). Видаліть її вручну.'
+    M[d_stub_inst]='Не вдалося встановити заглушку в %s (потрібні права sudo).'
+    M[d_stub_src]='Не знайдено %s: він потрібен при APP_ENV=DEVELOPMENT.'
+    M[d_stub_mark]="У %s немає маркера '%s': таку заглушку потім не можна безпечно видалити."
+    M[d_tmp]='Не вдалося створити тимчасовий файл.'
+    M[d_new_mv]='Не вдалося перенести %s в архів.'
+    M[err_trap]='run.sh: помилка (код %s), рядок %s. Подробиці: %s'
+    M[new_title]='СКИДАННЯ ДО БАЗОВИХ НАЛАШТУВАНЬ. В архів буде перенесено:'
+    M[new_stub]='заглушку usbrelay %s буде видалено (sudo)'
+    M[new_archive]='Папка архіву: %s'
+    M[new_keep]='Віртуальне середовище (%s) не чіпається.'
+    M[new_confirm]='Для підтвердження введіть NEW (усе інше — скасування): '
+    M[new_cancel]='Скасовано. Нічого не змінено.'
+    M[new_nothing]='Архівувати нічого. Продовжуємо як перший старт.'
+    M[new_done]='Перенесено в архів: %s'
+    M[yn_invalid]='Будь ласка, введіть y/n'
+    M[calc_done]='Розрахунок завершено.'
+}
+
+# Результат в REPLY (без подпроцессов): msg — на языке терминала, msg_en — английский для журнала
+msg() {
+    local key="$1"
+    shift
+    printf -v REPLY -- "${M[$key]:-$key}" "$@"
+}
+
+msg_en() {
+    local key="$1"
+    shift
+    printf -v REPLY -- "${E[$key]:-$key}" "$@"
+}
+
+set_language() {
+    local k
+    LANG_CODE="$1"
+    M=()
+    lang_en
+    if [ "${#E[@]}" -eq 0 ]; then
+        for k in "${!M[@]}"; do E[$k]="${M[$k]}"; done
+    fi
+    case "$LANG_CODE" in
+        ru) lang_ru ;;
+        uk) lang_uk ;;
+    esac
+}
+
+# Значение языка → ru / uk / en (REPLY). Вид ru_RU.UTF-8, ru_RU:ru, RU → ru; неизвестный язык → en
+normalize_lang() {
+    local v="${1%%:*}"
+    v="${v,,}"
+    v="${v:0:2}"
+    case "$v" in
+        ru) REPLY="ru" ;;
+        uk|ua) REPLY="uk" ;;
+        *) REPLY="en" ;;
+    esac
+}
+
+# Язык системы (REPLY): LC_ALL → LC_MESSAGES → LANG
+locale_lang() {
+    local v
+    REPLY=""
+    for v in "${LC_ALL:-}" "${LC_MESSAGES:-}" "${LANG:-}"; do
+        if [ -n "$v" ]; then
+            REPLY="$v"
+            return 0
+        fi
+    done
+    return 0
+}
+
+# Предварительный язык: окружение → .env → env.txt → система
+early_language() {
+    local raw=""
+    if [ "$IGNORE_ENV" != true ]; then raw="${LANGUAGE:-}"; fi
+    if [ -z "$raw" ]; then raw="${ENVF_VAL[LANGUAGE]:-}"; fi
+    if [ -z "$raw" ]; then raw="${TXT_VAL[LANGUAGE]:-}"; fi
+    if [ -z "$raw" ]; then
+        locale_lang
+        raw="$REPLY"
+    fi
+    normalize_lang "$raw"
+    set_language "$REPLY"
+}
+
 #################################### Журнал ####################################
 # До загрузки конфигурации LOG_DIR неизвестен, поэтому сообщения копятся в LOG_BUF
-# и сбрасываются в run_log.log сразу после его открытия.
+# и сбрасываются в run_log.log сразу после его открытия. Журнал создаётся только после согласия на первый старт.
 LOG_READY=false
+LOG_ALLOWED=false
 LOG_BUF=""
 
 note() {
@@ -62,48 +358,105 @@ open_log() {
     LOG_READY=true
 }
 
-# Ошибка: в терминал (fd 4) и в журнал, затем стоп
-die() {
-    echo "❌ $*" >&4
-    note "❌ $*"
-    if [ "$LOG_READY" != true ]; then open_log || true; fi
+# Ошибка до открытия журнала: только в терминал
+fail() {
+    local key="$1"
+    shift
+    msg "$key" "$@"
+    printf '❌ %s\n' "$REPLY" >&4
     exit 1
 }
 
-trap 'rc=$?; note "❌ Ошибка (код $rc), строка $LINENO: $BASH_COMMAND"; echo "❌ run.sh: ошибка (код $rc), строка $LINENO. Подробности: ${RUN_LOG:-журнал не открыт}" >&4' ERR
+# Ошибка: в терминал (fd 4) и в журнал, затем стоп
+die() {
+    local key="$1" text
+    shift
+    msg "$key" "$@"
+    text="$REPLY"
+    msg_en "$key" "$@"
+    printf '❌ %s\n' "$text" >&4
+    note "ERROR: $REPLY"
+    if [ "$LOG_ALLOWED" = true ] && [ "$LOG_READY" != true ]; then open_log || true; fi
+    exit 1
+}
 
-#################################### Вопросы и действия ####################################
-AUTO=false
+on_err() {
+    local rc="$1" line="$2" cmd="$3"
+    note "ERROR (code $rc), line $line: $cmd"
+    msg err_trap "$rc" "$line" "${RUN_LOG:-log not opened}"
+    printf '❌ %s\n' "$REPLY" >&4
+}
 
-ask_confirm() {
-    local prompt="$1" answer="" use_tty=false
-    if [ "$AUTO" = true ]; then
-        note "АВТО: «$prompt» → да"
-        return 0
-    fi
+trap 'on_err "$?" "$LINENO" "$BASH_COMMAND"' ERR
+
+#################################### Терминал, вопросы ####################################
+has_terminal() {
+    if ( : </dev/tty ) 2>/dev/null; then return 0; fi
+    [ -t 5 ]
+}
+
+# Строка с терминала в REPLY. Код 1 — терминала нет или ввод закрыт.
+tty_read() {
+    local prompt="$1"
+    REPLY=""
     if ( : </dev/tty ) 2>/dev/null; then
-        use_tty=true
-    elif [ ! -t 5 ]; then
-        note "Нет терминала: «$prompt» → нет"
+        printf '%s' "$prompt" > /dev/tty
+        IFS= read -r REPLY < /dev/tty || return 1
+    elif [ -t 5 ]; then
+        printf '%s' "$prompt" >&3
+        IFS= read -r REPLY <&5 || return 1
+    else
         return 1
     fi
+    return 0
+}
+
+# Строка в терминал (если терминала нет — в исходный stdout)
+tty_out() {
+    if ( : </dev/tty ) 2>/dev/null; then
+        printf '%s\n' "$1" > /dev/tty
+    else
+        printf '%s\n' "$1" >&3
+    fi
+}
+
+# Вопрос да/нет: $1 — ключ текста, дальше параметры. AUTO — всегда «да»; нет терминала — «нет».
+ask_confirm() {
+    local key="$1" q en_q answer
+    shift
+    msg "$key" "$@"
+    q="$REPLY"
+    msg_en "$key" "$@"
+    en_q="$REPLY"
+    if [ "$AUTO" = true ]; then
+        note "AUTO: \"$en_q\" -> yes"
+        return 0
+    fi
     while true; do
-        if [ "$use_tty" = true ]; then
-            printf '%s [y/N]: ' "$prompt" > /dev/tty
-            read -r answer < /dev/tty || return 1
-        else
-            printf '%s [y/N]: ' "$prompt" >&3
-            read -r answer <&5 || return 1
+        if ! tty_read "$q [y/N]: "; then
+            note "No terminal: \"$en_q\" -> no"
+            return 1
         fi
+        answer="$REPLY"
         case "$answer" in
-            [yY]|[yY][eE][sS]) return 0 ;;
-            [nN]|[nN][oO]|"")  return 1 ;;
+            y|Y|yes|Yes|YES|д|Д|да|Да|ДА|так|Так|ТАК|т|Т) return 0 ;;
+            n|N|no|No|NO|н|Н|нет|Нет|НЕТ|ні|Ні|НІ|"") return 1 ;;
             *)
-                if [ "$use_tty" = true ]; then echo "Пожалуйста, введите y/n" > /dev/tty
-                else echo "Пожалуйста, введите y/n" >&3; fi
+                msg yn_invalid
+                tty_out "$REPLY"
                 ;;
         esac
     done
+}
+
+# Вопрос по действию из списка первого старта: после согласия со списком не задаётся
+ask_listed() {
+    if [ "$PRECONSENT" = true ]; then
+        msg_en "$@"
+        note "Approved with the first-start list: \"$REPLY\""
+        return 0
+    fi
+    ask_confirm "$@"
 }
 
 # Команда с правами root: root — напрямую; AUTO — sudo без пароля (-n, чтобы не зависнуть); иначе обычный sudo
@@ -120,61 +473,67 @@ run_sudo() {
 install_package() {
     local package_name="$1" test_command="$2"
     if eval "$test_command" &>/dev/null; then
-        echo "✅ Пакет '$package_name' уже установлен"
+        echo "OK: package '$package_name' is already installed"
         return 0
     fi
-    echo "❌ Пакет '$package_name' не установлен"
+    echo "Package '$package_name' is not installed"
     if [ "$AUTO" = true ]; then
-        die "Не установлен пакет '$package_name'. В автоматическом режиме пакеты не ставятся."
+        die d_pkg_auto "$package_name"
     fi
-    ask_confirm "Установить пакет '$package_name'?" || { echo "❌ Установка '$package_name' отменена"; return 1; }
-    echo "🔄 Обновление кэша пакетов..."
-    sudo apt update -q || return 1
-    echo "⚙️ Устанавливаю $package_name..."
+    ask_listed q_pkg "$package_name" || { echo "Installation of '$package_name' cancelled"; return 1; }
+    echo "Updating package cache..."
+    run_sudo apt update -q || return 1
+    echo "Installing $package_name..."
     # shellcheck disable=SC2086
-    sudo apt install -y $package_name || { echo "❌ Ошибка установки пакета '$package_name'!" >&2; return 1; }
-    eval "$test_command" &>/dev/null || { echo "❌ Пакет '$package_name' установлен, но проверка не пройдена!" >&2; return 1; }
-    echo "✅ Пакет '$package_name' успешно установлен"
+    run_sudo apt install -y $package_name || { echo "Error installing package '$package_name'!" >&2; return 1; }
+    eval "$test_command" &>/dev/null || { echo "Package '$package_name' installed, but the check failed!" >&2; return 1; }
+    echo "OK: package '$package_name' installed"
 }
 
 check_or_create_dir() {
     local dir_path="$1"
     if [ -d "$dir_path" ]; then
-        echo "Директория $dir_path уже существует."
+        echo "Folder $dir_path already exists."
         return 0
     fi
-    echo "Директория $dir_path не существует."
-    if ask_confirm "Создать папку $dir_path ?"; then
+    echo "Folder $dir_path does not exist."
+    if ask_listed q_mkdir "$dir_path"; then
         mkdir -p -- "$dir_path" || return 1
-        echo "Директория $dir_path успешно создана."
+        echo "Folder $dir_path created."
         return 0
     fi
-    echo "Создание $dir_path отменено."
+    echo "Creation of $dir_path cancelled."
     return 1
 }
 
 check_or_create_file() {
     local file_path="$1" template="$2"
     if [ ! -d "${file_path%/*}" ]; then
-        echo "✗ Директория '${file_path%/*}' не существует — файл не может быть создан"
+        echo "Folder '${file_path%/*}' does not exist: the file cannot be created"
         return 1
     fi
     if [ -f "$file_path" ]; then
-        echo "✓ Файл '$file_path' существует"
+        echo "File '$file_path' exists"
         return 0
     fi
-    echo "✗ Файл '$file_path' не найден"
-    if ask_confirm "Создать файл '$file_path'?"; then
+    echo "File '$file_path' not found"
+    if ask_listed q_mkfile "$file_path"; then
         if [ -n "$template" ] && [ -f "$template" ]; then
             cp -- "$template" "$file_path" || return 1
         else
             : > "$file_path" || return 1
         fi
-        echo "  > Файл '$file_path' успешно создан"
+        echo "File '$file_path' created"
         return 0
     fi
-    echo "  > Создание файла отменено"
+    echo "Creation of the file cancelled"
     return 1
+}
+
+# Запущено ли приложение (python -m app.main)
+app_running() {
+    if ! command -v pgrep &>/dev/null; then return 1; fi
+    pgrep -f -- 'm app\.main' &>/dev/null
 }
 
 #################################### Заглушка usbrelay ####################################
@@ -201,48 +560,48 @@ manage_relay_stub() {
     # Заглушка не нужна: сервер (AUTO) или APP_ENV не DEVELOPMENT
     if [ "$AUTO" = true ] || [ "${FINAL[APP_ENV]}" != "DEVELOPMENT" ]; then
         if [ "$st" = stub ]; then
-            note "APP_ENV=${FINAL[APP_ENV]} (AUTO=$AUTO): найдена заглушка $RELAY_BIN — удаляю"
-            run_sudo rm -f -- "$RELAY_BIN" || die "Не удалось удалить заглушку $RELAY_BIN (нужны права sudo). Удалите её вручную."
-            rm -f -- "$STUB_STATE" 2>/dev/null || note "Предупреждение: не удалось удалить $STUB_STATE"
-            note "Заглушка $RELAY_BIN удалена"
+            note "APP_ENV=${FINAL[APP_ENV]} (AUTO=$AUTO): stub found at $RELAY_BIN, removing"
+            run_sudo rm -f -- "$RELAY_BIN" || die d_stub_rm "$RELAY_BIN"
+            rm -f -- "$STUB_STATE" 2>/dev/null || note "Warning: could not remove $STUB_STATE"
+            note "Stub $RELAY_BIN removed"
         fi
         return 0
     fi
 
     # APP_ENV=DEVELOPMENT, обычный режим
     if [ "$st" = foreign ]; then
-        note "APP_ENV=DEVELOPMENT, но $RELAY_BIN — не заглушка (реальный usbrelay): заглушка не ставится"
+        note "APP_ENV=DEVELOPMENT, but $RELAY_BIN is not a stub (real usbrelay): stub is not installed"
         return 0
     fi
 
-    [ -f "$STUB_SRC" ] || die "Не найден $STUB_SRC — он нужен при APP_ENV=DEVELOPMENT."
-    grep -qF -- "$STUB_MARK" "$STUB_SRC" || die "В $STUB_SRC нет маркера '$STUB_MARK': такую заглушку потом нельзя безопасно удалить."
+    [ -f "$STUB_SRC" ] || die d_stub_src "$STUB_SRC"
+    grep -qF -- "$STUB_MARK" "$STUB_SRC" || die d_stub_mark "$STUB_SRC" "$STUB_MARK"
 
-    tmp="$(mktemp)" || die "Не удалось создать временный файл для заглушки."
+    tmp="$(mktemp)" || die d_tmp
     tr -d '\r' < "$STUB_SRC" > "$tmp"   # на случай CRLF (иначе «bad interpreter»)
 
     if [ "$st" = stub ] && [ -x "$RELAY_BIN" ] && cmp -s "$tmp" "$RELAY_BIN"; then
         rm -f -- "$tmp"
-        note "Заглушка $RELAY_BIN уже установлена и актуальна"
+        note "Stub $RELAY_BIN is already installed and up to date"
         return 0
     fi
 
     if [ "$st" = none ]; then
-        if ! ask_confirm "APP_ENV=DEVELOPMENT: установить заглушку usbrelay в $RELAY_BIN (sudo)?"; then
+        if ! ask_listed q_stub "$RELAY_BIN"; then
             rm -f -- "$tmp"
-            note "Установка заглушки отклонена: приложение будет работать без usbrelay"
+            note "Stub installation declined: the application will work without usbrelay"
             return 0
         fi
     else
-        note "Заглушка $RELAY_BIN отличается от $STUB_SRC — обновляю"
+        note "Stub $RELAY_BIN differs from $STUB_SRC, updating"
     fi
 
     if ! run_sudo install -m 755 -- "$tmp" "$RELAY_BIN"; then
         rm -f -- "$tmp"
-        die "Не удалось установить заглушку в $RELAY_BIN (нужны права sudo)."
+        die d_stub_inst "$RELAY_BIN"
     fi
     rm -f -- "$tmp"
-    note "Заглушка usbrelay установлена: $RELAY_BIN (APP_ENV=DEVELOPMENT)"
+    note "usbrelay stub installed: $RELAY_BIN (APP_ENV=DEVELOPMENT)"
 }
 
 #################################### Разбор env-файлов ####################################
@@ -272,9 +631,6 @@ parse_assign() {
     return 0
 }
 
-declare -A TXT_VAL=() ENVF_VAL=() FINAL=() IS_OPT=()
-REQ_NAMES=()
-
 # env.txt: имена до разделителя — обязательные; значения запоминаем все
 load_env_txt() {
     local line in_req=true
@@ -297,6 +653,8 @@ load_envf() {
 #################################### Необязательные переменные и значения по умолчанию ####################################
 # Строки на «#» — комментарии для .env, остальные — имена переменных (порядок = порядок в .env)
 OPT_SPEC=(
+    "# Язык сообщений run.sh (ru, uk, en). Пусто — язык системы"
+    LANGUAGE
     "# Сайт погоды (OPENWEATHERMAP, TOMORROW, OPEN_METEO или MET_NO)"
     SITE_WEATHER
     "# Координаты города для сайта погоды:"
@@ -332,7 +690,8 @@ PATH_VARS=(DB_DIR VENV_DIR LOG_DIR WORK_LOG API_LOG BACKUP)
 # Результат в REPLY (без подпроцессов)
 get_default() {
     case "$1" in
-        SITE_WEATHER)      REPLY="OPENWEATHERMAP" ;;
+        LANGUAGE)          locale_lang ;;
+        SITE_WEATHER)      REPLY="MET_NO" ;;
         LOCATION_LAT)      REPLY="50.4501" ;;
         LOCATION_LON)      REPLY="30.5234" ;;
         DB_DIR)            REPLY="$DIR_PATH" ;;
@@ -356,8 +715,8 @@ get_default() {
     esac
 }
 
-# Запись .env: обязательная часть — из env.txt как есть (значения из существующего .env, если есть),
-# необязательная — из таблицы выше. Ключи из окружения в файл не попадают.
+# Запись .env: обязательная часть — из env.txt как есть, необязательная — из таблицы выше.
+# Значения берутся из итоговых FINAL.
 write_env_file() {
     local tmp="$ENV_FILE.tmp" line v s
     (
@@ -366,8 +725,7 @@ write_env_file() {
             while IFS= read -r line || [ -n "$line" ]; do
                 if [[ $line =~ $RE_SEP ]]; then break; fi
                 if parse_assign "$line"; then
-                    v="${ENVF_VAL[$P_NAME]:-}"
-                    if [ -z "$v" ]; then v="$P_VAL"; fi
+                    v="${FINAL[$P_NAME]:-$P_VAL}"
                     printf "%s = '%s'%s\n" "$P_NAME" "$v" "$P_TAIL"
                 else
                     printf '%s\n' "${line%$'\r'}"
@@ -385,9 +743,54 @@ write_env_file() {
     mv -f -- "$tmp" "$ENV_FILE"
 }
 
+# Проверка записанного .env: все переменные на месте и значения совпадают с итоговыми
+verify_env_file() {
+    local line n ok=true
+    local -A seen=()
+    [ -f "$ENV_FILE" ] || return 1
+    while IFS= read -r line || [ -n "$line" ]; do
+        if parse_assign "$line"; then seen["$P_NAME"]="$P_VAL"; fi
+    done < "$ENV_FILE"
+    for n in "${REQ_NAMES[@]}" "${OPT_NAMES[@]}"; do
+        if [ "${seen[$n]-__none__}" != "${FINAL[$n]-}" ]; then ok=false; fi
+    done
+    [ "$ok" = true ]
+}
+
+# Очистка env.txt: в обязательной части (VERSION) всё как есть, в необязательной значения обнуляются,
+# имена и комментарии остаются. Файл переписывается, только если в нём были значения.
+clear_env_txt() {
+    local tmp="$ENV_TXT.tmp" line in_req=true changed=false
+    {
+        while IFS= read -r line || [ -n "$line" ]; do
+            if [[ $line =~ $RE_SEP ]]; then
+                in_req=false
+                printf '%s\n' "${line%$'\r'}"
+            elif [ "$in_req" = false ] && parse_assign "$line"; then
+                if [ -n "$P_VAL" ]; then changed=true; fi
+                printf "%s = ''%s\n" "$P_NAME" "$P_TAIL"
+            else
+                printf '%s\n' "${line%$'\r'}"
+            fi
+        done < "$ENV_TXT"
+    } > "$tmp"
+    if [ "$changed" = true ]; then
+        chmod --reference="$ENV_TXT" -- "$tmp" 2>/dev/null || true
+        if mv -f -- "$tmp" "$ENV_TXT"; then
+            note "run/env.txt cleared (values moved to .env)"
+        else
+            rm -f -- "$tmp"
+            note "Warning: could not clear run/env.txt"
+        fi
+    else
+        rm -f -- "$tmp"
+    fi
+    return 0
+}
+
 # Точечная замена APP_ENV в существующем .env (остальное содержимое не меняется, права сохраняются)
 set_app_env_in_file() {
-    local new="$1" tmp="$ENV_FILE.tmp"
+    local new="$1" tmp="$ENV_FILE.tmp" found line
     (
         umask 077
         found=false
@@ -407,285 +810,451 @@ set_app_env_in_file() {
     mv -f -- "$tmp" "$ENV_FILE"
 }
 
-######################################## Загрузка конфигурации ########################################
-note "СТАРТ RUN"
-
-[ -f "$ENV_TXT" ] || die "Не найден файл $ENV_TXT (запускайте run.sh из корня проекта)."
-load_env_txt
-[ "${#REQ_NAMES[@]}" -gt 0 ] || die "В $ENV_TXT не найдено ни одной обязательной переменной."
-case " ${REQ_NAMES[*]} " in
-    *" VERSION "*) ;;
-    *) die "В обязательной части $ENV_TXT должна быть переменная VERSION." ;;
-esac
-
-# 1. Что есть в окружении
-env_missing=()
-other_filled=0
-for n in "${REQ_NAMES[@]}"; do
-    if [ -n "${!n:-}" ]; then
-        if [ "$n" != "VERSION" ]; then other_filled=$((other_filled + 1)); fi
-    else
-        env_missing+=("$n")
+#################################### Параметр -new: общий сброс ####################################
+reset_add() {
+    if [ -e "$2" ] || [ -L "$2" ]; then
+        NEW_CAT+=("$1")
+        NEW_SRC+=("$2")
     fi
-done
-if [ -n "${VERSION:-}" ] && [ "$other_filled" -ge 1 ]; then AUTO=true; fi
-if [ "$AUTO" = true ]; then note "Режим: автоматический (сервер)"; else note "Режим: обычный (вопросы в терминал)"; fi
+}
 
-# 2. Недостающие обязательные: .env, затем env.txt
-SOURCE="окружение"
-from_txt=0
-HAVE_ENVF=false
-if [ "${#env_missing[@]}" -gt 0 ]; then
-    SOURCE="файлы"
-    if [ "${#env_missing[@]}" -eq "${#REQ_NAMES[@]}" ]; then
-        note "В окружении нет ни одной обязательной переменной."
-    else
-        note "В окружении нет обязательных переменных: ${env_missing[*]}"
-    fi
-    if [ -f "$ENV_FILE" ]; then
-        load_envf
-        HAVE_ENVF=true
-        note "Найден файл $ENV_FILE"
-    else
-        note "Файл $ENV_FILE не найден"
-    fi
-    still=()
-    for n in "${env_missing[@]}"; do
-        if [ -n "${ENVF_VAL[$n]:-}" ]; then
-            FINAL["$n"]="${ENVF_VAL[$n]}"
-        elif [ -n "${TXT_VAL[$n]:-}" ]; then
-            FINAL["$n"]="${TXT_VAL[$n]}"
-            from_txt=$((from_txt + 1))
-            note "$n взята из $ENV_TXT"
-        elif [[ $n == *_API_KEY ]]; then
-            # Ключ погоды может быть пустым: его наличие проверяется в шаге 8 по выбранному SITE_WEATHER
-            FINAL["$n"]=""
-        else
-            still+=("$n")
-        fi
+do_reset() {
+    local ver prefix db_dir db_name log_dir backup f base ts archive i n dest stub_found=false
+    local work_log api_log
+
+    if [ "$AUTO" = true ]; then fail new_auto; fi
+    if ! has_terminal; then fail need_tty; fi
+    if app_running; then fail app_running; fi
+
+    # Пути берём из .env максимально терпимо: при испорченных настройках сброс тоже должен работать.
+    ver="${ENVF_VAL[VERSION]:-${TXT_VAL[VERSION]:-}}"
+    prefix=""
+    if [[ $ver =~ $RE_VER ]]; then prefix="${ver//./_}_"; fi
+    db_dir="${ENVF_VAL[DB_DIR]:-$DIR_PATH}"
+    db_name="${ENVF_VAL[DB_NAME]:-${prefix}climate_data.sqlite3}"
+    log_dir="${ENVF_VAL[LOG_DIR]:-$DIR_PATH/logs}"
+    backup="${ENVF_VAL[BACKUP]:-$DIR_PATH/backup}"
+    work_log="${ENVF_VAL[WORK_LOG]:-$log_dir/work_log.log}"
+    api_log="${ENVF_VAL[API_LOG]:-$log_dir/api_log.log}"
+
+    NEW_SRC=()
+    NEW_CAT=()
+    reset_add env "$ENV_FILE"
+    for f in "$db_dir/$db_name" "$db_dir/$db_name-wal" "$db_dir/$db_name-shm" "$db_dir/$db_name-journal"; do
+        reset_add db "$f"
     done
-    if [ "${#still[@]}" -gt 0 ]; then
-        die "Не заполнены обязательные переменные: ${still[*]}. Задайте их в окружении, в .env или в run/env.txt и перезапустите."
-    fi
-    for n in "${env_missing[@]}"; do export "$n=${FINAL[$n]}"; done
+    for f in "$backup"/*; do
+        [ -f "$f" ] || continue
+        case "$f" in
+            *.sqlite3|*.db) reset_add backup "$f" ;;
+        esac
+    done
+    for base in "$work_log" "$api_log" "$log_dir/run_log.log"; do
+        for f in "$base"*; do
+            if [ -f "$f" ]; then reset_add logs "$f"; fi
+        done
+    done
+    relay_state
+    if [ "$REPLY" = stub ]; then stub_found=true; fi
 
-    # Неизвестные имена в .env и расхождение версии
+    if [ "${#NEW_SRC[@]}" -eq 0 ] && [ "$stub_found" = false ]; then
+        msg new_nothing
+        tty_out "$REPLY"
+    else
+        printf -v ts '%(%Y%m%d_%H%M%S)T' -1
+        archive="$backup/reset_$ts"
+        msg new_title
+        tty_out "$REPLY"
+        for n in "${NEW_SRC[@]}"; do tty_out "  - $n"; done
+        if [ "$stub_found" = true ]; then
+            msg new_stub "$RELAY_BIN"
+            tty_out "  - $REPLY"
+        fi
+        msg new_archive "$archive"
+        tty_out "$REPLY"
+        msg new_keep "${ENVF_VAL[VENV_DIR]:-$DIR_PATH/venv}/${ENVF_VAL[VENV_NAME]:-venv_smart_home_climate}"
+        tty_out "$REPLY"
+
+        msg new_confirm
+        if ! tty_read "$REPLY" || [ "$REPLY" != "NEW" ]; then
+            msg new_cancel
+            tty_out "$REPLY"
+            exit 0
+        fi
+
+        for i in "${!NEW_SRC[@]}"; do
+            dest="$archive/${NEW_CAT[$i]}"
+            if ! { mkdir -p -- "$dest" && mv -- "${NEW_SRC[$i]}" "$dest/"; }; then
+                fail d_new_mv "${NEW_SRC[$i]}"
+            fi
+        done
+        if [ "$stub_found" = true ]; then
+            run_sudo rm -f -- "$RELAY_BIN" || fail d_stub_rm "$RELAY_BIN"
+            rm -f -- "$STUB_STATE" 2>/dev/null || true
+        fi
+        note "RESET: ${#NEW_SRC[@]} item(s) moved to $archive"
+        msg new_done "$archive"
+        tty_out "$REPLY"
+    fi
+
+    # Дальше старт как с нуля: окружение и старый .env не используются
+    for n in "${REQ_NAMES[@]}" "${OPT_NAMES[@]}"; do unset "$n" || true; done
+    IGNORE_ENV=true
+    FORCE_FIRST=true
+    ENVF_VAL=()
+    HAVE_ENVF=false
+}
+
+#################################### Определение первого старта ####################################
+detect_first_start() {
+    local n
+    FIRST_START=false
+    if [ "$FORCE_FIRST" = true ]; then
+        FIRST_START=true
+        return 0
+    fi
+    if [ -f "$ENV_FILE" ]; then return 0; fi
+    for n in "${REQ_NAMES[@]}" "${OPT_NAMES[@]}"; do
+        if [ "$n" != "LANGUAGE" ] && [ -n "${!n:-}" ]; then return 0; fi
+    done
+    FIRST_START=true
+    return 0
+}
+
+#################################### Итоговая конфигурация ####################################
+resolve_config() {
+    local n cand site
+    FINAL=()
+    defaulted=()
+    FIXED=false
+    APP_ENV_DEFAULTED=false
+    APP_ENV_DOWNGRADED=false
+
+    # 1. Обязательные: окружение → .env → env.txt
+    for n in "${REQ_NAMES[@]}"; do
+        cand=""
+        if [ "$IGNORE_ENV" != true ] && [ -n "${!n:-}" ]; then
+            cand="${!n}"
+        else
+            cand="${ENVF_VAL[$n]:-}"
+            if [ -z "$cand" ]; then cand="${TXT_VAL[$n]:-}"; fi
+        fi
+        if [ -z "$cand" ]; then die req_missing "$n"; fi
+        FINAL["$n"]="$cand"
+    done
+
+    # 2. VERSION → префикс имени БД (3.0.0 → 3_0_0_)
+    VERSION="${FINAL[VERSION]}"
+    [[ $VERSION =~ $RE_VER ]] || die bad_version "$VERSION"
+    VERSION_PREFIX="${VERSION//./_}_"
+    if [ -n "${ENVF_VAL[VERSION]:-}" ] && [ -n "${TXT_VAL[VERSION]:-}" ] && [ "${ENVF_VAL[VERSION]}" != "${TXT_VAL[VERSION]}" ]; then
+        note "Warning: VERSION in .env ('${ENVF_VAL[VERSION]}') differs from env.txt ('${TXT_VAL[VERSION]}')"
+    fi
     for n in "${!ENVF_VAL[@]}"; do
         if [ -z "${IS_OPT[$n]:-}" ] && [[ " ${REQ_NAMES[*]} " != *" $n "* ]]; then
-            note "Предупреждение: переменная $n из .env неизвестна и игнорируется"
+            note "Warning: variable $n from .env is unknown and ignored"
         fi
     done
-    if [ -n "${ENVF_VAL[VERSION]:-}" ] && [ -n "${TXT_VAL[VERSION]:-}" ] && [ "${ENVF_VAL[VERSION]}" != "${TXT_VAL[VERSION]}" ]; then
-        note "Предупреждение: VERSION в .env ('${ENVF_VAL[VERSION]}') отличается от env.txt ('${TXT_VAL[VERSION]}')"
-    fi
-fi
 
-# 3. VERSION → префикс имени БД (3.0.0 → 3_0_0_)
-re_ver='^[0-9]+(\.[0-9]+)*$'
-[[ $VERSION =~ $re_ver ]] || die "Некорректная VERSION='$VERSION' (ожидается вид 3.0.0)."
-VERSION_PREFIX="${VERSION//./_}_"
-
-# 4. Необязательные: окружение → (.env → env.txt, если источник не окружение) → по умолчанию
-FIXED=false
-defaulted=()
-for n in "${OPT_NAMES[@]}"; do
-    cand=""
-    if [ -n "${!n:-}" ]; then
-        cand="${!n}"
-    elif [ "$SOURCE" != "окружение" ]; then
-        cand="${ENVF_VAL[$n]:-}"
-        if [ -z "$cand" ]; then cand="${TXT_VAL[$n]:-}"; fi
-    fi
-    if [ -z "$cand" ]; then
-        get_default "$n"
-        cand="$REPLY"
-        defaulted+=("$n")
-    fi
-    FINAL["$n"]="$cand"
-done
-if [ "${#defaulted[@]}" -gt 0 ]; then note "Значения по умолчанию: ${defaulted[*]}"; fi
-
-# 5. PROJECT_DIR: .env/окружение от другого проекта → сбрасываем только пути
-if [ "${FINAL[PROJECT_DIR]}" != "$DIR_PATH" ]; then
-    note "PROJECT_DIR='${FINAL[PROJECT_DIR]}' не совпадает с папкой проекта '$DIR_PATH'"
-    if ask_confirm "PROJECT_DIR='${FINAL[PROJECT_DIR]}', а проект в '$DIR_PATH'. Заменить пути (${PATH_VARS[*]}) на значения по умолчанию?"; then
-        FINAL[LOG_DIR]="$DIR_PATH/logs"
-        for n in "${PATH_VARS[@]}"; do
+    # 3. Необязательные: окружение → .env → env.txt → по умолчанию
+    for n in "${OPT_NAMES[@]}"; do
+        cand=""
+        if [ "$IGNORE_ENV" != true ] && [ -n "${!n:-}" ]; then
+            cand="${!n}"
+        else
+            cand="${ENVF_VAL[$n]:-}"
+            if [ -z "$cand" ]; then cand="${TXT_VAL[$n]:-}"; fi
+        fi
+        if [ -z "$cand" ]; then
             get_default "$n"
-            FINAL["$n"]="$REPLY"
-        done
-        FIXED=true
-        note "Пути сброшены на значения по умолчанию"
-    else
-        die "Пути указывают на другой проект ('${FINAL[PROJECT_DIR]}'). Исправьте PROJECT_DIR или пути."
-    fi
-    FINAL[PROJECT_DIR]="$DIR_PATH"
-fi
+            cand="$REPLY"
+            defaulted+=("$n")
+        fi
+        FINAL["$n"]="$cand"
+    done
+    if [ "${#defaulted[@]}" -gt 0 ]; then note "Defaults used: ${defaulted[*]}"; fi
 
-# 6. DB_NAME = префикс VERSION + базовая часть имени (старый префикс версии отрезается)
-db_base="${FINAL[DB_NAME]}"
-re_pref='^[0-9]+(_[0-9]+)+_'
-if [[ $db_base =~ $re_pref ]]; then db_base="${db_base#"${BASH_REMATCH[0]}"}"; fi
-if [ -z "$db_base" ] || [[ $db_base == */* ]]; then db_base="climate_data.sqlite3"; fi
-if [ "${FINAL[DB_NAME]}" != "${VERSION_PREFIX}${db_base}" ]; then
-    note "DB_NAME исправлено: '${FINAL[DB_NAME]}' → '${VERSION_PREFIX}${db_base}'"
-    FINAL[DB_NAME]="${VERSION_PREFIX}${db_base}"
-    FIXED=true
-fi
+    # 3a. Язык: ru, uk или en
+    normalize_lang "${FINAL[LANGUAGE]}"
+    FINAL[LANGUAGE]="$REPLY"
+    set_language "$REPLY"
 
-# 7. PYTHON_VERSION подставляется в команды — проверяем формат
-re_py='^3\.[0-9]+$'
-if ! [[ ${FINAL[PYTHON_VERSION]} =~ $re_py ]]; then
-    note "PYTHON_VERSION='${FINAL[PYTHON_VERSION]}' некорректна, значение по умолчанию: 3.12"
-    FINAL[PYTHON_VERSION]="3.12"
-    FIXED=true
-fi
-
-# 8. Сайт погоды и его ключ
-#    OPENWEATHERMAP и TOMORROW требуют ключ; OPEN_METEO и MET_NO работают без ключа.
-site="${FINAL[SITE_WEATHER]^^}"
-case "$site" in
-    OPENWEATHERMAP|TOMORROW|OPEN_METEO|MET_NO)
-        if [ "$site" != "${FINAL[SITE_WEATHER]}" ]; then FINAL[SITE_WEATHER]="$site"; FIXED=true; fi
-        ;;
-    *)
-        note "SITE_WEATHER='${FINAL[SITE_WEATHER]}' неизвестен (допустимо: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)"
-        if ask_confirm "SITE_WEATHER='${FINAL[SITE_WEATHER]}' неизвестен. Заменить на OPENWEATHERMAP?"; then
-            FINAL[SITE_WEATHER]="OPENWEATHERMAP"
+    # 4. PROJECT_DIR: .env/окружение от другого проекта → сбрасываем только пути
+    if [ "${FINAL[PROJECT_DIR]}" != "$DIR_PATH" ]; then
+        note "PROJECT_DIR='${FINAL[PROJECT_DIR]}' does not match the project folder '$DIR_PATH'"
+        if ask_confirm q_project_dir "${FINAL[PROJECT_DIR]}" "$DIR_PATH" "${PATH_VARS[*]}"; then
+            FINAL[LOG_DIR]="$DIR_PATH/logs"
+            for n in "${PATH_VARS[@]}"; do
+                get_default "$n"
+                FINAL["$n"]="$REPLY"
+            done
             FIXED=true
+            note "Paths reset to defaults"
         else
-            die "Неизвестный SITE_WEATHER='${FINAL[SITE_WEATHER]}' (допустимо: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)."
+            die d_project_dir "${FINAL[PROJECT_DIR]}"
         fi
-        ;;
-esac
-case "${FINAL[SITE_WEATHER]}" in
-    OPENWEATHERMAP|TOMORROW)
-        key_name="${FINAL[SITE_WEATHER]}_API_KEY"
-        if [ -z "${!key_name:-}" ]; then
-            die "Для SITE_WEATHER=${FINAL[SITE_WEATHER]} не заполнен $key_name (заполните его или смените SITE_WEATHER)."
-        fi
-        ;;
-    *)
-        note "SITE_WEATHER=${FINAL[SITE_WEATHER]}: API-ключ не требуется"
-        ;;
-esac
-
-# 8a. APP_ENV: регистр; DEVELOPMENT при реальном usbrelay → STAGING
-#     (в режиме AUTO ничего не меняем: заглушка там не ставится, а наша заглушка удаляется)
-FINAL[APP_ENV]="${FINAL[APP_ENV]^^}"
-for n in "${defaulted[@]}"; do
-    if [ "$n" = "APP_ENV" ]; then APP_ENV_DEFAULTED=true; fi
-done
-if [ "${FINAL[APP_ENV]}" = "DEVELOPMENT" ] && [ "$AUTO" != true ]; then
-    relay_state
-    if [ "$REPLY" = foreign ]; then
-        if [ "$APP_ENV_DEFAULTED" = true ]; then
-            note "APP_ENV по умолчанию DEVELOPMENT (первый запуск), но $RELAY_BIN — реальный usbrelay: заглушка не ставится, при следующем запуске APP_ENV станет STAGING"
-        else
-            note "Предупреждение: APP_ENV=DEVELOPMENT, но $RELAY_BIN — реальный usbrelay. APP_ENV заменён на STAGING"
-            FINAL[APP_ENV]="STAGING"
-            APP_ENV_DOWNGRADED=true
-        fi
-    elif [ "$APP_ENV_DEFAULTED" = true ]; then
-        note "APP_ENV не задан: по умолчанию DEVELOPMENT (обычный режим), будет предложена заглушка usbrelay"
+        FINAL[PROJECT_DIR]="$DIR_PATH"
     fi
+
+    # 5. DB_NAME = префикс VERSION + базовая часть имени (старый префикс версии отрезается)
+    local db_base="${FINAL[DB_NAME]}" re_pref='^[0-9]+(_[0-9]+)+_'
+    if [[ $db_base =~ $re_pref ]]; then db_base="${db_base#"${BASH_REMATCH[0]}"}"; fi
+    if [ -z "$db_base" ] || [[ $db_base == */* ]]; then db_base="climate_data.sqlite3"; fi
+    if [ "${FINAL[DB_NAME]}" != "${VERSION_PREFIX}${db_base}" ]; then
+        note "DB_NAME corrected: '${FINAL[DB_NAME]}' -> '${VERSION_PREFIX}${db_base}'"
+        FINAL[DB_NAME]="${VERSION_PREFIX}${db_base}"
+        FIXED=true
+    fi
+
+    # 6. PYTHON_VERSION подставляется в команды — проверяем формат
+    local re_py='^3\.[0-9]+$'
+    if ! [[ ${FINAL[PYTHON_VERSION]} =~ $re_py ]]; then
+        note "PYTHON_VERSION='${FINAL[PYTHON_VERSION]}' is invalid, default used: 3.12"
+        FINAL[PYTHON_VERSION]="3.12"
+        FIXED=true
+    fi
+
+    # 7. Сайт погоды. Ключи ему больше не нужны здесь (OPEN_METEO и MET_NO работают без ключа).
+    site="${FINAL[SITE_WEATHER]^^}"
+    case "$site" in
+        OPENWEATHERMAP|TOMORROW|OPEN_METEO|MET_NO)
+            if [ "$site" != "${FINAL[SITE_WEATHER]}" ]; then FINAL[SITE_WEATHER]="$site"; FIXED=true; fi
+            ;;
+        *)
+            note "SITE_WEATHER='${FINAL[SITE_WEATHER]}' is unknown (allowed: OPENWEATHERMAP, TOMORROW, OPEN_METEO, MET_NO)"
+            if ask_confirm q_site "${FINAL[SITE_WEATHER]}"; then
+                FINAL[SITE_WEATHER]="MET_NO"
+                FIXED=true
+            else
+                die d_site "${FINAL[SITE_WEATHER]}"
+            fi
+            ;;
+    esac
+
+    # 8. APP_ENV: регистр; DEVELOPMENT при реальном usbrelay → STAGING
+    #    (в режиме AUTO ничего не меняем: заглушка там не ставится, а наша заглушка удаляется)
+    FINAL[APP_ENV]="${FINAL[APP_ENV]^^}"
+    for n in "${defaulted[@]}"; do
+        if [ "$n" = "APP_ENV" ]; then APP_ENV_DEFAULTED=true; fi
+    done
+    if [ "${FINAL[APP_ENV]}" = "DEVELOPMENT" ] && [ "$AUTO" != true ]; then
+        relay_state
+        if [ "$REPLY" = foreign ]; then
+            if [ "$APP_ENV_DEFAULTED" = true ]; then
+                note "APP_ENV defaults to DEVELOPMENT (first start), but $RELAY_BIN is a real usbrelay: stub not installed, APP_ENV becomes STAGING on the next start"
+            else
+                note "Warning: APP_ENV=DEVELOPMENT, but $RELAY_BIN is a real usbrelay. APP_ENV replaced with STAGING"
+                FINAL[APP_ENV]="STAGING"
+                APP_ENV_DOWNGRADED=true
+            fi
+        elif [ "$APP_ENV_DEFAULTED" = true ]; then
+            note "APP_ENV not set: DEVELOPMENT by default (normal mode), the usbrelay stub will be offered"
+        fi
+    fi
+
+    # 9. Экспорт (LANGUAGE не экспортируем: это переменная gettext, приложение читает её из .env)
+    for n in "${OPT_NAMES[@]}"; do
+        if [ "$n" != "LANGUAGE" ]; then export "$n=${FINAL[$n]}"; fi
+    done
+    export VERSION
+    RUN_LOG="${RUN_LOG:-${FINAL[LOG_DIR]}/run_log.log}"
+    export RUN_LOG
+}
+
+#################################### Согласие на первый старт ####################################
+confirm_first_start() {
+    msg first_title;  tty_out "$REPLY"
+    msg first_python "${FINAL[PYTHON_VERSION]}";               tty_out "  - $REPLY"
+    msg first_venv "${FINAL[VENV_DIR]}/${FINAL[VENV_NAME]}";   tty_out "  - $REPLY"
+    msg first_env;                                             tty_out "  - $REPLY"
+    msg first_logs "${FINAL[LOG_DIR]}";                        tty_out "  - $REPLY"
+    msg first_db "${FINAL[DB_DIR]}/${FINAL[DB_NAME]}" "${FINAL[BACKUP]}"; tty_out "  - $REPLY"
+    if [ "${FINAL[APP_ENV]}" = "DEVELOPMENT" ] && [ "$AUTO" != true ]; then
+        msg first_stub "$RELAY_BIN"
+        tty_out "  - $REPLY"
+    fi
+    note "First start: Python ${FINAL[PYTHON_VERSION]}, venv ${FINAL[VENV_DIR]}/${FINAL[VENV_NAME]}, .env, logs ${FINAL[LOG_DIR]}, database ${FINAL[DB_DIR]}/${FINAL[DB_NAME]}"
+    if ask_confirm first_ask; then
+        PRECONSENT=true
+        note "First-start list approved"
+        return 0
+    fi
+    msg first_declined
+    printf '%s\n' "$REPLY" >&4
+    exit 1
+}
+
+# .env после согласия: создать или обновить, проверить и очистить env.txt
+finish_env_write() {
+    HAVE_ENVF=true
+    if verify_env_file; then
+        clear_env_txt
+    else
+        note "Warning: the written .env failed verification, run/env.txt left unchanged"
+    fi
+}
+
+handle_env_file() {
+    local n need_update=false
+    if [ "$HAVE_ENVF" = false ]; then
+        if ask_listed q_envcreate; then
+            write_env_file || die d_env_write "$ENV_FILE"
+            note ".env created"
+            finish_env_write
+        else
+            note ".env not created: values are used for this run only"
+        fi
+        return 0
+    fi
+    if [ "$FIXED" = true ]; then need_update=true; fi
+    for n in "${REQ_NAMES[@]}" "${OPT_NAMES[@]}"; do
+        if [ -z "${ENVF_VAL[$n]:-}" ]; then need_update=true; fi
+    done
+    if [ "$need_update" = true ]; then
+        if [ "$AUTO" = true ]; then
+            note "AUTO: .env lacks variables or they were corrected; the file is not changed, values are applied to this process"
+        elif ask_confirm q_envrewrite; then
+            write_env_file || die d_env_write "$ENV_FILE"
+            note ".env updated"
+            finish_env_write
+        fi
+    fi
+    return 0
+}
+
+######################################## Старт ########################################
+# Язык до чтения файлов: окружение → система
+early_language
+
+for arg in "$@"; do
+    case "$arg" in
+        -new|--new)   MODE_NEW=true ;;
+        -calc|--calc) MODE_CALC=true ;;
+        -h|--help)
+            msg usage
+            printf '%s\n' "$REPLY" >&3
+            exit 0
+            ;;
+        *)
+            msg bad_arg "$arg"
+            printf '❌ %s\n' "$REPLY" >&4
+            msg usage
+            printf '%s\n' "$REPLY" >&4
+            exit 1
+            ;;
+    esac
+done
+if [ "$MODE_NEW" = true ] && [ "$MODE_CALC" = true ]; then fail both_modes; fi
+if [ "$MODE_CALC" = true ]; then
+    [ -f "$CALC_FILE" ] || fail calc_missing "$CALC_FILE"
+    if app_running; then fail app_running; fi
 fi
 
-# 9. Экспорт
-for n in "${OPT_NAMES[@]}"; do export "$n=${FINAL[$n]}"; done
-export VERSION
-RUN_LOG="${RUN_LOG:-$LOG_DIR/run_log.log}"
-export RUN_LOG
+note "RUN START"
+if [ "$AUTO" = true ]; then note "Mode: automatic (server)"; else note "Mode: normal (questions in the terminal)"; fi
 
-# 10. Запись .env (только когда источник — файлы; значения из окружения на диск не пишутся)
-if [ "$SOURCE" != "окружение" ]; then
-    if [ "$HAVE_ENVF" = false ]; then
-        if ask_confirm "Файл .env не найден. Создать его из $ENV_TXT?"; then
-            write_env_file || die "Не удалось записать $ENV_FILE"
-            note "Файл .env создан из $ENV_TXT"
-        else
-            note "Файл .env не создан; переменные взяты из $ENV_TXT только для этого запуска"
-        fi
+[ -f "$ENV_TXT" ] || fail no_env_txt "$ENV_TXT"
+load_env_txt
+case " ${REQ_NAMES[*]} " in
+    *" VERSION "*) ;;
+    *) fail no_version_section "$ENV_TXT" ;;
+esac
+if [ -f "$ENV_FILE" ]; then
+    load_envf
+    HAVE_ENVF=true
+    note "Found $ENV_FILE"
+else
+    note "$ENV_FILE not found"
+fi
+early_language
+
+if [ "$MODE_NEW" = true ]; then
+    do_reset
+    early_language
+fi
+
+detect_first_start
+if [ "$FIRST_START" != true ]; then LOG_ALLOWED=true; fi
+
+resolve_config
+
+if [ "$FIRST_START" = true ]; then
+    confirm_first_start
+    LOG_ALLOWED=true
+fi
+
+handle_env_file
+
+# APP_ENV DEVELOPMENT → STAGING: точечно, без вопросов (остальной .env не трогаем)
+if [ "$APP_ENV_DOWNGRADED" = true ] && [ -f "$ENV_FILE" ] && [ "$AUTO" != true ]; then
+    if set_app_env_in_file "STAGING"; then
+        note "APP_ENV replaced with STAGING in $ENV_FILE"
     else
-        need_update=false
-        if [ "$from_txt" -gt 0 ] || [ "$FIXED" = true ]; then need_update=true; fi
-        for n in "${OPT_NAMES[@]}"; do
-            if [ -z "${ENVF_VAL[$n]:-}" ]; then need_update=true; fi
-        done
-        if [ "$need_update" = true ]; then
-            if [ "$AUTO" = true ]; then
-                note "АВТО: в .env не хватает переменных или они исправлены; файл не изменяется, значения применены в окружении процесса"
-            elif ask_confirm "В .env не хватает переменных или значения исправлены. Перезаписать .env по шаблону (неизвестные переменные будут удалены)?"; then
-                write_env_file || die "Не удалось записать $ENV_FILE"
-                note "Файл .env обновлён"
-            fi
-        fi
-    fi
-
-    # APP_ENV DEVELOPMENT → STAGING: точечно, без вопросов (остальной .env не трогаем)
-    if [ "$APP_ENV_DOWNGRADED" = true ] && [ -f "$ENV_FILE" ]; then
-        if set_app_env_in_file "STAGING"; then
-            note "В $ENV_FILE APP_ENV заменён на STAGING"
-        else
-            note "Предупреждение: не удалось обновить APP_ENV в $ENV_FILE"
-        fi
+        note "Warning: could not update APP_ENV in $ENV_FILE"
     fi
 fi
 
 ################################ Журнал и вывод ################################
-open_log || die "Не удалось открыть журнал ${RUN_LOG:-}"
+open_log || die d_log "${RUN_LOG:-}"
 exec 1>> "$RUN_LOG" 2>&1
 
+LOG_DIR="${FINAL[LOG_DIR]}"
+WORK_LOG="${FINAL[WORK_LOG]}"
+API_LOG="${FINAL[API_LOG]}"
+DB_DIR="${FINAL[DB_DIR]}"
+BACKUP="${FINAL[BACKUP]}"
+VENV_DIR="${FINAL[VENV_DIR]}"
+VENV_NAME="${FINAL[VENV_NAME]}"
 VENV_PATH="$VENV_DIR/$VENV_NAME"
-PY="python${PYTHON_VERSION}"
+PY="python${FINAL[PYTHON_VERSION]}"
 
 ############################ Папки и файлы логов/БД ############################
-check_or_create_dir "$LOG_DIR"  || die "Папка логов $LOG_DIR не создана"
-check_or_create_file "$WORK_LOG" "run/log.txt" || die "Файл $WORK_LOG не создан"
-check_or_create_file "$API_LOG"  "run/log.txt" || die "Файл $API_LOG не создан"
-check_or_create_dir "$DB_DIR"   || die "Папка БД $DB_DIR не создана"
-check_or_create_dir "$BACKUP"   || die "Папка backup $BACKUP не создана"
+check_or_create_dir "$LOG_DIR"  || die d_dir "$LOG_DIR"
+check_or_create_file "$WORK_LOG" "run/log.txt" || die d_file "$WORK_LOG"
+check_or_create_file "$API_LOG"  "run/log.txt" || die d_file "$API_LOG"
+check_or_create_dir "$DB_DIR"   || die d_dir "$DB_DIR"
+check_or_create_dir "$BACKUP"   || die d_dir "$BACKUP"
 
 ############################ Реле usbrelay ############################
 manage_relay_stub
 
 ########################### Проверка Python ###########################
 if command -v "$PY" &>/dev/null; then
-    echo "✅ $PY уже установлен."
+    echo "OK: $PY is already installed."
 else
-    echo "❌ $PY не найден."
+    echo "$PY not found."
     if [ "$AUTO" = true ]; then
-        die "$PY не найден. В автоматическом режиме Python не устанавливается."
+        die d_py_auto "$PY"
     fi
-    ask_confirm "Установить $PY?" || die "Установка $PY отменена."
-    sudo apt-get update
-    sudo apt-get install -y software-properties-common
-    sudo add-apt-repository -y ppa:deadsnakes/ppa
-    sudo apt-get update
-    sudo apt-get install -y "$PY" "${PY}-venv" "${PY}-dev"
+    ask_listed q_python "$PY" || die d_py_cancel "$PY"
+    run_sudo apt-get update
+    run_sudo apt-get install -y software-properties-common
+    run_sudo add-apt-repository -y ppa:deadsnakes/ppa
+    run_sudo apt-get update
+    run_sudo apt-get install -y "$PY" "${PY}-venv" "${PY}-dev"
 fi
 
 ############################ Проверка пакетов ############################
-install_package "python3-pip" "pip3 --version" || die "pip не установлен."
-install_package "${PY}-venv ${PY}-dev" "$PY -c 'import ensurepip, venv'" || die "Модуль venv для $PY не установлен."
+install_package "python3-pip" "pip3 --version" || die d_pip
+install_package "${PY}-venv ${PY}-dev" "$PY -c 'import ensurepip, venv'" || die d_venv_mod "$PY"
 
 ########################### Виртуальное окружение ###########################
-check_or_create_dir "$VENV_DIR" || die "Папка $VENV_DIR не создана"
-if [ ! -d "$VENV_PATH" ]; then
-    echo "Виртуальное окружение $VENV_NAME не существует."
-    if ask_confirm "Создать виртуальное окружение $VENV_NAME ?"; then
+check_or_create_dir "$VENV_DIR" || die d_dir "$VENV_DIR"
+if [ ! -f "$VENV_PATH/bin/activate" ]; then
+    echo "Virtual environment $VENV_NAME does not exist."
+    if ask_listed q_venv "$VENV_PATH"; then
         "$PY" -m venv "$VENV_PATH"
-        echo "Виртуальное окружение успешно создано в $VENV_PATH"
+        echo "Virtual environment created in $VENV_PATH"
         # shellcheck disable=SC1091
         source "$VENV_PATH/bin/activate"
         if [ -f "requirements.txt" ]; then
             pip install -r requirements.txt
         fi
     else
-        echo "Виртуальное окружение не создано."
+        echo "Virtual environment not created."
     fi
 else
-    echo "Виртуальное окружение $VENV_NAME уже существует в $VENV_DIR"
+    echo "Virtual environment $VENV_NAME already exists in $VENV_DIR"
 fi
 
 ############################### Запуск приложения ###############################
@@ -694,18 +1263,33 @@ if [ -f "$VENV_PATH/bin/activate" ]; then
     source "$VENV_PATH/bin/activate"
 fi
 
-note "СТАРТ run_program.py"
-echo "################################----------- Запуск run_program.py #############################"
+note "RUN run_program.py"
+echo "################################----------- run_program.py #############################"
 "$PY" run/run_program.py
 
-note "СТАРТ migrator.py"
-echo "################################----------- Запуск migrator.py #############################"
+note "RUN migrator.py"
+echo "################################----------- migrator.py #############################"
 "$PY" run/migrator.py
 
-note "СТАРТ main.py"
+# Параметр -calc: резервная копия БД, расчёт и выход без запуска main.py
+if [ "$MODE_CALC" = true ]; then
+    note "Database backup before calculations"
+    "$PY" -c "import sys; sys.path.insert(0, 'run'); import run_program as r; sys.exit(0 if r.create_backup(r.database_file, r.backup_dir) else 1)"
+    note "RUN initial_calculations.py"
+    echo "################################----------- initial_calculations.py #############################"
+    PYTHONPATH="$DIR_PATH${PYTHONPATH:+:$PYTHONPATH}" "$PY" "$CALC_FILE"
+    note "initial_calculations.py finished"
+    trap - ERR
+    exec 1>&3 2>&4 3>&- 4>&- 5<&-
+    msg calc_done
+    printf '%s\n' "$REPLY"
+    exit 0
+fi
+
+note "RUN main.py"
 # Восстановление стандартных потоков (systemd / консоль)
 trap - ERR
 exec 1>&3 2>&4 3>&- 4>&- 5<&-
 
-echo "######################## Пуск основной программы проекта main.py ######################"
+echo "######################## Starting the main program: main.py ######################"
 exec "$PY" -m app.main
